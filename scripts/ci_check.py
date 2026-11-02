@@ -3,18 +3,23 @@
 
 Verifies:
 1. Every folder in skills/ has a SKILL.md.
-2. Frontmatter 'name' matches the folder name, and 'description' is present and <= 1024 chars.
-3. Every SKILL.md has <= 500 lines.
-4. Every .py file compiles without syntax errors (using py_compile).
-5. No __pycache__ directories or .pyc files exist in the repository tree.
-6. No file under skills/ contains an em dash or en dash.
-7. Smoke tests:
+2. Frontmatter conformance for every skill (name matches folder, description present and <= 1024 chars,
+   allowed fields only, compatibility <= 500 chars).
+3. Tool-specific word denylist check in skills/.
+4. No placeholder paths (<this-skill>, <project-bootstrap>) and no command uses 'python ' without the 3.
+5. Every SKILL.md has <= 500 lines.
+6. Every .py file compiles without syntax errors (using py_compile).
+7. No __pycache__ directories or .pyc files exist in the repository tree.
+8. No file under skills/ contains an em dash or en dash.
+9. Smoke tests:
    - validate_profile.py exits 0 on example-nemo profile.
    - render.py exits 0 on example-nemo profile.
    - check_commit_message.py exits 0 on "feat(entry): add keypad" and exits 1 on "Added keypad".
-   - bin/install.js installs one skill per folder in skills/ in a temporary folder.
+   - bin/build-forge.js installs one skill per folder in skills/ in a temporary folder.
+10. Multi-agent link and unlink tests in temporary folders.
 """
 import os
+import re
 import sys
 import shutil
 import tempfile
@@ -26,6 +31,24 @@ try:
     import yaml
 except ImportError:
     sys.exit("PyYAML is required: pip install pyyaml")
+
+TOOL_WORD_DENYLIST = [
+    "str_replace",
+    "ask_user_input",
+    "view tool",
+    "bash tool",
+    "task tool",
+    "CLAUDE.md"
+]
+
+ALLOWED_FRONTMATTER_FIELDS = {
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "metadata",
+    "allowed-tools"
+}
 
 
 def check_skills(skills_dir, errors):
@@ -56,33 +79,69 @@ def check_skills(skills_dir, errors):
         if len(lines) > 500:
             errors.append(f"Rule 3 failure: '{skill_md}' has {len(lines)} lines (maximum allowed is 500).")
 
-        # Rule 2: A SKILL.md frontmatter name differs from folder, or description missing or > 1024 chars
+        # Frontmatter conformance
         if content.startswith("---"):
             parts = content.split("---", 2)
             if len(parts) >= 3:
                 try:
                     fm = yaml.safe_load(parts[1]) or {}
                 except Exception as e:
-                    errors.append(f"Rule 2 failure: Invalid YAML frontmatter in '{skill_md}': {e}")
+                    errors.append(f"Frontmatter parse error in '{skill_md}': {e}")
                     fm = {}
+
+                # Check allowed fields
+                extra_fields = set(fm.keys()) - ALLOWED_FRONTMATTER_FIELDS
+                if extra_fields:
+                    errors.append(f"Frontmatter failure: '{skill_md}' contains disallowed fields: {sorted(extra_fields)}.")
 
                 name = fm.get("name")
                 desc = fm.get("description")
+                compat = fm.get("compatibility")
 
                 if name != item:
-                    errors.append(f"Rule 2 failure: '{skill_md}' frontmatter name '{name}' does not match folder name '{item}'.")
+                    errors.append(f"Frontmatter failure: '{skill_md}' name '{name}' does not match folder '{item}'.")
+                if not name or not re.match(r"^[a-z0-9]+(-[a-z0-9]+)*$", str(name)) or len(str(name)) > 64:
+                    errors.append(f"Frontmatter failure: '{skill_md}' name '{name}' violates Agent Skills naming rules.")
+
                 if not desc:
-                    errors.append(f"Rule 2 failure: '{skill_md}' description is missing.")
+                    errors.append(f"Frontmatter failure: '{skill_md}' description is missing.")
                 elif len(str(desc)) > 1024:
-                    errors.append(f"Rule 2 failure: '{skill_md}' description is {len(str(desc))} characters (maximum allowed is 1024).")
+                    errors.append(f"Frontmatter failure: '{skill_md}' description length {len(str(desc))} > 1024.")
+
+                if compat is not None and len(str(compat)) > 500:
+                    errors.append(f"Frontmatter failure: '{skill_md}' compatibility length {len(str(compat))} > 500.")
             else:
-                errors.append(f"Rule 2 failure: Malformed frontmatter in '{skill_md}'.")
+                errors.append(f"Frontmatter failure: Malformed frontmatter in '{skill_md}'.")
         else:
-            errors.append(f"Rule 2 failure: '{skill_md}' missing leading '---' frontmatter boundary.")
+            errors.append(f"Frontmatter failure: '{skill_md}' missing leading '---' frontmatter boundary.")
+
+        # Denylist check for tool-specific words in SKILL.md
+        for line_num, line in enumerate(lines, 1):
+            for denylisted in TOOL_WORD_DENYLIST:
+                if denylisted.lower() in line.lower():
+                    errors.append(f"Denylist failure: '{skill_md}:{line_num}' contains denylisted term '{denylisted}'.")
+
+            # Check for python without 3 in commands
+            if re.search(r"`python\s+(?!3\b)", line) or re.search(r"^\s*python\s+(?!3\b)", line):
+                errors.append(f"Command failure: '{skill_md}:{line_num}' uses 'python' without 3.")
+
+
+def check_skill_placeholders(skills_dir, errors):
+    for root, dirs, files in os.walk(skills_dir):
+        for f in files:
+            file_path = os.path.join(root, f)
+            try:
+                with open(file_path, "r", encoding="utf-8") as fh:
+                    for line_num, line in enumerate(fh, 1):
+                        if "<this-skill>" in line:
+                            errors.append(f"Placeholder failure: '{file_path}:{line_num}' contains '<this-skill>'.")
+                        if "<project-bootstrap>" in line:
+                            errors.append(f"Placeholder failure: '{file_path}:{line_num}' contains '<project-bootstrap>'.")
+            except UnicodeDecodeError:
+                pass
 
 
 def check_python_files(repo_root, errors):
-    # Rule 4: A .py file does not compile (use py_compile)
     with tempfile.TemporaryDirectory() as tmp:
         for root, dirs, files in os.walk(repo_root):
             dirs[:] = [d for d in dirs if d not in {".git", "node_modules"}]
@@ -97,7 +156,6 @@ def check_python_files(repo_root, errors):
 
 
 def check_no_cache_or_pyc(repo_root, errors):
-    # Rule 5: The tree holds __pycache__ or .pyc files
     for root, dirs, files in os.walk(repo_root):
         dirs[:] = [d for d in dirs if d != ".git"]
         if "__pycache__" in dirs:
@@ -108,7 +166,6 @@ def check_no_cache_or_pyc(repo_root, errors):
 
 
 def check_dashes(skills_dir, errors):
-    # Rule 6: A file under skills/ contains an em dash or an en dash
     dashes = {"\u2014": "em dash (\u2014)", "\u2013": "en dash (\u2013)"}
     for root, dirs, files in os.walk(skills_dir):
         for f in files:
@@ -159,12 +216,12 @@ def run_smoke_test(repo_root, errors):
         if res_chk_invalid.returncode != 1:
             errors.append(f"Smoke test failure: check_commit_message.py expected exit code 1 for invalid message, got {res_chk_invalid.returncode}:\n{res_chk_invalid.stdout}")
 
-        # 5. node bin/install.js installs one skill per folder in skills/
-        inst_js = os.path.join(repo_root, "bin/install.js")
+        # 5. node bin/build-forge.js install
+        cli_js = os.path.join(repo_root, "bin/build-forge.js")
         with tempfile.TemporaryDirectory() as inst_tmpdir:
-            res_inst = subprocess.run(["node", inst_js], cwd=inst_tmpdir, capture_output=True, text=True)
+            res_inst = subprocess.run(["node", cli_js, "install"], cwd=inst_tmpdir, capture_output=True, text=True)
             if res_inst.returncode != 0:
-                errors.append(f"Smoke test failure: node bin/install.js failed with {res_inst.returncode}:\n{res_inst.stderr}")
+                errors.append(f"Smoke test failure: node bin/build-forge.js install failed with {res_inst.returncode}:\n{res_inst.stderr}")
             else:
                 installed_dir = os.path.join(inst_tmpdir, ".agents", "skills")
                 installed_skills = sorted(os.listdir(installed_dir)) if os.path.exists(installed_dir) else []
@@ -172,6 +229,92 @@ def run_smoke_test(repo_root, errors):
                 expected_skills = sorted([d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d))])
                 if installed_skills != expected_skills:
                     errors.append(f"Smoke test failure: Installed skills {installed_skills} != expected {expected_skills}")
+
+
+def run_link_tests(repo_root, errors):
+    cli = os.path.join(repo_root, "bin/build-forge.js")
+    with tempfile.TemporaryDirectory() as tmp:
+        # Install skills first
+        res = subprocess.run(["node", cli, "install"], cwd=tmp, capture_output=True, text=True)
+        if res.returncode != 0:
+            errors.append(f"Link test failure: install failed:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
+            return
+
+        # 1. No agent folder: expect a whole folder symlink
+        res = subprocess.run(["node", cli, "link", "--agents", "claude,gemini"], cwd=tmp, capture_output=True, text=True)
+        if res.returncode != 0:
+            errors.append(f"Link test failure: link --agents claude,gemini failed:\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}")
+            return
+
+        claude_skills = os.path.join(tmp, ".claude", "skills")
+        if not os.path.islink(claude_skills):
+            errors.append("Link test failure: .claude/skills should be a symlink when no agent folder exists.")
+
+        claude_ptr = os.path.join(tmp, "CLAUDE.md")
+        if not os.path.isfile(claude_ptr):
+            errors.append("Link test failure: Pointer file CLAUDE.md was not created.")
+
+        # 2. verify exit 0 through the links
+        res_v1 = subprocess.run(["node", cli, "verify"], cwd=tmp, capture_output=True, text=True)
+        if res_v1.returncode != 0:
+            errors.append(f"Link test failure: verify exit code was {res_v1.returncode} through links:\nSTDOUT:\n{res_v1.stdout}\nSTDERR:\n{res_v1.stderr}")
+
+        # 3. Second link run: no change (idempotent)
+        res_l2 = subprocess.run(["node", cli, "link", "--agents", "claude"], cwd=tmp, capture_output=True, text=True)
+        if res_l2.returncode != 0:
+            errors.append(f"Link test failure: Second link run failed:\nSTDOUT:\n{res_l2.stdout}\nSTDERR:\n{res_l2.stderr}")
+        if not os.path.islink(claude_skills):
+            errors.append("Link test failure: .claude/skills should remain a symlink after second link run.")
+
+        # 4. Unlink: only links removed
+        res_u1 = subprocess.run(["node", cli, "unlink", "--agents", "claude"], cwd=tmp, capture_output=True, text=True)
+        if res_u1.returncode != 0:
+            errors.append(f"Link test failure: unlink failed:\nSTDOUT:\n{res_u1.stdout}\nSTDERR:\n{res_u1.stderr}")
+        if os.path.exists(claude_skills):
+            errors.append("Link test failure: .claude/skills was not removed by unlink.")
+        if not os.path.isfile(claude_ptr):
+            errors.append("Link test failure: Pointer file CLAUDE.md should not be removed by unlink.")
+
+        # 5. Existing folder holding user's own skill: expect per-skill links and user skill untouched
+        os.makedirs(os.path.join(claude_skills, "user-skill"), exist_ok=True)
+        user_skill_file = os.path.join(claude_skills, "user-skill", "SKILL.md")
+        with open(user_skill_file, "w", encoding="utf-8") as f:
+            f.write("user custom skill")
+
+        res_l3 = subprocess.run(["node", cli, "link", "--agents", "claude"], cwd=tmp, capture_output=True, text=True)
+        if res_l3.returncode != 0:
+            errors.append(f"Link test failure: link on existing folder failed:\nSTDOUT:\n{res_l3.stdout}\nSTDERR:\n{res_l3.stderr}")
+        if os.path.islink(claude_skills):
+            errors.append("Link test failure: .claude/skills should not be a symlink when it was an existing folder.")
+        if not os.path.isfile(user_skill_file):
+            errors.append("Link test failure: User's custom skill was removed or overwritten.")
+        pb_link = os.path.join(claude_skills, "project-bootstrap")
+        if not os.path.islink(pb_link):
+            errors.append("Link test failure: Expected per-skill symlink for project-bootstrap inside .claude/skills.")
+
+        # 6. verify exit 0 through per-skill links
+        res_v2 = subprocess.run(["node", cli, "verify"], cwd=tmp, capture_output=True, text=True)
+        if res_v2.returncode != 0:
+            errors.append(f"Link test failure: verify exit code was {res_v2.returncode} through per-skill links:\nSTDOUT:\n{res_v2.stdout}\nSTDERR:\n{res_v2.stderr}")
+
+        # 7. Unlink on real folder: only links removed
+        res_u2 = subprocess.run(["node", cli, "unlink", "--agents", "claude"], cwd=tmp, capture_output=True, text=True)
+        if res_u2.returncode != 0:
+            errors.append(f"Link test failure: unlink on real folder failed:\nSTDOUT:\n{res_u2.stdout}\nSTDERR:\n{res_u2.stderr}")
+        if os.path.exists(pb_link):
+            errors.append("Link test failure: Per-skill symlink was not removed by unlink.")
+        if not os.path.isfile(user_skill_file):
+            errors.append("Link test failure: User's custom skill should remain after unlink.")
+
+        # 8. Pointer file creation must never overwrite an existing file
+        with open(claude_ptr, "w", encoding="utf-8") as f:
+            f.write("Custom instructions")
+        res_l4 = subprocess.run(["node", cli, "link", "--agents", "claude"], cwd=tmp, capture_output=True, text=True)
+        if res_l4.returncode != 0:
+            errors.append(f"Link test failure: link run failed:\nSTDOUT:\n{res_l4.stdout}\nSTDERR:\n{res_l4.stderr}")
+        with open(claude_ptr, "r", encoding="utf-8") as f:
+            if f.read() != "Custom instructions":
+                errors.append("Link test failure: Pointer file was overwritten by link command.")
 
 
 def main():
@@ -182,6 +325,7 @@ def main():
 
     print("Running CI checks...")
     check_skills(skills_dir, errors)
+    check_skill_placeholders(skills_dir, errors)
     check_python_files(repo_root, errors)
     check_no_cache_or_pyc(repo_root, errors)
     check_dashes(skills_dir, errors)
@@ -189,13 +333,16 @@ def main():
     print("Running smoke tests...")
     run_smoke_test(repo_root, errors)
 
+    print("Running multi-agent link tests...")
+    run_link_tests(repo_root, errors)
+
     if errors:
         print(f"\nCI checks failed with {len(errors)} error(s):")
         for err in errors:
             print(f"  - {err}")
         sys.exit(1)
 
-    print("\nAll CI checks and smoke tests passed successfully.")
+    print("\nAll CI checks, smoke tests, and link tests passed successfully.")
     sys.exit(0)
 
 
