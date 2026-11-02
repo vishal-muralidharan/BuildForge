@@ -20,7 +20,7 @@ By hand:
 ## Publish (maintainers)
 
 1. Make sure you are logged in to npm as `v1006`, or as a member of the `@v1006` organization.
-2. From this folder run `npm pack --dry-run` and check the file list.
+2. From the repo root run `npm pack --dry-run` and check the file list.
 3. Run `npm publish`. The package is set to public access.
 
 ## Pick your path
