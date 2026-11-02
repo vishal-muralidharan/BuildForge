@@ -1,7 +1,7 @@
 ---
 name: project-bootstrap
 description: Set up the build pipeline for any project, whether it is an existing codebase or a brand new app. Creates .agents/project-profile.yaml (the single source of truth for stack, commands, folder layout, naming, design, data and git rules), then generates AGENTS.md, convention skills and a repo map from it. Use this whenever the user wants to add the pipeline, agent guidelines, AGENTS.md, project rules or skills to a repo, start a new app with the pipeline, onboard an existing codebase, regenerate or update the project profile, or says things like "bootstrap", "set up my project for agents", "generalize my skills" or "make my AGENTS.md reusable", even if they do not name this skill.
-compatibility: Needs Python 3 and PyYAML (pip install pyyaml). Git is optional and improves commit style detection.
+compatibility: Needs file read, file edit, shell, git, Python 3, and PyYAML.
 ---
 
 # Project bootstrap
@@ -14,17 +14,17 @@ The 5 process skills (`audit-and-planning`, `repo-search`, `atomic-commits`, `ta
 
 Bootstrap never edits application source code. It writes only `.agents/`, the AGENTS.md router and the skills folder.
 
-Scripts live in this skill's `scripts/` folder. Run them with the full path to that folder.
+Scripts live in this skill's `scripts/` folder. Run them with the full path to that folder. If python3 is not found, use python or py -3.
 
 ## Step 0: Pick the mode
 
 1. If `.agents/project-profile.yaml` exists, use **update mode**. Run discovery again, compare with the profile, and show the user each difference. Never change a rule silently.
-2. Otherwise run `python scripts/detect_stack.py <repo_root>`. Read `suggested_mode`.
+2. Otherwise run `python3 .agents/skills/project-bootstrap/scripts/detect_stack.py <repo_root>`. Read `suggested_mode`.
 3. If the user says this is a new app, or discovery finds no manifest and fewer than 3 source files, use **new mode**. If the repo has code, use **existing mode**. When unsure, ask in 1 question.
 
 ## Existing mode
 
-1. Read the discovery JSON. Also read `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` and `README.md` when they exist. They hold rules the code cannot show.
+1. Read the discovery JSON. Also read `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, and any agent instruction files when they exist. They hold rules the code cannot show.
 2. Copy `assets/project-profile.template.yaml` to `.agents/project-profile.yaml`. Fill only what the evidence supports.
    - Commands: use `commands_suggested`. If there is no single `check` command, propose one that chains lint, test and build, and ask before adding it to `package.json`.
    - Naming: state a style only when it covers at least 80% of files of that kind. Otherwise leave a TODO and ask.
@@ -60,8 +60,8 @@ Ask once, after the draft profile exists:
 
 ## Finish
 
-1. Run `python scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root>`. Fix every error. Show the user any remaining TODO.
-2. Run `python scripts/render.py --profile .agents/project-profile.yaml --root <repo_root>`. It never overwrites existing files. If `AGENTS.md` exists it writes `AGENTS.generated.md`. Help the user merge it, then offer to delete the generated copy.
+1. Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root>`. Fix every error. Show the user any remaining TODO.
+2. Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root <repo_root>`. It never overwrites existing files. If `AGENTS.md` exists it writes `AGENTS.generated.md`. Help the user merge it, then offer to delete the generated copy.
 3. Report in this shape:
 
 ```
