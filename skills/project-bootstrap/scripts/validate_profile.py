@@ -20,6 +20,10 @@ except ImportError:
 AREAS = {"design", "tokens", "motion", "responsive", "structure", "naming", "data",
          "security", "verify", "git", "docs", "process"}
 STAGES = {"audit", "plan", "build", "verify", "deploy", "commit", "docs", "report"}
+REF_STAGES = {"audit", "build", "verify", "deploy", "report"}
+REF_MODES = {"advisory", "gate"}
+REF_ACTIVATIONS = {"pipeline-only", "native"}
+REF_CATEGORIES = {"backend", "database", "security", "deploy", "hosting", "browser", "performance", "accessibility", "other"}
 ENFORCED = {"manual", "test", "lint"}
 STATUS = {"declared", "installed", "rejected"}
 PUSH = {"never", "ask", "allowed"}
@@ -119,29 +123,96 @@ def main():
     if not get(prof, "git.commit_format"):
         errors.append("git.commit_format is required")
 
-    refs = prof.get("external_references") or []
     names = set()
-    for i, r in enumerate(refs):
-        if not isinstance(r, dict):
-            errors.append(f"external_references[{i}] must be a mapping")
-            continue
-        name = r.get("name")
-        if not name:
-            errors.append(f"external_references[{i}].name is required")
-        names.add(name)
-        repo = str(r.get("repo", ""))
-        if not (repo.startswith("https://") or repo.startswith("git@")):
-            errors.append(f"external_references[{i}].repo must be an https or git URL")
-        if r.get("status") not in STATUS:
-            errors.append(f"external_references[{i}].status must be one of {sorted(STATUS)}")
-        bad = set(r.get("used_by") or []) - STAGES
-        if bad or not r.get("used_by"):
-            errors.append(f"external_references[{i}].used_by must list stages from {sorted(STAGES)}")
-        if r.get("status") == "installed":
-            if not r.get("path"):
-                errors.append(f"external_references[{i}].path is required when installed")
-            elif a.root and not (Path(a.root) / r["path"]).exists():
-                errors.append(f"external_references[{i}].path not found: {r['path']}")
+    root_path = Path(a.root).resolve() if a.root else Path(".").resolve()
+    ref_yaml = root_path / ".agents" / "references.yaml"
+
+    if ref_yaml.is_file():
+        try:
+            rdata = yaml.safe_load(ref_yaml.read_text(encoding="utf-8")) or {}
+        except Exception as e:
+            errors.append(f"Invalid YAML in .agents/references.yaml: {e}")
+            rdata = {}
+
+        if not isinstance(rdata, dict):
+            errors.append(".agents/references.yaml must be a mapping")
+        else:
+            if rdata.get("schema_version") != 1:
+                errors.append(".agents/references.yaml schema_version must be 1")
+            if not isinstance(rdata.get("vendor_in_git", False), bool):
+                errors.append(".agents/references.yaml vendor_in_git must be a boolean")
+
+            ref_entries = rdata.get("references")
+            if not isinstance(ref_entries, list):
+                errors.append(".agents/references.yaml 'references' must be a list")
+            else:
+                for idx, entry in enumerate(ref_entries):
+                    if not isinstance(entry, dict):
+                        errors.append(f"references[{idx}] must be a mapping")
+                        continue
+                    rname = entry.get("name")
+                    if not rname or not re.match(r"^[a-z0-9]+(-[a-z0-9]+)*$", str(rname)):
+                        errors.append(f"references[{idx}].name '{rname}' must be kebab-case")
+                    if rname in names:
+                        errors.append(f"references[{idx}].name '{rname}' is a duplicate")
+                    names.add(rname)
+
+                    if entry.get("kind") != "skill":
+                        errors.append(f"references[{idx}].kind must be 'skill'")
+                    if entry.get("category") not in REF_CATEGORIES:
+                        errors.append(f"references[{idx}].category must be one of {sorted(REF_CATEGORIES)}")
+                    if entry.get("status") not in STATUS:
+                        errors.append(f"references[{idx}].status must be one of {sorted(STATUS)}")
+                    if entry.get("mode") not in REF_MODES:
+                        errors.append(f"references[{idx}].mode must be one of {sorted(REF_MODES)}")
+                    if entry.get("activation") not in REF_ACTIVATIONS:
+                        errors.append(f"references[{idx}].activation must be one of {sorted(REF_ACTIVATIONS)}")
+
+                    used = entry.get("used_by") or []
+                    if not isinstance(used, list) or not used or (set(used) - REF_STAGES):
+                        errors.append(f"references[{idx}].used_by must list stages from {sorted(REF_STAGES)}")
+
+                    if entry.get("status") == "installed":
+                        rpath = entry.get("path")
+                        if not rpath:
+                            errors.append(f"references[{idx}].path is required when installed")
+                        else:
+                            norm_path = Path(rpath).as_posix()
+                            if not (norm_path.startswith(".agents/vendor/") or norm_path.startswith(".agents/skills/")):
+                                errors.append(f"references[{idx}].path '{rpath}' must be inside .agents/vendor or .agents/skills")
+                            elif a.root and not (root_path / rpath).exists():
+                                errors.append(f"references[{idx}].path not found: {rpath}")
+                        if not entry.get("pinned_commit") or entry.get("pinned_commit") == "unknown":
+                            errors.append(f"references[{idx}].pinned_commit is required when installed")
+                        if entry.get("approved") is not True:
+                            errors.append(f"references[{idx}].approved must be true when installed")
+
+    # Backwards compatibility: external_references in profile
+    old_refs = prof.get("external_references")
+    if old_refs is not None:
+        warnings.append("`external_references` in project profile is deprecated. Use .agents/references.yaml instead.")
+        if isinstance(old_refs, list):
+            for i, r in enumerate(old_refs):
+                if not isinstance(r, dict):
+                    errors.append(f"external_references[{i}] must be a mapping")
+                    continue
+                name = r.get("name")
+                if not name:
+                    errors.append(f"external_references[{i}].name is required")
+                names.add(name)
+                repo = str(r.get("repo", ""))
+                if not (repo.startswith("https://") or repo.startswith("git@")):
+                    errors.append(f"external_references[{i}].repo must be an https or git URL")
+                if r.get("status") not in STATUS:
+                    errors.append(f"external_references[{i}].status must be one of {sorted(STATUS)}")
+                bad = set(r.get("used_by") or []) - STAGES
+                if bad or not r.get("used_by"):
+                    errors.append(f"external_references[{i}].used_by must list stages from {sorted(STAGES)}")
+                if r.get("status") == "installed":
+                    if not r.get("path"):
+                        errors.append(f"external_references[{i}].path is required when installed")
+                    elif a.root and not (Path(a.root) / r["path"]).exists():
+                        errors.append(f"external_references[{i}].path not found: {r['path']}")
 
     for cap, cfg in (prof.get("capabilities") or {}).items():
         if not isinstance(cfg, dict):
@@ -149,7 +220,7 @@ def main():
             continue
         ref = cfg.get("reference")
         if ref and ref not in names:
-            errors.append(f"capabilities.{cap}.reference '{ref}' is not in external_references")
+            errors.append(f"capabilities.{cap}.reference '{ref}' is not in .agents/references.yaml")
         if cap == "deploy":
             if cfg.get("enabled") and not (cfg.get("command") or cmds.get("deploy")):
                 errors.append("capabilities.deploy is enabled but has no command")

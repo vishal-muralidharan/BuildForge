@@ -81,10 +81,12 @@ capabilities:
     verify_url: "https://example.com"
     on_failure: self-heal      # or report
     max_attempts: 3            # self-heal stops after this many tries (1 to 10)
-    reference: ""              # optional name from external_references
+    reference: ""              # optional name from .agents/references.yaml
 ```
 
-External references are third party skills or docs the user chose. Valid `used_by` stages: audit, plan, build, verify, deploy, commit, docs, report. Valid `status`: declared, installed, rejected. An installed entry needs a `path` relative to the repo root.
+External references and third party skills live in `.agents/references.yaml`. Hashes and pinned commits live in `.agents/references.lock.json`. The profile keeps only capability slots that point to a reference by name. Manage references using `python3 .agents/skills/extend-pipeline/scripts/refs.py`.
+
+Valid reference `used_by` stages: `audit`, `build`, `verify`, `deploy`, `report`. Valid `status`: `declared`, `installed`, `rejected`. Valid `mode`: `advisory`, `gate`. Valid `activation`: `pipeline-only`, `native`. Installed entries require `path`, `pinned_commit`, and `approved: true`.
 
 ## 4. Which stage reads which field
 
