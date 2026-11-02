@@ -2,6 +2,15 @@
   "name": "@v1006/build-forge",
   "version": "0.1.0",
   "description": "A build pipeline of agent skills for new and existing projects: spec, bootstrap, scaffold, rule checks, gated delivery.",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vishal-muralidharan/BuildForge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vishal-muralidharan/BuildForge/issues"
+  },
+  "homepage": "https://github.com/vishal-muralidharan/BuildForge#readme",
   "bin": {
     "build-forge": "bin/install.js"
   },
