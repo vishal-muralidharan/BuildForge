@@ -1,6 +1,6 @@
 # Project profile. The single source of truth for the build pipeline.
 # Every pipeline skill reads this file first. Edit it, then re-render:
-#   python <project-bootstrap>/scripts/render.py --profile .agents/project-profile.yaml
+#   python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml
 # Fields marked "TODO" are unresolved. The validator flags them.
 schema_version: 1
 
