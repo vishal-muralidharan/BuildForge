@@ -1,6 +1,7 @@
 ---
 name: repo-search
 description: Use to find out whether a feature, component, hook, helper, data field, style token or any symbol already exists in the repo, and where it is declared and used. Read-only discovery that reports findings without editing code. Also refreshes the repo map on request. Use it before creating any new file or function, when the user asks "is there already a...", "where is...", "find usages of...", or "refresh the repo map", and whenever audit-and-planning needs a search phase.
+compatibility: Needs file read, file edit, and shell access.
 ---
 
 # Repo search
