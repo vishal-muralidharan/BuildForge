@@ -58,3 +58,19 @@ Complete this checklist when configuring the repository and npm publishing:
 7. Generate an npm access token (`NPM_TOKEN`) as a granular token scoped only to `@v1006/build-forge` with an expiration date. Add it to GitHub repository secrets.
 8. Turn on 2FA on the GitHub account.
 
+## Versioning
+
+Build Forge follows semantic versioning (MAJOR.MINOR.PATCH):
+
+- **Major**: A skill is renamed or removed, the profile `schema_version` changes, or a CLI flag or exit code changes.
+- **Minor**: A new skill is added, a new optional profile field is introduced, or a new check type is added.
+- **Patch**: Wording fixes, documentation updates, and bug fixes.
+
+[CHANGELOG.md](CHANGELOG.md) uses the Keep a Changelog headings.
+
+Deprecation policy: [CONFIRM: deprecation policy]
+
+Publishing roadmap: [CONFIRM: switch the publish workflow to npm trusted publishing, check the current npm docs]
+
+Note on package provenance: npm provenance generation only works from a public repository. If the repository is ever made private, `--provenance` must be removed from `publish.yml`.
+
