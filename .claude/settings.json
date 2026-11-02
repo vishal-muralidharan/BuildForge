@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(skills/**)",
+      "Edit(bin/**)",
+      "Edit(LICENSE)",
+      "Edit(package.json)",
+      "Write(skills/**)",
+      "Write(bin/**)",
+      "Write(LICENSE)",
+      "Write(package.json)"
+    ]
+  }
+}
