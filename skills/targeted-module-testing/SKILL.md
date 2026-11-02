@@ -39,6 +39,10 @@ Run only if `capabilities.browser_inspection.enabled` is true. Use the linked re
 
 If the capability is off, do not skip silently. List the checks under "Not run" in the report so the user can do them by hand.
 
+## 3b. Reference checks
+
+Run `python3 .agents/skills/extend-pipeline/scripts/refs.py due --stage verify --paths <changed files>`. Apply each listed reference to the change. Run a bundled script only if the listing says allow_scripts is true. Otherwise list it under 'Not run'. If a reference has mode gate and reports a blocking finding, stop and ask the user. Report findings under 'Third party review' in the Post-Build Audit, with the reference name.
+
 ## 4. Deploy (optional)
 
 Run only if `capabilities.deploy.enabled` is true, and only after step 1 passes. Never deploy a failing build.

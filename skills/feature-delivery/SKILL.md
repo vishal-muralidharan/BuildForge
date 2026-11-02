@@ -15,6 +15,7 @@ The conductor for the pipeline. It does not hold rules of its own. It decides wh
    - New app: run `product-spec`, then `project-bootstrap`, then `scaffold-app`.
 2. `git status`. If the working tree has changes you did not make, tell the user and ask whether to commit them, stash them or continue. Never mix someone else's changes into your commits.
 3. The repo map at `docs.repo_map`.
+4. Run `python3 .agents/skills/extend-pipeline/scripts/refs.py verify`. If it reports a difference, tell the user and ask.
 
 Open only what each stage needs. Do not load every skill at the start. That wastes context and slows the work.
 
@@ -31,6 +32,8 @@ Open only what each stage needs. Do not load every skill at the start. That wast
 | 5 | Full verify | `targeted-module-testing`, steps 1 to 3 | `commands.check` passes. Browser checks ran, or are listed as not run. |
 | 6 | Deploy (optional) | `targeted-module-testing`, step 4 | Runs only if `capabilities.deploy.enabled` is true. |
 | 7 | Report | `targeted-module-testing`, step 5 | The Post-Build Audit is written. |
+
+Stages 1, 5 and 6 consult references through `due`. A gate reference with a blocking finding stops the stage until the user decides.
 
 Repeat stages 3, 3a and 3b for each step in the plan. Never start step N+1 while step N fails its checks or is uncommitted.
 

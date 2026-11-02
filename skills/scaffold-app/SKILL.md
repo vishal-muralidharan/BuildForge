@@ -16,7 +16,7 @@ Turns a validated profile into a skeleton that builds, lints and tests green. It
 
 ## Steps
 
-1. **Check the target folder.** If it holds files other than `.agents/`, `docs/`, `.git/` and the profile, ask before continuing. Never overwrite existing files without a yes.
+1. **Check the target folder.** If it holds files other than `.agents/`, `docs/`, `.git/` and the profile, ask before continuing. Never overwrite existing files without a yes. If a reference with category backend or deploy exists for this stack, read it before you choose the recipe. It never overrides the profile.
 2. **Run the official generator.** Use the framework's own create tool. Do not hand write boilerplate that a generator provides. Look up the exact command in the framework's current docs, because flags change. Use non interactive flags. Generate into a temporary folder if the target is not empty, then copy files in.
 3. **Install and get a baseline.** Run `commands.install`. Run the generated lint, test and build. All must pass before you change anything. If the generator's output fails, stop and report. Do not paper over it.
 4. **Apply the profile layout.** Create every folder in `structure.layers`. Move generated files into the layers where they belong. Put a `.gitkeep` in a layer that is still empty.
