@@ -1,6 +1,7 @@
 ---
 name: feature-delivery
 description: Run any task in a project end to end through the build pipeline, with a gate between every stage. Audit, plan, build one atomic step at a time, verify, commit, sync docs, deploy if enabled, and report. Use it for every request to add, build, implement, fix, refactor, change or ship something in a repo that has a .agents/project-profile.yaml, including each milestone of a new app. Use it even for small tasks, so the stages and the report are never skipped.
+compatibility: Needs file read, file edit, shell, git, and Python 3.
 ---
 
 # Feature delivery
