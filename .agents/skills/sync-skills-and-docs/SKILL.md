@@ -1,0 +1,59 @@
+---
+name: sync-skills-and-docs
+description: Use when a change adds, moves or removes a screen, component, file, folder, token, route, command, storage key, commit scope, capability or rule in a project that has a .agents/project-profile.yaml. Updates the profile first, re-renders AGENTS.md and the convention skills from it, refreshes the README and repo map, and runs a drift checker. Use it at the end of any structural change, and whenever docs, skills or the profile might be out of date.
+compatibility: Needs Python 3 and PyYAML for the drift checker. Re-rendering needs the project-bootstrap skill.
+---
+
+# Keep docs and skills in sync
+
+Stage 6 of the pipeline. Rules live once, in the profile. AGENTS.md and the convention skills are generated from it. So the order is always: profile first, then generated files, then prose docs. If you edit a generated file by hand, the next re-render erases the edit.
+
+## Read first
+
+`.agents/project-profile.yaml`, section `docs`. It names the README, the AGENTS file, the skills folder and the repo map.
+
+## Map: what changed, what to update
+
+| Change | Update in the profile | Also update |
+|---|---|---|
+| File or folder added, moved or removed | `structure.layers`, `structure.root_allowed` | README structure section, repo map |
+| Token, primitive, icon or font rule | `design`, `rules` (areas `design`, `tokens`) | README token section |
+| Breakpoint or layout rule | `responsive`, `rules` (area `responsive`) | |
+| Storage key, schema or data rule | `data`, `rules` (area `data`) | README data section |
+| Command or test rule | `commands`, `verification` | README commands |
+| Naming rule | `naming`, `rules` (area `naming`) | |
+| New commit scope or type | `git.scopes`, `git.types` | |
+| New rule for agents | `rules` | |
+| Capability or external reference | `capabilities`, `external_references` | |
+| Post-build audit format | `verification` | |
+
+## Steps
+
+1. **List what changed.** Use `git diff --stat` or the commit list for the task.
+2. **Edit the profile.** Make the smallest change that makes it true. One id per rule, written once. Remove stale rules. Do not leave contradictions.
+3. **Validate.** Run `python <project-bootstrap>/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .`.
+4. **Re-render.** Run `python <project-bootstrap>/scripts/render.py --profile .agents/project-profile.yaml --root .`.
+   - It skips files that exist. Add `--force` only for generated convention skills you have not edited by hand.
+   - If the user merged AGENTS.md by hand, do not use `--force` on it. Read `AGENTS.generated.md` and apply the differences.
+   - If project-bootstrap is not installed, edit the generated files to match the profile by hand and say so.
+5. **Refresh the repo map.** Run `repo-search` in map mode.
+6. **Update the README** sections named in the map above.
+7. **Search for old names.** Search the docs, skills and README for names that no longer exist: moved files, removed components, removed tokens, old commands.
+8. **Flag, do not delete.** If a skill no longer applies, add it to the section "Skills flagged for review" in the repo map. Never delete it silently.
+9. **Run the drift checker.**
+
+```bash
+python <this-skill>/scripts/check_sync.py --profile .agents/project-profile.yaml --root .
+```
+
+Fix every error. Read every warning and decide.
+
+10. **Run `commands.check`.** The docs change must not break the build.
+
+## Checklist
+
+- [ ] The README structure matches the layers in the profile.
+- [ ] The commands in the profile match the project manifest.
+- [ ] Every skill named in AGENTS.md exists in the skills folder.
+- [ ] No doc names a file, token or command that no longer exists.
+- [ ] Every commit scope in recent history is in `git.scopes`.
