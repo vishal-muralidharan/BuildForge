@@ -1,6 +1,7 @@
 ---
 name: product-spec
 description: Turn a rough app idea into a short product spec with users, core flows, data entities, non-goals, milestones and a first list of atomic build steps. Use it at the very start of a new app, before project-bootstrap, and whenever the user says "I want to build", "I have an idea for an app", "plan this app", "write a spec", "what should the milestones be" or describes an app without technical details. Also use it to cut a big feature into milestones for an existing project.
+compatibility: Needs file read and file edit capabilities.
 ---
 
 # Product spec
