@@ -1,0 +1,21 @@
+Build Forge License
+
+Copyright (c) 2026 [TODO: legal name of the copyright holder]. All rights reserved except as granted below.
+
+1. Use. You may install and run Build Forge (the "Software") on any number of projects and machines, for personal or commercial work, at no cost.
+
+2. No changes. You may not modify, adapt, translate or create derivative works of the Software. This includes its skill files, scripts, templates, references and installer.
+
+3. Copies. You may keep complete, unmodified copies of the Software inside your own projects and share them with the people who work on those projects. You may not publish, sell, sublicense or distribute the Software, or any part of it, to anyone else.
+
+4. Adaptation and generated files. The Software adapts to a project by generating files from that project's own context: the project profile, AGENTS.md, convention skills and the repo map. Those generated files are not part of the Software. They belong to you, and you may edit them freely. Any code or documents produced while using the Software also belong to you.
+
+5. Third party material. Anything not written by the copyright holder that you add or reference while using the Software is covered by its own terms, not by this license.
+
+6. Ending. This license ends automatically if you break any of its terms. You must then delete all copies of the Software.
+
+7. No warranty. The Software is provided "as is", without warranty of any kind.
+
+8. Limit of liability. The copyright holder is not liable for any claim, damages or other liability arising from the use of the Software.
+
+9. Governing law. [TODO: governing law and courts]
