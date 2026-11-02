@@ -393,9 +393,9 @@ function verifyCommand(cwd) {
             failed = true;
           }
         } else if (entryStat.isDirectory()) {
-          // It is a real folder copy. Compare with .agents/skills/<entry>
+          // It is a real folder copy of a pipeline skill if it exists in .agents/skills
           const srcSkill = path.join(targetSkillsDir, entry);
-          if (!areDirsIdentical(srcSkill, entryPath)) {
+          if (fs.existsSync(srcSkill) && !areDirsIdentical(srcSkill, entryPath)) {
             console.error(`  copy differs from .agents/skills: ${entryPath}`);
             failed = true;
           }
