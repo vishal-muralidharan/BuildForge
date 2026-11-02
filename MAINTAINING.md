@@ -40,6 +40,13 @@ Follow these steps to publish a new release:
    node package/bin/build-forge.js verify
    ```
 5. Confirm that `.agents/build-forge.lock.json` was created and that verification exits with code 0.
+6. Test agent linking and unlinking:
+   ```bash
+   node package/bin/build-forge.js link --agents claude
+   node package/bin/build-forge.js verify
+   node package/bin/build-forge.js unlink --agents claude
+   ```
+7. Confirm that `.claude/skills` was created as a symlink pointing to `.agents/skills`, that `verify` exited 0 through the link, and that `unlink` removed the symlink.
 
 ## One time setup checklist
 

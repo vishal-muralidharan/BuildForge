@@ -27,14 +27,17 @@ Project context -> project-bootstrap -> .agents/project-profile.yaml
                       AGENTS.md           Convention skills        repo-map.md
 ```
 
+## Works with
+
+Build Forge works with coding agents that support the open Agent Skills format or read `AGENTS.md`. Confirmed agents include Claude Code, OpenAI Codex, Gemini CLI, GitHub Copilot, Cursor, and Windsurf. See [COMPATIBILITY.md](COMPATIBILITY.md) for setup details, pointer files, and verification status.
+
 ## Requirements
 
 - Node.js >= 18 (from package.json engines)
 - Python 3
 - PyYAML (`pip install pyyaml`)
 - git
-
-Tested with: [CONFIRM: list the agent tools tested with Build Forge]
+- Agent capabilities: The agent must read files, edit files, and run shell commands.
 
 ## Install
 
@@ -65,6 +68,35 @@ Existing skill folders are kept by default. To overwrite existing pipeline skill
 
 ```bash
 npx @v1006/build-forge --force
+```
+
+### Linking skills for other agents
+
+Skills live in 1 place: `.agents/skills`. To make them visible to agents that look in a tool-specific folder (such as Claude Code):
+
+```bash
+npx @v1006/build-forge link
+```
+
+To link specific agents or auto-detect based on existing configuration files:
+
+```bash
+npx @v1006/build-forge link --agents auto
+npx @v1006/build-forge link --agents claude
+```
+
+You can also pass `--agents` during installation to install and link in 1 step:
+
+```bash
+npx @v1006/build-forge install --agents auto
+```
+
+### Unlinking agent folders
+
+To remove only the symbolic links created by Build Forge without touching real folders or files:
+
+```bash
+npx @v1006/build-forge unlink
 ```
 
 ## Quick start
@@ -289,6 +321,9 @@ All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention ski
 |---|---|---|
 | `PyYAML is required` | PyYAML package is not installed. | Run `pip install pyyaml` in your active Python environment. |
 | `python: command not found` | `python` alias is not mapped to Python 3. | Use `python3` instead of `python` when running scripts. |
+| `python3: command not found` | `python3` alias is not installed or not in PATH. | Use `python` or `py -3` in your shell, or install Python 3 and add it to your system PATH. |
+| Agent does not see the skills | The agent scans a folder other than `.agents/skills`. | Run `npx @v1006/build-forge link`. Check the agent's skills folder in [COMPATIBILITY.md](COMPATIBILITY.md). |
+| Windows symlink errors | Windows requires elevated permissions or developer mode for directory symlinks. | Build Forge uses directory junctions and copy fallbacks. Enable Windows Developer Mode if linking fails. |
 | Validator reports `unexpected keys` | YAML parser split an unquoted string on commas. | Wrap string values containing commas in double quotes in `.agents/project-profile.yaml`. |
 | `AGENTS.generated.md already exists` | `render.py` found an existing `AGENTS.md` and avoided overwriting it. | Merge changes from `AGENTS.generated.md` into `AGENTS.md`, or run `render.py --force`. |
 | `verify` exits with code 2 | Lock file is missing. | Run `npx @v1006/build-forge install` to write `.agents/build-forge.lock.json`. |
