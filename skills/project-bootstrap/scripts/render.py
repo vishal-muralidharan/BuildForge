@@ -183,7 +183,7 @@ def render_agents(p, pn, skill_names, root):
     stack = ", ".join(str(v) for k, v in s.items() if v and v != "none" and k in ("framework", "bundler", "styling", "backend", "database"))
     lines = [BANNER.format(profile=pn), "", f"# Agent Guidelines for {name}", "",
              f"{g(p, 'project.summary')}" + (f" Stack: {stack}." if stack else ""), "",
-             f"Read the skill listed for each area before you touch it. Skills live in `{sdir}`. Facts live in `{pn}`. Rule details live in the skills. Do not copy them here.", "",
+             f"Read the skill listed for each area before you touch it. Skills live in `{sdir}`. Facts live in `{pn}`. Rule details live in the skills. Do not copy them here. If your agent does not load skills on its own, open the skill file named in the table.", "",
              "## Areas", ""]
     sdir_path = root / sdir
     rows = []
@@ -287,6 +287,7 @@ def main():
         print(f"SKIPPED {s.relative_to(root)} (exists; use --force to overwrite)")
     if missing:
         print("NOTE  Process skills not found in the skills dir: " + ", ".join(missing))
+    print("If your agent does not read .agents/skills, run: npx @v1006/build-forge link")
 
 
 if __name__ == "__main__":
