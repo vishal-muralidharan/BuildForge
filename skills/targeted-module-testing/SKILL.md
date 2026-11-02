@@ -1,6 +1,7 @@
 ---
 name: targeted-module-testing
 description: Use after any change in a project that has a .agents/project-profile.yaml. Runs the verify, deploy and report stages. Runs the project's own lint, test and build commands, checks the rule-enforcing tests, runs browser checks and a deploy loop only if the profile enables them, and ends every task with a Post-Build Audit of open questions and known issues. Use it before you say a task is done, after every build, and whenever the user asks to verify, test, check, ship or deploy.
+compatibility: Needs file read, shell, and network access if deploy checks are enabled.
 ---
 
 # Verification, deploy and report
