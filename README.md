@@ -3,6 +3,7 @@
 A build pipeline of 11 agent skills for new and existing projects: spec, bootstrap, scaffold, rule checks, and gated delivery.
 
 [![npm version](https://img.shields.io/npm/v/@v1006/build-forge)](https://www.npmjs.com/package/@v1006/build-forge)
+[![CI](https://github.com/vishal-muralidharan/BuildForge/actions/workflows/ci.yml/badge.svg)](https://github.com/vishal-muralidharan/BuildForge/actions/workflows/ci.yml)
 
 Distributed under the [Build Forge License](LICENSE).
 
@@ -311,8 +312,8 @@ Build Forge is distributed under the [Build Forge License](LICENSE). Below is a 
 
 - Security issues: See [SECURITY.md](SECURITY.md) for reporting guidelines.
 - Version history: See [CHANGELOG.md](CHANGELOG.md).
+- Contributing: See [CONTRIBUTING.md](CONTRIBUTING.md). [CONFIRM: contribution policy]. The license does not allow derivative works.
 - Bug reports: [CONFIRM: where to report bugs]
-- Contributing: [CONFIRM: contribution policy]. The license does not allow derivative works.
 
 ## Maintainers
 
