@@ -127,3 +127,4 @@ Report to the user:
   ```bash
   python3 .agents/skills/extend-pipeline/scripts/refs.py restore
   ```
+

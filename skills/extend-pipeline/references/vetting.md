@@ -48,3 +48,4 @@ The scanner reports findings grouped by file and severity:
 ## Safety limit
 
 A clean scan is not proof of safety. The scanner checks known heuristics and patterns. It cannot detect all forms of obfuscated or novel exploits. Only install skills from sources you personally trust.
+
