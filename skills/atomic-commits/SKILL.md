@@ -1,7 +1,7 @@
 ---
 name: atomic-commits
 description: Use whenever you are about to commit code in a project that has a .agents/project-profile.yaml. Enforces small, single purpose commits whose message follows the project's own format, scopes and push policy. Validates the message with a script. Use it after finishing any cohesive unit of work, before starting the next one, and whenever the user says commit, save my work, or wrap up.
-compatibility: Needs Python 3 and PyYAML for the message checker. Git is required.
+compatibility: Needs file read, shell, git, Python 3, and PyYAML.
 ---
 
 # Atomic commits
@@ -62,8 +62,10 @@ Write the subject in the present tense, in lowercase, with no final period. Keep
 Check the message before you commit:
 
 ```bash
-python <this-skill>/scripts/check_commit_message.py --profile .agents/project-profile.yaml "feat(ui): add button"
+python3 .agents/skills/atomic-commits/scripts/check_commit_message.py --profile .agents/project-profile.yaml "feat(ui): add button"
 ```
+
+If python3 is not found, use python or py -3.
 
 Fix every error it reports. Warnings are advice.
 
