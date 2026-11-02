@@ -1,0 +1,51 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Run CI checks
+        run: python scripts/ci_check.py
+
+      - name: Validate tag matches package version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          EXPECTED_TAG="v${PKG_VERSION}"
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo "Error: Tag '$TAG' does not match expected tag '$EXPECTED_TAG' for package.json version '$PKG_VERSION'"
+            exit 1
+          fi
+          echo "Tag '$TAG' matches package.json version '$PKG_VERSION'"
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
