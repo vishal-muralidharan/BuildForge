@@ -1,0 +1,27 @@
+{
+  "name": "@v1006/build-forge",
+  "version": "0.1.0",
+  "description": "A build pipeline of agent skills for new and existing projects: spec, bootstrap, scaffold, rule checks, gated delivery.",
+  "bin": {
+    "build-forge": "bin/install.js"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "README.md"
+  ],
+  "keywords": [
+    "agents",
+    "skills",
+    "ai-agents",
+    "build-pipeline",
+    "scaffolding",
+    "project-profile"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
