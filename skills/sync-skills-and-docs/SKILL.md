@@ -1,7 +1,7 @@
 ---
 name: sync-skills-and-docs
 description: Use when a change adds, moves or removes a screen, component, file, folder, token, route, command, storage key, commit scope, capability or rule in a project that has a .agents/project-profile.yaml. Updates the profile first, re-renders AGENTS.md and the convention skills from it, refreshes the README and repo map, and runs a drift checker. Use it at the end of any structural change, and whenever docs, skills or the profile might be out of date.
-compatibility: Needs Python 3 and PyYAML for the drift checker. Re-rendering needs the project-bootstrap skill.
+compatibility: Needs file read, file edit, shell, git, Python 3, and PyYAML.
 ---
 
 # Keep docs and skills in sync
@@ -31,8 +31,8 @@ Stage 6 of the pipeline. Rules live once, in the profile. AGENTS.md and the conv
 
 1. **List what changed.** Use `git diff --stat` or the commit list for the task.
 2. **Edit the profile.** Make the smallest change that makes it true. One id per rule, written once. Remove stale rules. Do not leave contradictions.
-3. **Validate.** Run `python <project-bootstrap>/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .`.
-4. **Re-render.** Run `python <project-bootstrap>/scripts/render.py --profile .agents/project-profile.yaml --root .`.
+3. **Validate.** Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .`.
+4. **Re-render.** Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root .`.
    - It skips files that exist. Add `--force` only for generated convention skills you have not edited by hand.
    - If the user merged AGENTS.md by hand, do not use `--force` on it. Read `AGENTS.generated.md` and apply the differences.
    - If project-bootstrap is not installed, edit the generated files to match the profile by hand and say so.
@@ -43,8 +43,10 @@ Stage 6 of the pipeline. Rules live once, in the profile. AGENTS.md and the conv
 9. **Run the drift checker.**
 
 ```bash
-python <this-skill>/scripts/check_sync.py --profile .agents/project-profile.yaml --root .
+python3 .agents/skills/sync-skills-and-docs/scripts/check_sync.py --profile .agents/project-profile.yaml --root .
 ```
+
+If python3 is not found, use python or py -3.
 
 Fix every error. Read every warning and decide.
 
