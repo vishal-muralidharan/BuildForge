@@ -1,0 +1,88 @@
+---
+name: project-bootstrap
+description: Set up the build pipeline for any project, whether it is an existing codebase or a brand new app. Creates .agents/project-profile.yaml (the single source of truth for stack, commands, folder layout, naming, design, data and git rules), then generates AGENTS.md, convention skills and a repo map from it. Use this whenever the user wants to add the pipeline, agent guidelines, AGENTS.md, project rules or skills to a repo, start a new app with the pipeline, onboard an existing codebase, regenerate or update the project profile, or says things like "bootstrap", "set up my project for agents", "generalize my skills" or "make my AGENTS.md reusable", even if they do not name this skill.
+compatibility: Needs Python 3 and PyYAML (pip install pyyaml). Git is optional and improves commit style detection.
+---
+
+# Project bootstrap
+
+Every other pipeline skill reads one file first: `.agents/project-profile.yaml`. This skill creates and maintains that file. It works the same way for an existing repo and for a new app. Only the first stage differs. After the profile exists, audit, plan, build, verify, commit and docs all behave identically. That is why one pipeline stays efficient in both cases.
+
+The profile holds facts (stack, commands, layers, naming, breakpoints, commit scopes) and rules. Each rule is written once, in the profile. AGENTS.md and the convention skills are generated views of it. This prevents the drift that happens when the same rule is copied into 3 files by hand.
+
+The 5 process skills (`audit-and-planning`, `repo-search`, `atomic-commits`, `targeted-module-testing`, `sync-skills-and-docs`) ship in the same pipeline pack. Install them next to this skill. The renderer warns if any are missing.
+
+Bootstrap never edits application source code. It writes only `.agents/`, the AGENTS.md router and the skills folder.
+
+Scripts live in this skill's `scripts/` folder. Run them with the full path to that folder.
+
+## Step 0: Pick the mode
+
+1. If `.agents/project-profile.yaml` exists, use **update mode**. Run discovery again, compare with the profile, and show the user each difference. Never change a rule silently.
+2. Otherwise run `python scripts/detect_stack.py <repo_root>`. Read `suggested_mode`.
+3. If the user says this is a new app, or discovery finds no manifest and fewer than 3 source files, use **new mode**. If the repo has code, use **existing mode**. When unsure, ask in 1 question.
+
+## Existing mode
+
+1. Read the discovery JSON. Also read `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` and `README.md` when they exist. They hold rules the code cannot show.
+2. Copy `assets/project-profile.template.yaml` to `.agents/project-profile.yaml`. Fill only what the evidence supports.
+   - Commands: use `commands_suggested`. If there is no single `check` command, propose one that chains lint, test and build, and ask before adding it to `package.json`.
+   - Naming: state a style only when it covers at least 80% of files of that kind. Otherwise leave a TODO and ask.
+   - Commit rules: copy the style from `git` facts only when `conventional_ratio` is at least 0.8.
+   - Layers: use `layers`. Write one plain purpose per folder. Mark a guessed purpose as TODO.
+3. Move every rule from existing guideline files into the `rules` list. One sentence each, imperative, with an id and an area. Set `enforced_by` to `test` or `lint` only after you find the test or lint rule that enforces it. Otherwise use `manual`.
+4. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
+5. Run the external references step below.
+6. Validate, render and report (see "Finish").
+
+## New mode
+
+1. If `docs.spec` names a file, or `docs/product-spec.md` exists, read it and prefill every answer it covers. If there is no spec and the idea is vague, suggest running `product-spec` first. Then interview in at most 3 short rounds using `references/interview.md`: product, stack, then design and data. Ask only what the spec leaves open. Offer a default for every question. Accept "you decide".
+2. Write the profile with `mode: new`. Turn each decision into a rule. For example, "monochrome design" becomes a design rule with an id.
+3. Fill `structure.layers` with the folders the stack needs. Fill `commands` with the commands the chosen tooling will provide.
+4. Run the external references step below.
+5. Validate and render.
+6. Scaffolding: if the `scaffold-app` skill is available, hand off to it. Otherwise create only the empty folders from `structure.layers` and tell the user that code scaffolding is the next step. Do not generate application code here.
+
+Order for a new app: `product-spec`, then `project-bootstrap`, then `scaffold-app`, then `feature-delivery` once per milestone.
+
+## External references (both modes)
+
+Ask once, after the draft profile exists:
+
+> Do you want the pipeline to use any third party skills or docs, for example for browser debugging, a backend, deployment or security review? If yes, send the repo URL for each and say what it is for. You can skip this.
+
+- Skipping is a valid answer. Record nothing and leave the capability slots disabled. The pipeline then skips those stages.
+- Do not suggest specific third party repos on your own. If the user asks for ideas, describe the category and let them choose the repo.
+- For each repo the user gives, add an entry under `external_references` with `status: declared`, a `purpose`, and the stages in `used_by`. Link it from the matching `capabilities` slot with `reference`.
+- Offer to install each one. Follow `references/external-references.md`. Installing needs the user's yes for each repo.
+- Deploy is opt in. Set `capabilities.deploy.enabled` to true only when the user asks for it or already has a deploy command they want in the pipeline. Never add a mandatory production deploy rule by default.
+
+## Finish
+
+1. Run `python scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root>`. Fix every error. Show the user any remaining TODO.
+2. Run `python scripts/render.py --profile .agents/project-profile.yaml --root <repo_root>`. It never overwrites existing files. If `AGENTS.md` exists it writes `AGENTS.generated.md`. Help the user merge it, then offer to delete the generated copy.
+3. Report in this shape:
+
+```
+Detected: <stack and commands found, with the file each came from>
+Asked and answered: <questions and the user's answers>
+Still TODO: <unresolved fields>
+Files written: <paths>
+External references: <declared, installed, or none>
+Next step: <one sentence>
+```
+
+4. Do not commit. The user commits, or the commit stage of the pipeline does.
+
+## Reference files
+
+- `references/profile-schema.md`: every field, allowed values, and which pipeline stage reads which field. Read it when you fill or change a profile.
+- `references/interview.md`: question banks for new mode and for gaps in existing mode.
+- `references/external-references.md`: how to install and vet a third party skill repo.
+- `references/example-nemo.project-profile.yaml`: a complete worked profile.
+- `assets/project-profile.template.yaml`: the blank profile to copy.
+
+## Quoting in the profile
+
+Quote any YAML string that contains a comma, a colon or a leading symbol. An unquoted comma inside a one line mapping silently splits the value. The validator reports stray keys for this reason.
