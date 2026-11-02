@@ -45,6 +45,10 @@ Settings page, privacy policy, terms, consent and account deletion: run `legal-a
 - Convention skills such as `build-ui` and `review-directory-structure`, generated into `.agents/skills/`.
 - `.agents/repo-map.md`: a cache of where things live.
 
+## How it adapts
+
+Build Forge never edits itself. It reads each project and writes a project profile, AGENTS.md, convention skills and a repo map. To change behavior, edit the profile and re-render. Do not edit the pipeline skills.
+
 ## Script paths
 
 Skills refer to scripts by skill name. In this folder they live here:
@@ -79,3 +83,17 @@ Skills refer to scripts by skill name. In this folder they live here:
 Third party skills are never included. `project-bootstrap` asks whether you want to add any, and records only the repos you give it.
 
 The legal pages are templates, not legal advice. Have a qualified person review them before launch.
+
+## License
+
+Build Forge is distributed under the Build Forge License. Below is a plain summary of its 9 terms (see [LICENSE](LICENSE) for the full text):
+
+1. **Use**: Install and run on any number of projects and machines, for personal or commercial work, at no cost.
+2. **No changes**: Do not modify, adapt, translate, or create derivative works of Build Forge (including its skill files, scripts, templates, references, and installer).
+3. **Copies**: Keep complete, unmodified copies inside your projects and share with project collaborators. Do not publish, sell, sublicense, or distribute to anyone else.
+4. **Adaptation and generated files**: All files generated for your project (project profile, AGENTS.md, convention skills, repo map) and code/documents produced belong to you and may be edited freely.
+5. **Third party material**: Anything not written by the copyright holder is covered by its own terms.
+6. **Ending**: The license ends automatically upon breach of any terms, requiring deletion of all copies.
+7. **No warranty**: The software is provided "as is", without warranty of any kind.
+8. **Limit of liability**: The copyright holder is not liable for any claims or damages arising from use.
+9. **Governing law**: Subject to the governing law specified in [LICENSE](LICENSE).
