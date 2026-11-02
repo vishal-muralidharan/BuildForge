@@ -1,7 +1,7 @@
 ---
 name: legal-and-settings-pages
 description: Add a Settings page, public legal pages (terms of service, privacy policy, terms and conditions), a manage-my-data page with export, terms consent on signup, and server side account deletion to any web app. Audits the repo first, collects the legal details in a config file, adapts to the app's auth provider, database and host, and leaves visible TODO and CONFIRM markers instead of invented legal facts. Use it whenever the user asks for a settings page, privacy policy, terms and conditions, GDPR, DPDP or CCPA pages, consent checkbox, delete my account, export my data, or "make the app legal ready", even if they only name one of these.
-compatibility: Needs Python 3 and PyYAML for the placeholder scanner. Works inside a project that has .agents/project-profile.yaml.
+compatibility: Needs file read, file edit, shell, Python 3, and PyYAML.
 ---
 
 # Legal and settings pages
@@ -112,7 +112,7 @@ Then run `commands.check` and fix failures.
 
 ## Final report
 
-Run `python <this-skill>/scripts/check_legal_placeholders.py --root .` and use its output. Report:
+Run `python3 .agents/skills/legal-and-settings-pages/scripts/check_legal_placeholders.py --root .` and use its output. If python3 is not found, use python or py -3. Report:
 
 1. Every commit, in order.
 2. Every unresolved marker, grouped by file, with its section.
