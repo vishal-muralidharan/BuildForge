@@ -1,0 +1,65 @@
+name: Bug Report
+description: File a bug report for Build Forge
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue with Build Forge.
+  - type: input
+    id: version
+    attributes:
+      label: Build Forge Version
+      description: The version from `.agents/build-forge.lock.json` or package.json
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: Your OS and version (e.g. macOS 14.5, Ubuntu 22.04, Windows 11)
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Node and Python Versions
+      description: Output of `node -v` and `python3 --version`
+      placeholder: "Node 18.20.0, Python 3.11.8"
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command Run
+      description: The exact command line executed
+    validations:
+      required: true
+  - type: textarea
+    id: verify_output
+    attributes:
+      label: Verify Command Output
+      description: The complete output of `npx @v1006/build-forge verify`
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+    validations:
+      required: true
+  - type: input
+    id: agent_tool
+    attributes:
+      label: Agent Tool Used
+      description: Which agent tool was running (e.g. Claude Code, Gemini CLI, Cursor)
