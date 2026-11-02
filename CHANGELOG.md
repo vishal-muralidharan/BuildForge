@@ -2,6 +2,13 @@
 
 All notable changes to Build Forge will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- The `verify` command to inspect installed pipeline skill integrity.
+- `.agents/build-forge.lock.json` lock file generated upon install.
+- `integrity.json` checksum manifest for package verification.
+
 ## [0.1.0] - 2026-11-02
 
 ### Added
