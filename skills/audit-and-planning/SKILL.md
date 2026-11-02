@@ -1,6 +1,7 @@
 ---
 name: audit-and-planning
 description: Use before starting any feature, bug fix or refactor in a project that has a .agents/project-profile.yaml. Runs the audit and plan stages. Search the codebase first, diagnose the root cause, check the change against the project's own rules and protected data, then write a small atomic plan where every step has a target, a verification command and a commit message. Use it even when the task looks small, and whenever the user asks to add, fix, refactor, implement, build or change something in the repo.
+compatibility: Needs file read and shell access.
 ---
 
 # Audit and planning
