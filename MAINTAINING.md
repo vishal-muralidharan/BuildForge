@@ -57,3 +57,4 @@ Complete this checklist when configuring the repository and npm publishing:
 6. Create a GitHub environment named `release` with required reviewers enabled.
 7. Generate an npm access token (`NPM_TOKEN`) as a granular token scoped only to `@v1006/build-forge` with an expiration date. Add it to GitHub repository secrets.
 8. Turn on 2FA on the GitHub account.
+
