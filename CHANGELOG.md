@@ -5,9 +5,17 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- The `verify` command to inspect installed pipeline skill integrity.
-- `.agents/build-forge.lock.json` lock file generated upon install.
-- `integrity.json` checksum manifest for package verification.
+- `link` command in `bin/build-forge.js` to create relative symlinks or junctions for coding agents.
+- `unlink` command in `bin/build-forge.js` to remove symlinks pointing to `.agents/skills`.
+- `--agents <ids|auto|all>` CLI flag for `install`, `link`, and `unlink`.
+- Automatic pointer file creation (`CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`, `.windsurfrules`).
+- [COMPATIBILITY.md](COMPATIBILITY.md) with agent compatibility matrix, test checklist, and known limits.
+
+### Changed
+- Conformed all 11 skills to Agent Skills specification frontmatter.
+- Updated skill wording to vendor-neutral language.
+- Replaced placeholder script paths with explicit project-relative paths.
+- Standardized Python execution on `python3` across all skills.
 
 ## [0.1.0] - 2026-11-02
 
