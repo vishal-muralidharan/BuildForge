@@ -121,6 +121,8 @@ To keep the test matrix (Ubuntu, macOS, Windows; Node 18, 22) green across all C
    Test scripts importing internal modules must set `sys.dont_write_bytecode = True` and pass `PYTHONDONTWRITEBYTECODE=1` in subprocess environments to prevent creating `__pycache__` directories.
 4. **Git author in CI runners**:
    Always provide `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` in test fixture environments so `git commit` succeeds in headless environments.
+5. **Windows shell wildcard expansion**:
+   `cmd.exe` on Windows does not expand wildcards like `tests/*.test.js` in `package.json` scripts. Use `node --test` with default recursive discovery rather than file path globs.
 
 [CHANGELOG.md](CHANGELOG.md) uses the Keep a Changelog headings.
 

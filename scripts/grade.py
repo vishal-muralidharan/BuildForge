@@ -298,11 +298,13 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
                 "details": "npm test passed with 0 errors",
             })
         else:
+            err_output = (res.stderr.strip() or res.stdout.strip() or "").splitlines()
+            err_line = err_output[0] if err_output else f"exit code {res.returncode}"
             results.append({
                 "name": "Project test check",
                 "type": "auto",
                 "status": "FAIL",
-                "details": f"npm test failed with exit code {res.returncode}",
+                "details": f"npm test failed ({err_line})",
             })
 
     # 8. regression_test_exists

@@ -207,8 +207,13 @@ def run_grader_test_for_scenario_6(tmp_dir: Path) -> None:
     test_file = work_pass / "tests" / "storage.test.js"
     test_content = test_file.read_text(encoding="utf-8")
     test_file.write_text(test_content + "\n// extra test comment\n", encoding="utf-8")
-    subprocess.run(["git", "add", "."], cwd=str(work_pass), check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "feat(storage): update storage tests"], cwd=str(work_pass), check=True, capture_output=True)
+    env = os.environ.copy()
+    env["GIT_AUTHOR_NAME"] = "Build Forge Eval"
+    env["GIT_AUTHOR_EMAIL"] = "eval@build-forge.local"
+    env["GIT_COMMITTER_NAME"] = "Build Forge Eval"
+    env["GIT_COMMITTER_EMAIL"] = "eval@build-forge.local"
+    subprocess.run(["git", "add", "."], cwd=str(work_pass), env=env, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "feat(storage): update storage tests"], cwd=str(work_pass), env=env, check=True, capture_output=True)
 
     res_pass = grade_scenario(scenario_dir, work_pass, repo_root)
     assert res_pass["status"] == "PASS", f"Scenario 6 passing state failed: {res_pass}"
@@ -223,8 +228,8 @@ def run_grader_test_for_scenario_6(tmp_dir: Path) -> None:
 
     test_file_f = work_fail / "tests" / "storage.test.js"
     test_file_f.write_text(test_file_f.read_text(encoding="utf-8") + "\n// fail\n", encoding="utf-8")
-    subprocess.run(["git", "add", "."], cwd=str(work_fail), check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "Updated storage tests for session"], cwd=str(work_fail), check=True, capture_output=True)
+    subprocess.run(["git", "add", "."], cwd=str(work_fail), env=env, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Updated storage tests for session"], cwd=str(work_fail), env=env, check=True, capture_output=True)
 
     res_fail = grade_scenario(scenario_dir, work_fail, repo_root)
     assert res_fail["status"] == "FAIL", "Scenario 6 failing state unexpectedly passed"
