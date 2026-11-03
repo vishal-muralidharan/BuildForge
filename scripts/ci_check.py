@@ -17,6 +17,7 @@ Verifies:
    - check_commit_message.py exits 0 on "feat(entry): add keypad" and exits 1 on "Added keypad".
    - bin/build-forge.js installs one skill per folder in skills/ in a temporary folder.
 10. Multi-agent link and unlink tests in temporary folders.
+11. Allowlist guard: skills/, integrity.json, and npm pack must not contain folders outside ALLOWED_SKILLS.
 """
 import os
 import re
@@ -31,6 +32,21 @@ try:
     import yaml
 except ImportError:
     sys.exit("PyYAML is required: pip install pyyaml")
+
+ALLOWED_SKILLS = {
+    "atomic-commits",
+    "audit-and-planning",
+    "extend-pipeline",
+    "feature-delivery",
+    "legal-and-settings-pages",
+    "product-spec",
+    "project-bootstrap",
+    "repo-search",
+    "rules-to-tests",
+    "scaffold-app",
+    "sync-skills-and-docs",
+    "targeted-module-testing",
+}
 
 TOOL_WORD_DENYLIST = [
     "str_replace",
@@ -180,6 +196,66 @@ def check_dashes(skills_dir, errors):
                 pass
 
 
+def check_allowlist(repo_root, errors):
+    """Guard: skills/, integrity.json, and npm pack must not contain folders outside ALLOWED_SKILLS."""
+    skills_dir = os.path.join(repo_root, "skills")
+
+    # 1. skills/ folders
+    if os.path.isdir(skills_dir):
+        for item in sorted(os.listdir(skills_dir)):
+            if os.path.isdir(os.path.join(skills_dir, item)) and item not in ALLOWED_SKILLS:
+                errors.append(
+                    f"Allowlist failure: skills/{item} is not in ALLOWED_SKILLS. "
+                    "Remove it or add it to ALLOWED_SKILLS with maintainer approval."
+                )
+
+    # 2. integrity.json
+    integrity_path = os.path.join(repo_root, "integrity.json")
+    if os.path.isfile(integrity_path):
+        try:
+            import json
+            with open(integrity_path, "r", encoding="utf-8") as f:
+                integrity = json.load(f)
+            for key in integrity:
+                # keys are like "skills/<folder>/..." or "skills/<folder>"
+                parts = key.replace("\\", "/").split("/")
+                if len(parts) >= 2 and parts[0] == "skills":
+                    skill_name = parts[1]
+                    if skill_name and skill_name not in ALLOWED_SKILLS:
+                        errors.append(
+                            f"Allowlist failure: integrity.json lists path '{key}' "
+                            f"whose skill folder '{skill_name}' is not in ALLOWED_SKILLS."
+                        )
+        except Exception as e:
+            errors.append(f"Allowlist failure: could not parse integrity.json: {e}")
+
+    # 3. npm pack file list
+    res = subprocess.run(
+        ["npm", "pack", "--dry-run", "--json"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode == 0:
+        try:
+            import json
+            pack_data = json.loads(res.stdout)
+            # npm pack --json returns a list; first element has 'files'
+            files = pack_data[0].get("files", []) if pack_data else []
+            for entry in files:
+                path_str = entry.get("path", "").replace("\\", "/")
+                parts = path_str.split("/")
+                if len(parts) >= 2 and parts[0] == "skills":
+                    skill_name = parts[1]
+                    if skill_name and skill_name not in ALLOWED_SKILLS:
+                        errors.append(
+                            f"Allowlist failure: npm pack includes path '{path_str}' "
+                            f"whose skill folder '{skill_name}' is not in ALLOWED_SKILLS."
+                        )
+        except Exception as e:
+            errors.append(f"Allowlist failure: could not parse npm pack --json output: {e}")
+
+
 def run_smoke_test(repo_root, errors):
     with tempfile.TemporaryDirectory() as tmpdir:
         agents_dir = os.path.join(tmpdir, ".agents")
@@ -315,6 +391,128 @@ def run_link_tests(repo_root, errors):
         with open(claude_ptr, "r", encoding="utf-8") as f:
             if f.read() != "Custom instructions":
                 errors.append("Link test failure: Pointer file was overwritten by link command.")
+
+
+def run_allowlist_fixture_tests(repo_root, errors):
+    """Fixture tests: prove that each allowlist guard case fails as expected."""
+    import json
+    import shutil
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fake_skills = os.path.join(tmp, "skills")
+        os.makedirs(fake_skills)
+
+        # Seed one allowed skill so integrity/pack checks have realistic context.
+        allowed_skill = os.path.join(fake_skills, "atomic-commits")
+        os.makedirs(allowed_skill)
+        with open(os.path.join(allowed_skill, "SKILL.md"), "w", encoding="utf-8") as f:
+            f.write("---\nname: atomic-commits\ndescription: ok\n---\nContent.\n")
+
+        # --- Fixture A: unlisted folder in skills/ ---
+        unlisted_dir = os.path.join(fake_skills, "third-party-skill")
+        os.makedirs(unlisted_dir)
+        fixture_errors = []
+        check_allowlist_skills(fake_skills, fixture_errors)
+        if not any("third-party-skill" in e for e in fixture_errors):
+            errors.append(
+                "Allowlist fixture A failed: unlisted skills/ folder did not trigger an error."
+            )
+        shutil.rmtree(unlisted_dir)
+
+        # --- Fixture B: integrity.json with unlisted skill path ---
+        integrity_path = os.path.join(tmp, "integrity.json")
+        with open(integrity_path, "w", encoding="utf-8") as f:
+            json.dump({"skills/third-party-skill/SKILL.md": "abc123"}, f)
+        fixture_errors = []
+        check_allowlist_integrity(integrity_path, fixture_errors)
+        if not any("third-party-skill" in e for e in fixture_errors):
+            errors.append(
+                "Allowlist fixture B failed: integrity.json with unlisted skill did not trigger an error."
+            )
+        os.remove(integrity_path)
+
+        # --- Fixture C: npm pack file list with unlisted skill ---
+        fake_pack_output = json.dumps([{"files": [
+            {"path": "skills/atomic-commits/SKILL.md"},
+            {"path": "skills/third-party-skill/SKILL.md"},
+        ]}])
+        fixture_errors = []
+        check_allowlist_pack_output(fake_pack_output, fixture_errors)
+        if not any("third-party-skill" in e for e in fixture_errors):
+            errors.append(
+                "Allowlist fixture C failed: npm pack output with unlisted skill did not trigger an error."
+            )
+
+
+def check_allowlist_skills(skills_dir, errors):
+    """Sub-check: skills/ folders against ALLOWED_SKILLS."""
+    if os.path.isdir(skills_dir):
+        for item in sorted(os.listdir(skills_dir)):
+            if os.path.isdir(os.path.join(skills_dir, item)) and item not in ALLOWED_SKILLS:
+                errors.append(
+                    f"Allowlist failure: skills/{item} is not in ALLOWED_SKILLS. "
+                    "Remove it or add it to ALLOWED_SKILLS with maintainer approval."
+                )
+
+
+def check_allowlist_integrity(integrity_path, errors):
+    """Sub-check: integrity.json paths against ALLOWED_SKILLS."""
+    import json
+    if os.path.isfile(integrity_path):
+        try:
+            with open(integrity_path, "r", encoding="utf-8") as f:
+                integrity = json.load(f)
+            for key in integrity:
+                parts = key.replace("\\", "/").split("/")
+                if len(parts) >= 2 and parts[0] == "skills":
+                    skill_name = parts[1]
+                    if skill_name and skill_name not in ALLOWED_SKILLS:
+                        errors.append(
+                            f"Allowlist failure: integrity.json lists path '{key}' "
+                            f"whose skill folder '{skill_name}' is not in ALLOWED_SKILLS."
+                        )
+        except Exception as e:
+            errors.append(f"Allowlist failure: could not parse integrity.json: {e}")
+
+
+def check_allowlist_pack_output(pack_json_str, errors):
+    """Sub-check: npm pack --json output against ALLOWED_SKILLS."""
+    import json
+    try:
+        pack_data = json.loads(pack_json_str)
+        files = pack_data[0].get("files", []) if pack_data else []
+        for entry in files:
+            path_str = entry.get("path", "").replace("\\", "/")
+            parts = path_str.split("/")
+            if len(parts) >= 2 and parts[0] == "skills":
+                skill_name = parts[1]
+                if skill_name and skill_name not in ALLOWED_SKILLS:
+                    errors.append(
+                        f"Allowlist failure: npm pack includes path '{path_str}' "
+                        f"whose skill folder '{skill_name}' is not in ALLOWED_SKILLS."
+                    )
+    except Exception as e:
+        errors.append(f"Allowlist failure: could not parse npm pack --json output: {e}")
+
+
+def check_allowlist(repo_root, errors):
+    """Guard: skills/, integrity.json, and npm pack must not contain folders outside ALLOWED_SKILLS."""
+    skills_dir = os.path.join(repo_root, "skills")
+    check_allowlist_skills(skills_dir, errors)
+
+    integrity_path = os.path.join(repo_root, "integrity.json")
+    check_allowlist_integrity(integrity_path, errors)
+
+    res = subprocess.run(
+        ["npm", "pack", "--dry-run", "--json"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode == 0:
+        check_allowlist_pack_output(res.stdout, errors)
+    else:
+        errors.append(f"Allowlist failure: npm pack --dry-run --json failed: {res.stderr.strip()}")
 
 
 def run_references_tests(repo_root, errors):
@@ -497,13 +695,17 @@ def main():
     print("Running references system tests...")
     run_references_tests(repo_root, errors)
 
+    print("Running allowlist guard and fixture tests...")
+    check_allowlist(repo_root, errors)
+    run_allowlist_fixture_tests(repo_root, errors)
+
     if errors:
         print(f"\nCI checks failed with {len(errors)} error(s):")
         for err in errors:
             print(f"  - {err}")
         sys.exit(1)
 
-    print("\nAll CI checks, smoke tests, link tests, and references tests passed successfully.")
+    print("\nAll CI checks, smoke tests, link tests, references tests, and allowlist tests passed successfully.")
     sys.exit(0)
 
 
