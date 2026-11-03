@@ -86,23 +86,20 @@ capabilities:               # optional helpers. A disabled slot is skipped by th
     verify_url: ""
     on_failure: report      # report | self-heal
     max_attempts: 3         # self-heal stops after this many tries
-    reference: ""           # name of an entry in external_references
+    reference: ""           # name of an entry in .agents/references.yaml
   browser_inspection:
     enabled: false
-    reference: ""
+    reference: ""           # name of an entry in .agents/references.yaml
   backend:
     enabled: false
-    reference: ""
+    reference: ""           # name of an entry in .agents/references.yaml
   security_review:
     enabled: false
-    reference: ""
+    reference: ""           # name of an entry in .agents/references.yaml
 
-external_references: []     # third party skills or docs the USER chose. Example entry:
-#  - name: example-skill
-#    repo: https://github.com/owner/repo
-#    purpose: "what it is for"
-#    used_by: [verify]      # audit, plan, build, verify, deploy, commit, docs, report
-#    status: declared       # declared | installed | rejected
+# Third party skills and external references are managed in .agents/references.yaml.
+# Use extend-pipeline to add and vet references:
+#   python3 .agents/skills/extend-pipeline/scripts/refs.py add --help
 #    path: ""               # set when installed, relative to the repo root
 
 rules:                      # write each rule ONCE, here

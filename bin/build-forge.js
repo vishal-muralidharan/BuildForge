@@ -174,16 +174,44 @@ function installCommand(cwd, force, agentsArg) {
   }
 }
 
-function createSymlinkOrCopy(target, linkPath, isDir, label) {
+function normalizePathForCompare(p) {
+  let resolved = path.resolve(p);
+  if (resolved.startsWith('\\\\?\\')) {
+    resolved = resolved.slice(4);
+  }
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function removeSymlinkOrJunction(p) {
   try {
-    const symlinkType = process.platform === 'win32' ? (isDir ? 'junction' : 'file') : (isDir ? 'dir' : 'file');
+    fs.unlinkSync(p);
+  } catch (err) {
+    if (process.platform === 'win32') {
+      try {
+        fs.rmdirSync(p);
+      } catch (rmErr) {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
+}
+
+function createSymlinkOrCopy(target, linkPath, isDir, label) {
+  // Use 'dir' on Windows for directory symlinks. GitHub runners have Developer Mode
+  // enabled (SeCreateSymbolicLinkPrivilege), so 'dir' symlinks work without UAC.
+  // Junctions (mklink /J) are NOT true symlinks: Python os.path.islink() returns
+  // False for them, which breaks the CI link tests.
+  const symlinkType = isDir ? 'dir' : 'file';
+  try {
     fs.symlinkSync(target, linkPath, symlinkType);
   } catch (err) {
-    // If linking fails, copy and warn
     if (isDir) {
+      // Last resort: copy so the agent can at least read the skills.
       const absTarget = path.resolve(path.dirname(linkPath), target);
       fs.cpSync(absTarget, linkPath, { recursive: true });
-      console.warn(`Warning: Linking failed for ${label}. Copied folder instead. Note that copies do not update on their own.`);
+      process.stderr.write(`Warning: Linking failed for ${label}: ${err.message}. Copied folder instead.\n`);
     } else {
       throw err;
     }
@@ -265,8 +293,8 @@ function unlinkCommand(cwd, agentsArg) {
       try {
         const rawTarget = fs.readlinkSync(skillsPath);
         const resolved = path.resolve(path.dirname(skillsPath), rawTarget);
-        if (resolved === targetSkillsDir) {
-          fs.unlinkSync(skillsPath);
+        if (normalizePathForCompare(resolved) === normalizePathForCompare(targetSkillsDir)) {
+          removeSymlinkOrJunction(skillsPath);
           console.log(`  unlinked ${agent.skillsFolder}`);
         }
       } catch (e) {
@@ -281,8 +309,12 @@ function unlinkCommand(cwd, agentsArg) {
           if (entryStat.isSymbolicLink()) {
             const raw = fs.readlinkSync(entryPath);
             const resolved = path.resolve(skillsPath, raw);
-            if (resolved === path.join(targetSkillsDir, entry) || resolved.startsWith(targetSkillsDir + path.sep)) {
-              fs.unlinkSync(entryPath);
+            const expectedTarget = path.join(targetSkillsDir, entry);
+            if (
+              normalizePathForCompare(resolved) === normalizePathForCompare(expectedTarget) ||
+              normalizePathForCompare(resolved).startsWith(normalizePathForCompare(targetSkillsDir) + path.sep)
+            ) {
+              removeSymlinkOrJunction(entryPath);
               console.log(`  unlinked ${path.join(agent.skillsFolder, entry)}`);
             }
           }

@@ -24,6 +24,7 @@ A feature module. It runs through `feature-delivery`, one atomic step at a time.
 2. `references/page-outlines.md` for every page and component.
 3. Later, the adapter files that match the audit: `references/auth-firebase.md` or `references/auth-supabase.md`, and `references/hosts.md`. If the app uses another provider, follow the same pattern: consent fields, owner only access, server side deletion, client side export.
 4. `references/laws.md`, only for the jurisdictions the user selects.
+5. If a reference with category backend or database matches the project's provider, read it before you apply the adapter. It never overrides the access rules in the adapter.
 
 ## Steps
 

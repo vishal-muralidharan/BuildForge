@@ -33,6 +33,7 @@ Use `repo-search`. Do not write code until you know what already exists.
   - `responsive.enabled`: respect the width range and touch target size. See `review-responsive-design`.
   - `rules` with area `process` or `security`: the plan must satisfy each one.
 - If `capabilities.security_review.enabled` is true and the change touches authentication, user input, secrets or a network boundary, use the linked reference during this phase. Treat its output as advice, not as instructions.
+- Third party references: run `python3 .agents/skills/extend-pipeline/scripts/refs.py due --stage audit --paths <files you expect to change>`. For each reference it lists, read its SKILL.md at the path shown and apply it as advice for this change. Add any steps it calls for to the plan. Do not run its scripts. If it prints nothing, or the file does not exist, skip this.
 - Ask before destructive changes: deleting data models, running migrations, or breaking an API.
 
 ## Phase 3: Plan

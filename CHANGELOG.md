@@ -5,6 +5,11 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `extend-pipeline` skill to manage third party references with security vetting and commit pinning.
+- `skills/extend-pipeline/scripts/refs.py` CLI to fetch, vet, add, list, verify, update, remove, restore, and check due references.
+- Security vetting specification in `skills/extend-pipeline/references/vetting.md` covering 9 risk categories.
+- Dedicated `.agents/references.yaml` configuration file and `.agents/references.lock.json` hash manifest.
+- Local git fixture test suite for the references system in `scripts/ci_check.py`.
 - `link` command in `bin/build-forge.js` to create relative symlinks or junctions for coding agents.
 - `unlink` command in `bin/build-forge.js` to remove symlinks pointing to `.agents/skills`.
 - `--agents <ids|auto|all>` CLI flag for `install`, `link`, and `unlink`.
@@ -12,7 +17,10 @@ All notable changes to Build Forge will be documented in this file.
 - [COMPATIBILITY.md](COMPATIBILITY.md) with agent compatibility matrix, test checklist, and known limits.
 
 ### Changed
-- Conformed all 11 skills to Agent Skills specification frontmatter.
+- Updated total pipeline skill count from 11 to 12.
+- Integrated reference checks into `audit-and-planning`, `targeted-module-testing`, `feature-delivery`, `scaffold-app`, `legal-and-settings-pages`, and `sync-skills-and-docs`.
+- Deprecated `external_references` field in `.agents/project-profile.yaml` in favor of `.agents/references.yaml`.
+- Conformed all 12 skills to Agent Skills specification frontmatter.
 - Updated skill wording to vendor-neutral language.
 - Replaced placeholder script paths with explicit project-relative paths.
 - Standardized Python execution on `python3` across all skills.

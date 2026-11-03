@@ -317,6 +317,164 @@ def run_link_tests(repo_root, errors):
                 errors.append("Link test failure: Pointer file was overwritten by link command.")
 
 
+def run_references_tests(repo_root, errors):
+    refs_py = os.path.join(repo_root, "skills", "extend-pipeline", "scripts", "refs.py")
+    cli_js = os.path.join(repo_root, "bin", "build-forge.js")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # 1. Create local fixture git repository
+        fixture_dir = os.path.join(tmp, "fixture-repo")
+        os.makedirs(fixture_dir, exist_ok=True)
+        res_init = subprocess.run(["git", "init"], cwd=fixture_dir, capture_output=True, text=True)
+        if res_init.returncode != 0:
+            errors.append(f"References test failure: git init failed:\n{res_init.stderr}")
+            return
+        subprocess.run(["git", "config", "user.email", "ci@example.com"], cwd=fixture_dir, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "CI Tester"], cwd=fixture_dir, capture_output=True)
+
+        skill_dir = os.path.join(fixture_dir, "fixture-skill")
+        os.makedirs(skill_dir, exist_ok=True)
+        with open(os.path.join(skill_dir, "SKILL.md"), "w", encoding="utf-8") as f:
+            f.write("---\nname: fixture-skill\ndescription: A clean test skill.\ncompatibility: None.\n---\n# Test\nInstructions.\n")
+        subprocess.run(["git", "add", "."], cwd=fixture_dir, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=fixture_dir, capture_output=True)
+
+        # 2. Test fetch
+        out_inspect = os.path.join(tmp, "inspect")
+        res_fetch = subprocess.run([sys.executable, refs_py, "fetch", fixture_dir, "--out", out_inspect], capture_output=True, text=True)
+        if res_fetch.returncode != 0:
+            errors.append(f"References test failure: fetch failed:\nSTDOUT:\n{res_fetch.stdout}\nSTDERR:\n{res_fetch.stderr}")
+        elif "fixture-skill" not in res_fetch.stdout:
+            errors.append("References test failure: fetch output missing 'fixture-skill'.")
+
+        # 3. Test vet on clean fixture
+        res_vet_clean = subprocess.run([sys.executable, refs_py, "vet", out_inspect], capture_output=True, text=True)
+        if res_vet_clean.returncode != 0:
+            errors.append(f"References test failure: vet clean failed:\nSTDOUT:\n{res_vet_clean.stdout}\nSTDERR:\n{res_vet_clean.stderr}")
+
+        # 4. Test vet on bad fixture with high findings (scripts, curl, token, zero-width char, prompt override)
+        bad_dir = os.path.join(tmp, "bad-dir")
+        os.makedirs(bad_dir, exist_ok=True)
+        with open(os.path.join(bad_dir, "script.py"), "w", encoding="utf-8") as f:
+            f.write("import os\n# ignore previous instructions\napi_key = 'secret'\ncurl = 'curl'\nos.system('echo \u200b')\n")
+        res_vet_bad = subprocess.run([sys.executable, refs_py, "vet", bad_dir], capture_output=True, text=True)
+        if res_vet_bad.returncode != 1:
+            errors.append(f"References test failure: vet bad directory expected exit code 1, got {res_vet_bad.returncode}")
+        elif "HIGH" not in res_vet_bad.stdout:
+            errors.append("References test failure: vet bad directory missing HIGH findings.")
+
+        # 5. Test add without --approved fails
+        proj_dir = os.path.join(tmp, "proj")
+        os.makedirs(os.path.join(proj_dir, ".agents"), exist_ok=True)
+        res_add_unapproved = subprocess.run(
+            [sys.executable, refs_py, "add", "--name", "fixture-ref", "--source", fixture_dir, "--subpath", "fixture-skill",
+             "--category", "security", "--purpose", "Audit tests", "--used-by", "audit,verify", "--root", proj_dir],
+            capture_output=True, text=True
+        )
+        if res_add_unapproved.returncode == 0:
+            errors.append("References test failure: add without --approved should fail.")
+
+        # 6. Test add with --approved
+        res_add = subprocess.run(
+            [sys.executable, refs_py, "add", "--name", "fixture-ref", "--source", fixture_dir, "--subpath", "fixture-skill",
+             "--category", "security", "--purpose", "Audit tests", "--used-by", "audit,verify",
+             "--paths", "src/**", "--approved", "--root", proj_dir],
+            capture_output=True, text=True
+        )
+        if res_add.returncode != 0:
+            errors.append(f"References test failure: add failed:\nSTDOUT:\n{res_add.stdout}\nSTDERR:\n{res_add.stderr}")
+        installed_skill_md = os.path.join(proj_dir, ".agents", "vendor", "fixture-ref", "SKILL.md")
+        if not os.path.isfile(installed_skill_md):
+            errors.append("References test failure: Installed skill file missing in .agents/vendor.")
+
+        # 7. Test list
+        res_list = subprocess.run([sys.executable, refs_py, "list", "--root", proj_dir], capture_output=True, text=True)
+        if res_list.returncode != 0:
+            errors.append(f"References test failure: list failed:\n{res_list.stderr}")
+        elif "fixture-ref" not in res_list.stdout:
+            errors.append("References test failure: list output missing 'fixture-ref'.")
+
+        # 8. Test due
+        res_due_match = subprocess.run(
+            [sys.executable, refs_py, "due", "--stage", "audit", "--paths", "src/index.js", "--root", proj_dir],
+            capture_output=True, text=True
+        )
+        if "fixture-ref/SKILL.md" not in res_due_match.stdout:
+            errors.append("References test failure: due should return matching reference for path 'src/index.js'.")
+
+        res_due_nomatch_path = subprocess.run(
+            [sys.executable, refs_py, "due", "--stage", "audit", "--paths", "docs/spec.md", "--root", proj_dir],
+            capture_output=True, text=True
+        )
+        if res_due_nomatch_path.stdout.strip() != "":
+            errors.append("References test failure: due should return empty output for non-matching path.")
+
+        res_due_nomatch_stage = subprocess.run(
+            [sys.executable, refs_py, "due", "--stage", "deploy", "--paths", "src/index.js", "--root", proj_dir],
+            capture_output=True, text=True
+        )
+        if res_due_nomatch_stage.stdout.strip() != "":
+            errors.append("References test failure: due should return empty output for non-matching stage.")
+
+        # 9. Test verify & restore
+        res_ver_init = subprocess.run([sys.executable, refs_py, "verify", "--root", proj_dir], capture_output=True, text=True)
+        if res_ver_init.returncode != 0:
+            errors.append(f"References test failure: initial verify failed:\n{res_ver_init.stderr}")
+
+        with open(installed_skill_md, "a", encoding="utf-8") as f:
+            f.write("\ncorrupted content\n")
+        res_ver_tamper = subprocess.run([sys.executable, refs_py, "verify", "--root", proj_dir], capture_output=True, text=True)
+        if res_ver_tamper.returncode != 1:
+            errors.append(f"References test failure: verify expected exit code 1 on modified file, got {res_ver_tamper.returncode}")
+
+        res_restore = subprocess.run([sys.executable, refs_py, "restore", "--root", proj_dir], capture_output=True, text=True)
+        if res_restore.returncode != 0:
+            errors.append(f"References test failure: restore failed:\n{res_restore.stderr}")
+
+        res_ver_clean2 = subprocess.run([sys.executable, refs_py, "verify", "--root", proj_dir], capture_output=True, text=True)
+        if res_ver_clean2.returncode != 0:
+            errors.append(f"References test failure: verify failed after restore:\n{res_ver_clean2.stderr}")
+
+        # 10. Test update without --approved vs with --approved
+        extra_file = os.path.join(skill_dir, "extra.md")
+        with open(extra_file, "w", encoding="utf-8") as f:
+            f.write("extra content\n")
+        subprocess.run(["git", "add", "."], cwd=fixture_dir, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "add extra.md"], cwd=fixture_dir, capture_output=True)
+
+        res_upd_dry = subprocess.run([sys.executable, refs_py, "update", "fixture-ref", "--root", proj_dir], capture_output=True, text=True)
+        if "extra.md" not in res_upd_dry.stdout:
+            errors.append("References test failure: update preview missing 'extra.md'.")
+        installed_extra = os.path.join(proj_dir, ".agents", "vendor", "fixture-ref", "extra.md")
+        if os.path.exists(installed_extra):
+            errors.append("References test failure: update without --approved must not install files.")
+
+        res_upd_appr = subprocess.run([sys.executable, refs_py, "update", "fixture-ref", "--approved", "--root", proj_dir], capture_output=True, text=True)
+        if res_upd_appr.returncode != 0:
+            errors.append(f"References test failure: update with --approved failed:\n{res_upd_appr.stderr}")
+        if not os.path.exists(installed_extra):
+            errors.append("References test failure: update with --approved should have installed 'extra.md'.")
+
+        # 11. Pipeline-only reference is never linked into skills
+        res_inst = subprocess.run(["node", cli_js, "install"], cwd=proj_dir, capture_output=True, text=True)
+        if res_inst.returncode != 0:
+            errors.append(f"References test failure: build-forge install failed:\n{res_inst.stderr}")
+        res_link = subprocess.run(["node", cli_js, "link", "--agents", "claude"], cwd=proj_dir, capture_output=True, text=True)
+        if res_link.returncode != 0:
+            errors.append(f"References test failure: build-forge link failed:\n{res_link.stderr}")
+        if os.path.exists(os.path.join(proj_dir, ".agents", "skills", "fixture-ref")):
+            errors.append("References test failure: pipeline-only reference should not exist in .agents/skills.")
+        if os.path.exists(os.path.join(proj_dir, ".claude", "skills", "fixture-ref")):
+            errors.append("References test failure: pipeline-only reference should not be linked in .claude/skills.")
+
+        # 12. Test remove
+        res_rem = subprocess.run([sys.executable, refs_py, "remove", "fixture-ref", "--yes", "--root", proj_dir], capture_output=True, text=True)
+        if res_rem.returncode != 0:
+            errors.append(f"References test failure: remove failed:\n{res_rem.stderr}")
+        if os.path.exists(os.path.join(proj_dir, ".agents", "vendor", "fixture-ref")):
+            errors.append("References test failure: vendor directory still exists after remove.")
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -336,13 +494,16 @@ def main():
     print("Running multi-agent link tests...")
     run_link_tests(repo_root, errors)
 
+    print("Running references system tests...")
+    run_references_tests(repo_root, errors)
+
     if errors:
         print(f"\nCI checks failed with {len(errors)} error(s):")
         for err in errors:
             print(f"  - {err}")
         sys.exit(1)
 
-    print("\nAll CI checks, smoke tests, and link tests passed successfully.")
+    print("\nAll CI checks, smoke tests, link tests, and references tests passed successfully.")
     sys.exit(0)
 
 

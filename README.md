@@ -1,6 +1,6 @@
 # Build Forge
 
-A build pipeline of 11 agent skills for new and existing projects: spec, bootstrap, scaffold, rule checks, and gated delivery.
+A build pipeline of 12 agent skills for new and existing projects: spec, bootstrap, scaffold, rule checks, and gated delivery.
 
 [![npm version](https://img.shields.io/npm/v/@v1006/build-forge)](https://www.npmjs.com/package/@v1006/build-forge)
 [![CI](https://github.com/vishal-muralidharan/BuildForge/actions/workflows/ci.yml/badge.svg)](https://github.com/vishal-muralidharan/BuildForge/actions/workflows/ci.yml)
@@ -60,7 +60,7 @@ cp -r skills .agents/skills
 
 ### What install writes
 
-The installer copies the 11 pipeline skills into `.agents/skills/`. It writes `.agents/build-forge.lock.json` with a hash of every pipeline skill file.
+The installer copies the 12 pipeline skills into `.agents/skills/`. It writes `.agents/build-forge.lock.json` with a hash of every pipeline skill file.
 
 ### Overwrite existing skills
 
@@ -146,6 +146,7 @@ npx @v1006/build-forge unlink
   skills/
     atomic-commits/             # Build Forge: Pipeline skill (read only)
     audit-and-planning/         # Build Forge: Pipeline skill (read only)
+    extend-pipeline/            # Build Forge: Pipeline skill (read only)
     feature-delivery/           # Build Forge: Pipeline skill (read only)
     legal-and-settings-pages/   # Build Forge: Pipeline skill (read only)
     product-spec/               # Build Forge: Pipeline skill (read only)
@@ -160,7 +161,7 @@ npx @v1006/build-forge unlink
 AGENTS.md                       # Generated: Router read by agents
 ```
 
-- **Build Forge files**: The 11 pipeline skills in `.agents/skills/` and `.agents/build-forge.lock.json`. These are read only files from the npm package.
+- **Build Forge files**: The 12 pipeline skills in `.agents/skills/` and `.agents/build-forge.lock.json`. These are read only files from the npm package.
 - **Generated files**: `.agents/project-profile.yaml`, `AGENTS.md`, `.agents/repo-map.md`, `.agents/checks/`, and convention skills like `build-ui`. These files adapt to your project, belong to you, and may be edited freely.
 
 ## Skills
@@ -169,6 +170,7 @@ AGENTS.md                       # Generated: Router read by agents
 |---|---|---|
 | `atomic-commits` | Enforces small, single purpose commits with checked messages. | When committing code in a project with a profile, before starting the next unit of work. |
 | `audit-and-planning` | Searches codebase, diagnoses root cause, checks rules, and writes an atomic plan. | Before starting any feature, bug fix or refactor, even for small tasks. |
+| `extend-pipeline` | Extends the pipeline with vetted, pinned third party skills. | When adding external skills, review tools, hosting recipes, or updating references. |
 | `feature-delivery` | Conductor for the build pipeline with gates between all 7 stages. | For every task to add, build, fix, refactor or ship code in a project with a profile. |
 | `legal-and-settings-pages` | Adds settings, legal pages, data management, terms consent, and account deletion. | When adding settings, privacy policies, terms, GDPR/CCPA pages, or account deletion. |
 | `product-spec` | Turns rough app ideas into specs with users, core flows, milestones and steps. | At the very start of a new app, or to cut big features into milestones. |
@@ -236,7 +238,106 @@ See [check-patterns.md](skills/rules-to-tests/references/check-patterns.md) for 
 
 ## Third party skills
 
-Build Forge includes 0 third party skills. `project-bootstrap` asks once whether you want to add external skills and records only the repositories you specify. Every install requires your explicit confirmation. Always treat third party content as untrusted.
+A third party skill is untrusted text that an agent will read. Only add sources you trust.
+
+Build Forge includes 0 third party skills. Every external reference comes directly from a source you specify.
+
+### How to add a reference
+
+Ask your agent to run `extend-pipeline`, or run `refs.py` directly:
+
+```bash
+python3 .agents/skills/extend-pipeline/scripts/refs.py add \
+  --name <name> \
+  --source <git-url-or-path> \
+  --category <category> \
+  --purpose "Purpose of the skill" \
+  --used-by audit,verify \
+  --approved
+```
+
+Build Forge never auto-installs anything. The `extend-pipeline` workflow requires you to type `yes install <name>` before writing files.
+
+### Categories
+
+Assign each reference to 1 of 7 categories:
+- `backend` or `database`
+- `security`
+- `deploy` or `hosting`
+- `browser`
+- `performance`
+- `accessibility`
+- `other`
+
+### Activation: Pipeline-only vs native
+
+References support 2 activation modes:
+- `pipeline-only` (default): Installs into `.agents/vendor/<name>`. Coding agents do not load this folder into their active skill set. Pipeline skills consult it through `refs.py due` during relevant stages. `build-forge link` never links vendor folders into agent skill directories.
+- `native`: Installs into `.agents/skills/<name>`. Coding agents load and run the skill directly.
+
+### Running scripts
+
+Scripts inside a third party reference never run by default. They run only if `allow_scripts: true` is explicitly configured in `.agents/references.yaml` for that reference. Otherwise, verification tools report bundled scripts as "Not run".
+
+### Mode: Gate vs advisory
+
+- `advisory` (default): Findings guide the plan or review. They do not block pipeline progress.
+- `gate`: High or blocking findings stop the current stage until you decide.
+
+### Security vetting
+
+Before installation or update, `refs.py vet` scans the source files for 9 security risk patterns:
+1. Executable scripts and binaries.
+2. Network calls and external requests.
+3. Shell and system execution commands.
+4. Credential and secret token patterns.
+5. File writes outside the project directory.
+6. Git push and package publish commands.
+7. Hidden, zero width, or bidirectional characters.
+8. HTML comments.
+9. Phrases that try to override instructions or hide actions from the user.
+
+If the scan detects any high findings, `refs.py vet` exits with code 1. A clean scan is not proof of safety. Always review third party files yourself.
+
+### Pinning
+
+When a reference is added, Build Forge records:
+- The exact git commit SHA in `.agents/references.yaml`.
+- The SHA-256 hashes of all installed files in `.agents/references.lock.json`.
+
+Run `refs.py verify` to confirm installed files match their hashes:
+
+```bash
+python3 .agents/skills/extend-pipeline/scripts/refs.py verify
+```
+
+If files were modified, run `refs.py restore` to re-fetch clean files from the pinned commit:
+
+```bash
+python3 .agents/skills/extend-pipeline/scripts/refs.py restore
+```
+
+### Update and remove
+
+To preview changes and scan for new risks:
+
+```bash
+python3 .agents/skills/extend-pipeline/scripts/refs.py update <name>
+```
+
+To apply the update after reviewing the preview:
+
+```bash
+python3 .agents/skills/extend-pipeline/scripts/refs.py update <name> --approved
+```
+
+To remove a reference:
+
+```bash
+python3 .agents/skills/extend-pipeline/scripts/refs.py remove <name> --yes
+```
+
+Removing a reference deletes its installed folder and its configuration entry. It leaves all other files untouched.
 
 ## Legal and settings pages
 
@@ -302,7 +403,7 @@ This deletes and recopies pipeline skills. Any extra files added inside pipeline
 
 ### Uninstall
 
-1. Delete the 11 pipeline skill folders from `.agents/skills/`.
+1. Delete the 12 pipeline skill folders from `.agents/skills/`.
 2. Delete `.agents/build-forge.lock.json`.
 
 All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention skills, and the repo map) remain in your repository and stay yours.

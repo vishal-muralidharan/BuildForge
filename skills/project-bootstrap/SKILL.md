@@ -48,14 +48,10 @@ Order for a new app: `product-spec`, then `project-bootstrap`, then `scaffold-ap
 
 ## External references (both modes)
 
-Ask once, after the draft profile exists:
-
-> Do you want the pipeline to use any third party skills or docs, for example for browser debugging, a backend, deployment or security review? If yes, send the repo URL for each and say what it is for. You can skip this.
+Ask once whether the user wants third party skills. If yes, run the extend-pipeline skill. If no, record nothing.
 
 - Skipping is a valid answer. Record nothing and leave the capability slots disabled. The pipeline then skips those stages.
-- Do not suggest specific third party repos on your own. If the user asks for ideas, describe the category and let them choose the repo.
-- For each repo the user gives, add an entry under `external_references` with `status: declared`, a `purpose`, and the stages in `used_by`. Link it from the matching `capabilities` slot with `reference`.
-- Offer to install each one. Follow `references/external-references.md`. Installing needs the user's yes for each repo.
+- Never recommend or suggest third party repositories on your own.
 - Deploy is opt in. Set `capabilities.deploy.enabled` to true only when the user asks for it or already has a deploy command they want in the pipeline. Never add a mandatory production deploy rule by default.
 
 ## Finish

@@ -47,6 +47,11 @@ Follow these steps to publish a new release:
    node package/bin/build-forge.js unlink --agents claude
    ```
 7. Confirm that `.claude/skills` was created as a symlink pointing to `.agents/skills`, that `verify` exited 0 through the link, and that `unlink` removed the symlink.
+8. Test the references system with local fixtures:
+   ```bash
+   python3 scripts/ci_check.py
+   ```
+   The CI script tests `refs.py` against temporary local git fixtures without accessing the network. It verifies fetching, vetting, adding, listing, verification, updates, removal, and restoration.
 
 ## One time setup checklist
 
