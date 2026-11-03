@@ -23,6 +23,10 @@ All notable changes to Build Forge will be documented in this file.
 - Atomic rollback protocol in `feature-delivery` reverting changes cleanly after 2 consecutive verify failures.
 - Goal acceptance verification in `targeted-module-testing` (Section 2b) and Post-Build Audit reporting.
 - GitHub Actions workflow template in `skills/rules-to-tests/assets/rules-ci.yml` for automated rule check enforcement on PRs.
+- `scripts/make_integrity.py` and `integrity.json` hash manifest recording SHA-256 hashes of all skills.
+- Automatic `.gitignore` updating during `build-forge install` to ignore `.agents/work/` and `.agents/vendor/`.
+- CI smoke test coverage for `status`, `diff`, and `.gitignore` auto-ignore in `scripts/ci_check.py`.
+- `check_integrity_manifest` in `scripts/ci_check.py` verifying the skills tree against `integrity.json`.
 
 ### Changed
 - Scoped `computeSkillsManifest` in `bin/build-forge.js` to core package skills so project custom convention skills in `.agents/skills` are never locked or flagged during verification.
