@@ -174,10 +174,37 @@ function installCommand(cwd, force, agentsArg) {
   }
 }
 
+function normalizePathForCompare(p) {
+  let resolved = path.resolve(p);
+  if (resolved.startsWith('\\\\?\\')) {
+    resolved = resolved.slice(4);
+  }
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function removeSymlinkOrJunction(p) {
+  try {
+    fs.unlinkSync(p);
+  } catch (err) {
+    if (process.platform === 'win32') {
+      try {
+        fs.rmdirSync(p);
+      } catch (rmErr) {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
+}
+
 function createSymlinkOrCopy(target, linkPath, isDir, label) {
   try {
     const symlinkType = process.platform === 'win32' ? (isDir ? 'junction' : 'file') : (isDir ? 'dir' : 'file');
-    fs.symlinkSync(target, linkPath, symlinkType);
+    const symlinkTarget = (process.platform === 'win32' && symlinkType === 'junction')
+      ? path.resolve(path.dirname(linkPath), target)
+      : target;
+    fs.symlinkSync(symlinkTarget, linkPath, symlinkType);
   } catch (err) {
     // If linking fails, copy and warn
     if (isDir) {
@@ -265,8 +292,8 @@ function unlinkCommand(cwd, agentsArg) {
       try {
         const rawTarget = fs.readlinkSync(skillsPath);
         const resolved = path.resolve(path.dirname(skillsPath), rawTarget);
-        if (resolved === targetSkillsDir) {
-          fs.unlinkSync(skillsPath);
+        if (normalizePathForCompare(resolved) === normalizePathForCompare(targetSkillsDir)) {
+          removeSymlinkOrJunction(skillsPath);
           console.log(`  unlinked ${agent.skillsFolder}`);
         }
       } catch (e) {
@@ -281,8 +308,12 @@ function unlinkCommand(cwd, agentsArg) {
           if (entryStat.isSymbolicLink()) {
             const raw = fs.readlinkSync(entryPath);
             const resolved = path.resolve(skillsPath, raw);
-            if (resolved === path.join(targetSkillsDir, entry) || resolved.startsWith(targetSkillsDir + path.sep)) {
-              fs.unlinkSync(entryPath);
+            const expectedTarget = path.join(targetSkillsDir, entry);
+            if (
+              normalizePathForCompare(resolved) === normalizePathForCompare(expectedTarget) ||
+              normalizePathForCompare(resolved).startsWith(normalizePathForCompare(targetSkillsDir) + path.sep)
+            ) {
+              removeSymlinkOrJunction(entryPath);
               console.log(`  unlinked ${path.join(agent.skillsFolder, entry)}`);
             }
           }

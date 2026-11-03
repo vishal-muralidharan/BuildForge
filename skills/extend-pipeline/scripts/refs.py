@@ -331,7 +331,7 @@ def cmd_vet(args):
     med_findings = [f for f in findings if f[0] == "MEDIUM"]
 
     if not findings:
-        print("✓ No security findings detected.")
+        print("OK: No security findings detected.")
         print("\nNote: A clean scan is not proof of safety. Verify all third party text by hand.")
         sys.exit(0)
 
