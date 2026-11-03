@@ -100,7 +100,7 @@ function parseArgs(args) {
 
   if (positional.length > 0) {
     const first = positional[0].toLowerCase();
-    if (['install', 'link', 'unlink', 'verify', 'help'].includes(first)) {
+    if (['install', 'link', 'unlink', 'verify', 'status', 'diff', 'help'].includes(first)) {
       command = first;
     }
   }
@@ -469,6 +469,114 @@ function verifyCommand(cwd) {
   process.exit(0);
 }
 
+function statusCommand(cwd) {
+  console.log('Build Forge Status Report');
+  console.log(`  Root: ${cwd}`);
+  console.log(`  Node: ${process.version}`);
+  console.log(`  Platform: ${process.platform}`);
+
+  const profilePath = path.join(cwd, '.agents', 'project-profile.yaml');
+  const profileOk = fs.existsSync(profilePath);
+  console.log(`  Project Profile: ${profileOk ? 'Found (.agents/project-profile.yaml)' : 'Not found (run project-bootstrap)'}`);
+
+  const skillsDir = path.join(cwd, '.agents', 'skills');
+  let installedCount = 0;
+  if (fs.existsSync(skillsDir)) {
+    installedCount = fs.readdirSync(skillsDir).filter(name => {
+      try {
+        return fs.statSync(path.join(skillsDir, name)).isDirectory();
+      } catch (e) {
+        return false;
+      }
+    }).length;
+  }
+  console.log(`  Installed Skills: ${installedCount} in .agents/skills`);
+
+  const lockPath = path.join(cwd, '.agents', 'build-forge.lock.json');
+  let lockOk = false;
+  let lockedCount = 0;
+  if (fs.existsSync(lockPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+      lockedCount = Object.keys(data).length;
+      lockOk = true;
+    } catch (e) {}
+  }
+  console.log(`  Build Forge Lock: ${lockOk ? `Valid (${lockedCount} files tracked)` : 'Missing or invalid (run build-forge install)'}`);
+
+  const refsPath = path.join(cwd, '.agents', 'references.lock.json');
+  let refsCount = 0;
+  if (fs.existsSync(refsPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(refsPath, 'utf8'));
+      refsCount = Object.keys(data).length;
+    } catch (e) {}
+  }
+  console.log(`  Vendor References: ${refsCount} installed (.agents/references.lock.json)`);
+
+  console.log('  Agent Links:');
+  for (const agent of AGENTS) {
+    const details = [];
+    if (agent.pointerFile) {
+      const p = path.join(cwd, agent.pointerFile);
+      if (fs.existsSync(p)) details.push('pointer: yes');
+    }
+    if (agent.skillsFolder) {
+      const sp = path.join(cwd, agent.skillsFolder);
+      try {
+        const lst = fs.lstatSync(sp);
+        if (lst.isSymbolicLink()) details.push('link: symlink');
+        else if (lst.isDirectory()) details.push('link: folder');
+      } catch (e) {
+        // none
+      }
+    }
+    const statusStr = details.length > 0 ? details.join(', ') : 'not linked';
+    console.log(`    - ${agent.label} (${agent.id}): ${statusStr}`);
+  }
+}
+
+function diffCommand(cwd) {
+  const packageSkillsDir = path.join(__dirname, '..', 'skills');
+  const targetSkillsDir = path.join(cwd, '.agents', 'skills');
+
+  if (!fs.existsSync(targetSkillsDir)) {
+    console.error('.agents/skills not found. Run install first: npx @v1006/build-forge install');
+    process.exit(1);
+  }
+
+  const pkgManifest = computeSkillsManifest(packageSkillsDir);
+  const targetSkills = new Set(
+    fs.readdirSync(packageSkillsDir).filter(name => fs.statSync(path.join(packageSkillsDir, name)).isDirectory())
+  );
+  const currentManifest = computeSkillsManifest(targetSkillsDir, targetSkills);
+
+  let diffs = 0;
+  for (const [relFile, pkgHash] of Object.entries(pkgManifest)) {
+    const curHash = currentManifest[relFile];
+    if (!curHash) {
+      console.log(`  missing in project: .agents/${relFile}`);
+      diffs++;
+    } else if (curHash !== pkgHash) {
+      console.log(`  modified in project: .agents/${relFile}`);
+      diffs++;
+    }
+  }
+
+  for (const relFile of Object.keys(currentManifest)) {
+    if (!pkgManifest[relFile]) {
+      console.log(`  extra in project skill: .agents/${relFile}`);
+      diffs++;
+    }
+  }
+
+  if (diffs === 0) {
+    console.log('Diff clean: Installed core skills match package skills exactly.');
+  } else {
+    console.log(`\nFound ${diffs} difference(s) between package and project skills.`);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   const { command, force, agentsArg } = parseArgs(args);
@@ -482,6 +590,10 @@ function main() {
     unlinkCommand(cwd, agentsArg);
   } else if (command === 'verify') {
     verifyCommand(cwd);
+  } else if (command === 'status') {
+    statusCommand(cwd);
+  } else if (command === 'diff') {
+    diffCommand(cwd);
   } else if (command === 'help') {
     console.log('Build Forge CLI');
     console.log('Commands:');
@@ -489,6 +601,8 @@ function main() {
     console.log('  link [--agents <ids|auto|all>]');
     console.log('  unlink [--agents <ids|auto|all>]');
     console.log('  verify');
+    console.log('  status');
+    console.log('  diff');
   }
 }
 
@@ -503,5 +617,7 @@ module.exports = {
   installCommand,
   linkCommand,
   unlinkCommand,
-  verifyCommand
+  verifyCommand,
+  statusCommand,
+  diffCommand
 };
