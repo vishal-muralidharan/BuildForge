@@ -52,7 +52,7 @@ function hashFile(filePath) {
   return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
 }
 
-function computeSkillsManifest(skillsDir) {
+function computeSkillsManifest(skillsDir, allowedSkillNames = null) {
   const manifest = {};
   function walk(dir, relPrefix) {
     if (!fs.existsSync(dir)) return;
@@ -68,7 +68,12 @@ function computeSkillsManifest(skillsDir) {
       }
     }
   }
-  walk(skillsDir, 'skills');
+  if (!fs.existsSync(skillsDir)) return manifest;
+  for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (allowedSkillNames && !allowedSkillNames.has(entry.name)) continue;
+    walk(path.join(skillsDir, entry.name), path.join('skills', entry.name));
+  }
   return manifest;
 }
 
@@ -155,8 +160,11 @@ function installCommand(cwd, force, agentsArg) {
     added.push(name);
   }
 
-  // Write lockfile
-  const manifest = computeSkillsManifest(targetSkillsDir);
+  // Write lockfile scoped strictly to package pipeline skills
+  const packageSkills = new Set(
+    fs.readdirSync(packageSkillsDir).filter(name => fs.statSync(path.join(packageSkillsDir, name)).isDirectory())
+  );
+  const manifest = computeSkillsManifest(targetSkillsDir, packageSkills);
   fs.writeFileSync(lockFilePath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
   console.log(`Build Forge: ${added.length} skill(s) installed in .agents/skills`);
@@ -371,7 +379,23 @@ function verifyCommand(cwd) {
   let failed = false;
 
   // 1. Verify files against lockfile
-  const currentManifest = computeSkillsManifest(targetSkillsDir);
+  // Scope manifest check to core package skills or skills tracked in lockData
+  const packageSkillsDir = path.join(__dirname, '..', 'skills');
+  const allowedSkills = new Set();
+  if (fs.existsSync(packageSkillsDir)) {
+    for (const name of fs.readdirSync(packageSkillsDir)) {
+      if (fs.statSync(path.join(packageSkillsDir, name)).isDirectory()) {
+        allowedSkills.add(name);
+      }
+    }
+  }
+  for (const key of Object.keys(lockData)) {
+    const parts = key.split('/');
+    if (parts.length >= 2 && parts[0] === 'skills') {
+      allowedSkills.add(parts[1]);
+    }
+  }
+  const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
   for (const [relFile, expectedHash] of Object.entries(lockData)) {
     const currentHash = currentManifest[relFile];
     if (!currentHash) {
