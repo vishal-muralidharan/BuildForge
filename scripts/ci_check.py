@@ -197,6 +197,44 @@ def check_dashes(skills_dir, errors):
                 pass
 
 
+def check_feature_delivery_workflows(skills_dir, errors):
+    """Verify that feature-delivery workflows exist, are linked from SKILL.md, and pass checks."""
+    fd_dir = os.path.join(skills_dir, "feature-delivery")
+    skill_md = os.path.join(fd_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        errors.append("feature-delivery/SKILL.md not found.")
+        return
+
+    try:
+        with open(skill_md, "r", encoding="utf-8") as f:
+            skill_text = f.read()
+    except Exception as e:
+        errors.append(f"Failed to read feature-delivery/SKILL.md: {e}")
+        return
+
+    workflow_files = [
+        "references/workflows/fix-bug.md",
+        "references/workflows/review-changes.md",
+        "references/workflows/release-prep.md"
+    ]
+    for rel_path in workflow_files:
+        full_path = os.path.join(fd_dir, rel_path)
+        if not os.path.isfile(full_path):
+            errors.append(f"Workflow reference missing: '{full_path}' does not exist.")
+            continue
+        if rel_path not in skill_text:
+            errors.append(f"Workflow reference not linked: '{rel_path}' is not linked in feature-delivery/SKILL.md.")
+
+        try:
+            with open(full_path, "r", encoding="utf-8") as wf:
+                wf_text = wf.read()
+            for section in ("When to use", "Stages with gates", "What to read", "What to produce", "Stop conditions"):
+                if section not in wf_text:
+                    errors.append(f"Workflow '{rel_path}' missing required section '{section}'.")
+        except Exception as e:
+            errors.append(f"Failed to read '{full_path}': {e}")
+
+
 def check_integrity_manifest(repo_root, errors):
     """Verify that integrity.json exists and matches the skills directory exactly."""
     import json
@@ -702,6 +740,7 @@ def main():
     check_python_files(repo_root, errors)
     check_no_cache_or_pyc(repo_root, errors)
     check_dashes(skills_dir, errors)
+    check_feature_delivery_workflows(skills_dir, errors)
 
     print("Running smoke tests...")
     run_smoke_test(repo_root, errors)
