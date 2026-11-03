@@ -1,12 +1,12 @@
 ---
 name: targeted-module-testing
-description: Use after any change in a project that has a .agents/project-profile.yaml. Runs the verify, deploy and report stages. Runs the project's own lint, test and build commands, checks the rule-enforcing tests, runs browser checks and a deploy loop only if the profile enables them, and ends every task with a Post-Build Audit of open questions and known issues. Use it before you say a task is done, after every build, and whenever the user asks to verify, test, check, ship or deploy.
+description: Use after any change in a project that has a .agents/project-profile.yaml. Runs the verify, deploy and report stages. Runs lint, test and build commands, checks rule-enforcing tests, evaluates goal acceptance invariants, runs browser checks and a deploy loop only if enabled, and ends every task with a Post-Build Audit. Use it before you say a task is done, after every build, and whenever the user asks to verify, test, check, ship or deploy.
 compatibility: Needs file read, shell, and network access if deploy checks are enabled.
 ---
 
 # Verification, deploy and report
 
-Stages 4, 7 and the optional deploy stage of the pipeline. A change is not done until these pass and the report is written.
+Stages 5, 7 and the optional deploy stage of the pipeline. A change is not done until checks pass, goal acceptance invariants are verified, and the report is written.
 
 ## Read first
 
@@ -32,6 +32,19 @@ Fix every failure at its cause. Do not edit a test or loosen a rule just to get 
 - Assert on roles, labels and test ids. Do not assert on class names or colors.
 - If `design.enforced_by` is set, that test or lint rule enforces the design rules. It must pass. Do not edit it to make a change pass unless the user agrees the rule should change. If the rule should change, change the profile through `sync-skills-and-docs`.
 - Know what your test environment fakes (timers, layout, device APIs). Note any behavior that only a real browser can confirm.
+
+## 2b. Goal Acceptance Verification
+
+Automated tests exiting with code 0 does not prove that the user's objective was met.
+
+1. Read `.agents/work/CURRENT_GOAL.md`.
+2. Evaluate each acceptance invariant listed under `Acceptance Invariants`:
+   - Inspect data flow, API contract, or rendered component behavior against the expected invariant.
+   - Confirm edge cases (zero states, invalid inputs, error handling) behave as intended.
+3. Record invariant status:
+   - Mark `[x]` for proven invariants.
+   - If an invariant fails, record the observed deviation in `CURRENT_GOAL.md`.
+   - This signal feeds directly into Stage 5a (Goal Loop) in `feature-delivery`.
 
 ## 3. Browser checks (optional)
 
@@ -60,6 +73,7 @@ End every task with this section when `verification.post_build_report` is true. 
 
 ```markdown
 ### Post-Build Audit: Open Questions & Known Issues
+- **Goal Invariants:** <all passed, or which invariants failed with evidence>
 - **Checks:** <what ran and the result. Not run: <what was skipped and why>>
 - **Known Issues:** <edge cases, quirks and limits you found>
 - **Open Questions:** <decisions that need the user>
@@ -68,7 +82,7 @@ End every task with this section when `verification.post_build_report` is true. 
 Look for known issues in these places, depending on the profile:
 
 - Always: behavior that tests cannot prove, and edge cases of the new code.
-- `responsive.enabled`: the width limits, virtual keyboard overlap, safe areas and zoom.
+- `responsive.enabled`: width limits, virtual keyboard overlap, safe areas and zoom.
 - `design.enabled`: legibility in every theme, focus visibility and icon clarity.
 - `data.storage` is set: storage quota, offline retries, migrations and idempotent writes.
 - Keyboard shortcuts were added: modifiers across operating systems, and capture while typing in inputs.
