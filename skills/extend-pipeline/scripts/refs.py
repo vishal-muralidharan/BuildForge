@@ -48,7 +48,7 @@ VALID_MODES = {"advisory", "gate"}
 VALID_ACTIVATIONS = {"pipeline-only", "native"}
 VALID_STATUSES = {"declared", "installed", "rejected"}
 
-VET_SCRIPT_EXTENSIONS = {".sh", ".bash", ".py", ".js", ".mjs", ".ts", ".rb", ".pl", ".php", ".bin", ".exe"}
+VET_SCRIPT_EXTENSIONS = {".sh", ".bash", ".py", ".js", ".mjs", ".cjs", ".ts", ".rb", ".pl", ".php", ".bin", ".exe"}
 VET_NETWORK_PATTERNS = re.compile(r"\b(curl|wget|fetch|axios|urllib|requests|http\.client|socket|aiohttp)\b", re.IGNORECASE)
 VET_EXEC_PATTERNS = re.compile(r"\b(subprocess|os\.system|exec|spawn|eval|popen|child_process)\b", re.IGNORECASE)
 VET_CREDENTIAL_PATTERNS = re.compile(r"\b(api_key|token|secret|password|private_key|auth_token|bearer|npm_token|github_token)\b", re.IGNORECASE)
@@ -128,6 +128,30 @@ def save_lock(lock_path, lock_data):
 # -------------------------------------------------------------------------
 # Subcommand: fetch
 # -------------------------------------------------------------------------
+def git_clone_or_fetch(url, ref, target_dir):
+    """Clone or fetch a repository at a given ref (branch, tag, or commit SHA)."""
+    os.makedirs(target_dir, exist_ok=True)
+    clone_cmd = ["git", "clone", "--depth", "1"]
+    if ref and ref != "HEAD":
+        clone_cmd += ["--branch", ref]
+    clone_cmd += [url, str(target_dir)]
+    res = subprocess.run(clone_cmd, capture_output=True, text=True)
+    if res.returncode == 0:
+        return res
+    # If clone failed (e.g. ref is a commit SHA), use git init + fetch + checkout
+    shutil.rmtree(target_dir, ignore_errors=True)
+    os.makedirs(target_dir, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=target_dir, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", url], cwd=target_dir, capture_output=True)
+    fetch_target = ref if (ref and ref != "HEAD") else "HEAD"
+    res_fetch = subprocess.run(["git", "fetch", "--depth", "1", "origin", fetch_target], cwd=target_dir, capture_output=True, text=True)
+    if res_fetch.returncode == 0:
+        res_co = subprocess.run(["git", "checkout", "FETCH_HEAD"], cwd=target_dir, capture_output=True, text=True)
+        if res_co.returncode == 0:
+            return subprocess.CompletedProcess(args=clone_cmd, returncode=0, stdout=res_fetch.stdout, stderr="")
+    return res
+
+
 def cmd_fetch(args):
     url = args.url
     subpath = args.subpath or ""
@@ -163,11 +187,7 @@ def cmd_fetch(args):
                 pass
         else:
             # Git clone
-            clone_cmd = ["git", "clone", "--depth", "1"]
-            if ref and ref != "HEAD":
-                clone_cmd += ["--branch", ref]
-            clone_cmd += [url, target_dir]
-            res = subprocess.run(clone_cmd, capture_output=True, text=True)
+            res = git_clone_or_fetch(url, ref, target_dir)
             if res.returncode != 0:
                 sys.exit(f"Fetch failed: git clone error:\n{res.stderr}")
             res_rev = subprocess.run(["git", "rev-parse", "HEAD"], cwd=target_dir, capture_output=True, text=True)
@@ -391,11 +411,7 @@ def cmd_add(args):
                 pass
             skill_source = src_path / subpath if subpath else src_path
         else:
-            clone_cmd = ["git", "clone", "--depth", "1"]
-            if ref and ref != "HEAD":
-                clone_cmd += ["--branch", ref]
-            clone_cmd += [source_input, tmp_clone]
-            res = subprocess.run(clone_cmd, capture_output=True, text=True)
+            res = git_clone_or_fetch(source_input, ref, tmp_clone)
             if res.returncode != 0:
                 sys.exit(f"Clone failed during add: {res.stderr}")
             res_rev = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_clone, capture_output=True, text=True)
@@ -565,11 +581,7 @@ def cmd_update(args):
         sys.exit(f"Error: Target path '{target_dir}' does not exist.")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        clone_cmd = ["git", "clone", "--depth", "1"]
-        if ref and ref != "HEAD":
-            clone_cmd += ["--branch", ref]
-        clone_cmd += [url, tmp_dir]
-        res = subprocess.run(clone_cmd, capture_output=True, text=True)
+        res = git_clone_or_fetch(url, ref, tmp_dir)
         if res.returncode != 0:
             sys.exit(f"Error fetching update: {res.stderr}")
 
