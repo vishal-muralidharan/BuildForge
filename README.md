@@ -99,6 +99,22 @@ To remove only the symbolic links created by Build Forge without touching real f
 npx @v1006/build-forge unlink
 ```
 
+### Inspecting installation status
+
+To check environment health, project profile, installed skills, lockfile integrity, vendor references, and agent links:
+
+```bash
+npx @v1006/build-forge status
+```
+
+### Comparing skills against the package
+
+To see differences between installed skills and bundled package skills without overwriting:
+
+```bash
+npx @v1006/build-forge diff
+```
+
 ## Quick start
 
 ### Path 1: New app
@@ -123,17 +139,21 @@ npx @v1006/build-forge unlink
 
 ## The pipeline
 
+The pipeline is goal-oriented rather than task-oriented: it does not stop merely because a task checklist was completed. It defines measurable acceptance invariants upfront, verifies them iteratively, and loops until the goal is proven true.
+
 | # | Stage | Skill to use | Gate: do not continue until |
 |---|---|---|---|
-| 1 | Audit | `audit-and-planning` (phases 1 and 2), `repo-search` | Nothing in `data.protected` is touched without the user's yes. Open questions are answered or listed. |
-| 2 | Plan | `audit-and-planning` (phases 3 and 4) | Every step has a target, a verify command and a commit message. The user approved the plan if it has more than 5 steps or touches a protected item. |
-| 3 | Build, one step at a time | The convention skill for the area (`build-ui`, `review-db-structure`, and so on) | The step does 1 thing and follows the rules of its area. |
-| 3a | Verify the step | `targeted-module-testing`, step 1 | The step's checks pass with 0 errors and 0 warnings. |
-| 3b | Commit the step | `atomic-commits` | The message passes the checker. |
+| 0 | Pre-flight | git | Branch is checked against protected branches and working tree is clean. |
+| 1 | Audit & Goal | `audit-and-planning` (phases 1 and 2), `repo-search` | Root cause diagnosed. Protected data identified. Goal invariants defined in `.agents/work/CURRENT_GOAL.md`. |
+| 2 | Plan | `audit-and-planning` (phases 3 and 4) | Every step has a target, a verify command and a commit message. Plan approved if over 5 steps or touching protected items. |
+| 3 | Build step | The convention skill for the area (`build-ui`, `review-db-structure`, and so on) | The step does 1 thing and follows the rules of its area. |
+| 3a | Verify step | `targeted-module-testing`, step 1 | The step's checks pass with 0 errors and 0 warnings. Atomic rollback triggers after 2 consecutive check failures. |
+| 3b | Commit step | `atomic-commits` | The message passes the checker. Step committed. |
 | 4 | Sync | `sync-skills-and-docs`, and `rules-to-tests` if a new enforceable rule appeared | The profile, generated files and docs match the code. The drift checker is clean. |
-| 5 | Full verify | `targeted-module-testing`, steps 1 to 3 | `commands.check` passes. Browser checks ran, or are listed as not run. |
+| 5 | Full verify | `targeted-module-testing`, steps 1 to 3 | `commands.check` passes. Tests and browser checks pass. |
+| 5a | Goal loop gate | `targeted-module-testing`, step 2b | All acceptance invariants from `CURRENT_GOAL.md` are evaluated. If all pass, proceed to stage 6. If any fail, re-enter loop at stage 3. |
 | 6 | Deploy (optional) | `targeted-module-testing`, step 4 | Runs only if `capabilities.deploy.enabled` is true. |
-| 7 | Report | `targeted-module-testing`, step 5 | The Post-Build Audit is written. |
+| 7 | Report | `targeted-module-testing`, step 5 | The Post-Build Audit is written. `CURRENT_GOAL.md` marked completed. |
 
 ## What it creates in your project
 

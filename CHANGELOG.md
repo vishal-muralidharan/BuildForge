@@ -16,8 +16,15 @@ All notable changes to Build Forge will be documented in this file.
 - Automatic pointer file creation (`CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`, `.windsurfrules`).
 - [COMPATIBILITY.md](COMPATIBILITY.md) with agent compatibility matrix, test checklist, and known limits.
 - `ALLOWED_SKILLS` constant in `scripts/ci_check.py`; CI now fails if `skills/`, `integrity.json`, or the npm pack file list contains a folder not in the allowlist.
+- `status` command in `bin/build-forge.js` reporting environment versions, project profile, installed skills, lockfile integrity, vendor references, and agent links.
+- `diff` command in `bin/build-forge.js` comparing installed core skills in `.agents/skills` against bundled package skills.
+- Goal-oriented verification loop in `feature-delivery` that iterates until measurable acceptance invariants in `.agents/work/CURRENT_GOAL.md` are proven true.
+- Pre-flight branch gate (Stage 0) in `feature-delivery` preventing direct commits to `main` or `master`.
+- Atomic rollback protocol in `feature-delivery` reverting changes cleanly after 2 consecutive verify failures.
+- Goal acceptance verification in `targeted-module-testing` (Section 2b) and Post-Build Audit reporting.
 
 ### Changed
+- Scoped `computeSkillsManifest` in `bin/build-forge.js` to core package skills so project custom convention skills in `.agents/skills` are never locked or flagged during verification.
 - Updated total pipeline skill count from 11 to 12.
 - Integrated reference checks into `audit-and-planning`, `targeted-module-testing`, `feature-delivery`, `scaffold-app`, `legal-and-settings-pages`, and `sync-skills-and-docs`.
 - Deprecated `external_references` field in `.agents/project-profile.yaml` in favor of `.agents/references.yaml`.
