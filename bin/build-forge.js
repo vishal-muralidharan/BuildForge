@@ -172,6 +172,32 @@ function installCommand(cwd, force, agentsArg) {
   for (const n of kept) console.log(`  kept   ${n} (exists, use --force to overwrite)`);
   console.log('  lock   .agents/build-forge.lock.json written');
 
+  // Ensure transient work and vendor directories are ignored if .gitignore exists
+  const gitignorePath = path.join(cwd, '.gitignore');
+  if (fs.existsSync(gitignorePath)) {
+    try {
+      let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+      const lines = gitignoreContent.split(/\r?\n/).map(l => l.trim());
+      const toAdd = [];
+      if (!lines.includes('.agents/work/') && !lines.includes('.agents/work')) {
+        toAdd.push('.agents/work/');
+      }
+      if (!lines.includes('.agents/vendor/') && !lines.includes('.agents/vendor')) {
+        toAdd.push('.agents/vendor/');
+      }
+      if (toAdd.length > 0) {
+        if (!gitignoreContent.endsWith('\n') && gitignoreContent.length > 0) {
+          gitignoreContent += '\n';
+        }
+        gitignoreContent += toAdd.join('\n') + '\n';
+        fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
+        console.log(`  ignore added ${toAdd.join(', ')} to .gitignore`);
+      }
+    } catch (e) {
+      // Non-fatal if .gitignore is not writable
+    }
+  }
+
   if (agentsArg) {
     linkCommand(cwd, agentsArg);
   } else {
