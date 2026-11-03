@@ -9,18 +9,20 @@ The rules in [AGENTS.md](AGENTS.md) apply to all work in this repository.
 Follow these steps to publish a new release:
 
 1. Update the version number in `package.json`.
-2. Run `python3 scripts/ci_check.py` to ensure all checks pass.
-3. Run `npm pack --dry-run` and inspect the packaged file list.
-4. Commit the version bump and any doc updates.
-5. Create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
-6. In GitHub Actions, approve the deployment to the "release" environment so `publish.yml` executes.
+2. Run `python3 scripts/make_integrity.py` to refresh `integrity.json`.
+3. Run `python3 scripts/ci_check.py` to ensure all checks pass.
+4. Run `npm pack --dry-run` and inspect the packaged file list.
+5. Commit the version bump, integrity manifest, and any doc updates.
+6. Create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
+7. In GitHub Actions, approve the deployment to the "release" environment so `publish.yml` executes.
 
 ## How to change a skill
 
 1. Changes to files under `skills/` require prior maintainer approval.
 2. Make the approved modifications.
-3. Add an entry describing the changes in [CHANGELOG.md](CHANGELOG.md).
-4. Verify changes with `python3 scripts/ci_check.py`.
+3. Regenerate `integrity.json` by running `python3 scripts/make_integrity.py`.
+4. Add an entry describing the changes in [CHANGELOG.md](CHANGELOG.md).
+5. Verify changes with `python3 scripts/ci_check.py`.
 
 ## How to test locally
 
