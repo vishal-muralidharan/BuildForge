@@ -86,3 +86,4 @@ To report verification findings in `COMPATIBILITY.md`:
 2. Update the `Status` column from `Unverified` to `Verified` only when all 9 scenarios pass.
 3. Add a log entry in the Manual Verification Checklist section with the recorded date, agent version, and test summary.
 4. Never record an unverified result or claim benchmark scores that were not executed.
+
