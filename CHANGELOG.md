@@ -15,6 +15,7 @@ All notable changes to Build Forge will be documented in this file.
 - `--agents <ids|auto|all>` CLI flag for `install`, `link`, and `unlink`.
 - Automatic pointer file creation (`CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`, `.windsurfrules`).
 - [COMPATIBILITY.md](COMPATIBILITY.md) with agent compatibility matrix, test checklist, and known limits.
+- `ALLOWED_SKILLS` constant in `scripts/ci_check.py`; CI now fails if `skills/`, `integrity.json`, or the npm pack file list contains a folder not in the allowlist.
 
 ### Changed
 - Updated total pipeline skill count from 11 to 12.
@@ -24,6 +25,9 @@ All notable changes to Build Forge will be documented in this file.
 - Updated skill wording to vendor-neutral language.
 - Replaced placeholder script paths with explicit project-relative paths.
 - Standardized Python execution on `python3` across all skills.
+
+### Fixed
+- Removed third-party skill folders that were included in the package without authorisation.
 
 ## [0.1.0] - 2026-11-02
 
