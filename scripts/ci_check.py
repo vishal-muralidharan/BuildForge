@@ -18,6 +18,7 @@ Verifies:
    - bin/build-forge.js installs one skill per folder in skills/ in a temporary folder.
 10. Multi-agent link and unlink tests in temporary folders.
 11. Allowlist guard: skills/, integrity.json, and npm pack must not contain folders outside ALLOWED_SKILLS.
+12. Integrity manifest: every file in skills/ must match its recorded hash in integrity.json.
 """
 import os
 import re
@@ -196,64 +197,47 @@ def check_dashes(skills_dir, errors):
                 pass
 
 
-def check_allowlist(repo_root, errors):
-    """Guard: skills/, integrity.json, and npm pack must not contain folders outside ALLOWED_SKILLS."""
-    skills_dir = os.path.join(repo_root, "skills")
-
-    # 1. skills/ folders
-    if os.path.isdir(skills_dir):
-        for item in sorted(os.listdir(skills_dir)):
-            if os.path.isdir(os.path.join(skills_dir, item)) and item not in ALLOWED_SKILLS:
-                errors.append(
-                    f"Allowlist failure: skills/{item} is not in ALLOWED_SKILLS. "
-                    "Remove it or add it to ALLOWED_SKILLS with maintainer approval."
-                )
-
-    # 2. integrity.json
+def check_integrity_manifest(repo_root, errors):
+    """Verify that integrity.json exists and matches the skills directory exactly."""
+    import json
+    import hashlib
     integrity_path = os.path.join(repo_root, "integrity.json")
-    if os.path.isfile(integrity_path):
-        try:
-            import json
-            with open(integrity_path, "r", encoding="utf-8") as f:
-                integrity = json.load(f)
-            for key in integrity:
-                # keys are like "skills/<folder>/..." or "skills/<folder>"
-                parts = key.replace("\\", "/").split("/")
-                if len(parts) >= 2 and parts[0] == "skills":
-                    skill_name = parts[1]
-                    if skill_name and skill_name not in ALLOWED_SKILLS:
-                        errors.append(
-                            f"Allowlist failure: integrity.json lists path '{key}' "
-                            f"whose skill folder '{skill_name}' is not in ALLOWED_SKILLS."
-                        )
-        except Exception as e:
-            errors.append(f"Allowlist failure: could not parse integrity.json: {e}")
+    if not os.path.isfile(integrity_path):
+        errors.append("Integrity check failure: integrity.json not found. Run python3 scripts/make_integrity.py.")
+        return
 
-    # 3. npm pack file list
-    res = subprocess.run(
-        ["npm", "pack", "--dry-run", "--json"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode == 0:
-        try:
-            import json
-            pack_data = json.loads(res.stdout)
-            # npm pack --json returns a list; first element has 'files'
-            files = pack_data[0].get("files", []) if pack_data else []
-            for entry in files:
-                path_str = entry.get("path", "").replace("\\", "/")
-                parts = path_str.split("/")
-                if len(parts) >= 2 and parts[0] == "skills":
-                    skill_name = parts[1]
-                    if skill_name and skill_name not in ALLOWED_SKILLS:
-                        errors.append(
-                            f"Allowlist failure: npm pack includes path '{path_str}' "
-                            f"whose skill folder '{skill_name}' is not in ALLOWED_SKILLS."
-                        )
-        except Exception as e:
-            errors.append(f"Allowlist failure: could not parse npm pack --json output: {e}")
+    try:
+        with open(integrity_path, "r", encoding="utf-8") as f:
+            integrity = json.load(f)
+    except Exception as e:
+        errors.append(f"Integrity check failure: could not parse integrity.json: {e}")
+        return
+
+    skills_dir = os.path.join(repo_root, "skills")
+    actual = {}
+    if os.path.isdir(skills_dir):
+        for root, dirs, files in os.walk(skills_dir):
+            dirs.sort()
+            for file_name in sorted(files):
+                full_path = os.path.join(root, file_name)
+                rel_path = os.path.relpath(full_path, repo_root).replace("\\", "/")
+                try:
+                    with open(full_path, "r", encoding="utf-8") as fh:
+                        content = fh.read().replace("\r\n", "\n")
+                    actual[rel_path] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                except UnicodeDecodeError:
+                    with open(full_path, "rb") as fh:
+                        actual[rel_path] = hashlib.sha256(fh.read()).hexdigest()
+
+    for path, expected_hash in integrity.items():
+        if path not in actual:
+            errors.append(f"Integrity check failure: '{path}' listed in integrity.json but missing on disk.")
+        elif actual[path] != expected_hash:
+            errors.append(f"Integrity check failure: '{path}' hash modified. Run python3 scripts/make_integrity.py.")
+
+    for path in actual:
+        if path not in integrity:
+            errors.append(f"Integrity check failure: '{path}' exists on disk but missing from integrity.json.")
 
 
 def run_smoke_test(repo_root, errors):
@@ -723,6 +707,9 @@ def main():
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)
     run_allowlist_fixture_tests(repo_root, errors)
+
+    print("Running integrity manifest checks...")
+    check_integrity_manifest(repo_root, errors)
 
     if errors:
         print(f"\nCI checks failed with {len(errors)} error(s):")
