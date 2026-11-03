@@ -295,6 +295,11 @@ def run_smoke_test(repo_root, errors):
         # 5. node bin/build-forge.js install
         cli_js = os.path.join(repo_root, "bin/build-forge.js")
         with tempfile.TemporaryDirectory() as inst_tmpdir:
+            # Create a mock .gitignore to verify auto-ignore behavior
+            gi_path = os.path.join(inst_tmpdir, ".gitignore")
+            with open(gi_path, "w", encoding="utf-8") as fh:
+                fh.write("node_modules/\n")
+
             res_inst = subprocess.run(["node", cli_js, "install"], cwd=inst_tmpdir, capture_output=True, text=True)
             if res_inst.returncode != 0:
                 errors.append(f"Smoke test failure: node bin/build-forge.js install failed with {res_inst.returncode}:\n{res_inst.stderr}")
@@ -305,6 +310,26 @@ def run_smoke_test(repo_root, errors):
                 expected_skills = sorted([d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d))])
                 if installed_skills != expected_skills:
                     errors.append(f"Smoke test failure: Installed skills {installed_skills} != expected {expected_skills}")
+
+                # Verify .gitignore auto-appended
+                with open(gi_path, "r", encoding="utf-8") as fh:
+                    gi_content = fh.read()
+                if ".agents/work/" not in gi_content or ".agents/vendor/" not in gi_content:
+                    errors.append("Smoke test failure: install did not add .agents/work/ and .agents/vendor/ to .gitignore")
+
+                # 6. Test status command (must exit 0)
+                res_status = subprocess.run(["node", cli_js, "status"], cwd=inst_tmpdir, capture_output=True, text=True)
+                if res_status.returncode != 0:
+                    errors.append(f"Smoke test failure: status command failed with {res_status.returncode}:\n{res_status.stderr}")
+                elif "Build Forge Status Report" not in res_status.stdout:
+                    errors.append("Smoke test failure: status output missing header 'Build Forge Status Report'")
+
+                # 7. Test diff command (must exit 0 on clean install)
+                res_diff = subprocess.run(["node", cli_js, "diff"], cwd=inst_tmpdir, capture_output=True, text=True)
+                if res_diff.returncode != 0:
+                    errors.append(f"Smoke test failure: diff command failed with {res_diff.returncode}:\n{res_diff.stderr}")
+                elif "Diff clean" not in res_diff.stdout:
+                    errors.append("Smoke test failure: diff output missing 'Diff clean'")
 
 
 def run_link_tests(repo_root, errors):
