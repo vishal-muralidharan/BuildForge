@@ -987,6 +987,110 @@ function outdatedCommand(cwd, isJson) {
   }
 }
 
+function updateCommand(cwd) {
+  const packageSkillsDir = path.join(__dirname, '..', 'skills');
+  const targetSkillsDir = path.join(cwd, '.agents', 'skills');
+  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
+
+  if (!fs.existsSync(lockFilePath)) {
+    console.error('Update error: Lock file not found at .agents/build-forge.lock.json. Run install first.');
+    process.exit(1);
+  }
+
+  let lockData = {};
+  try {
+    lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+  } catch (err) {
+    console.error('Update error: Invalid JSON in .agents/build-forge.lock.json.');
+    process.exit(1);
+  }
+
+  // 1. Verify pipeline skills first
+  const allowedSkills = new Set();
+  if (fs.existsSync(packageSkillsDir)) {
+    for (const name of fs.readdirSync(packageSkillsDir)) {
+      if (fs.statSync(path.join(packageSkillsDir, name)).isDirectory()) {
+        allowedSkills.add(name);
+      }
+    }
+  }
+  for (const key of Object.keys(lockData)) {
+    const parts = key.split('/');
+    if (parts.length >= 2 && parts[0] === 'skills') {
+      allowedSkills.add(parts[1]);
+    }
+  }
+
+  const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
+  const modified = [];
+  for (const [relFile, expectedHash] of Object.entries(lockData)) {
+    if (relFile.startsWith('_') || relFile === 'version') continue;
+    const curHash = currentManifest[relFile];
+    if (curHash && curHash !== expectedHash) {
+      modified.push(`.agents/${relFile}`);
+    }
+  }
+
+  if (modified.length > 0) {
+    console.error('Update aborted: The following pipeline skill(s) have local modifications:');
+    for (const f of modified) {
+      console.error(`  modified  ${f}`);
+    }
+    console.error('\nRevert or stash your changes before updating.');
+    process.exit(1);
+  }
+
+  // 2. Install --force for pipeline skills only
+  fs.mkdirSync(targetSkillsDir, { recursive: true });
+  const updatedSkills = [];
+  for (const name of fs.readdirSync(packageSkillsDir)) {
+    const from = path.join(packageSkillsDir, name);
+    if (!fs.statSync(from).isDirectory()) continue;
+    const to = path.join(targetSkillsDir, name);
+    fs.cpSync(from, to, { recursive: true, force: true });
+    updatedSkills.push(name);
+  }
+
+  // Update lockfile
+  const newManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
+  let pkgVersion = '0.1.0';
+  try {
+    const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    pkgVersion = pkgJson.version || pkgVersion;
+  } catch (e) {}
+  newManifest['_version'] = pkgVersion;
+  fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
+
+  console.log(`Build Forge: Updated ${updatedSkills.length} pipeline skill(s) in .agents/skills.`);
+
+  // 3. Print migrate plan and command to apply it
+  const profilePath = path.join(cwd, '.agents', 'project-profile.yaml');
+  let migrateScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'migrate_profile.py');
+  if (!fs.existsSync(migrateScript)) {
+    migrateScript = path.join(packageSkillsDir, 'project-bootstrap', 'scripts', 'migrate_profile.py');
+  }
+
+  const python = findPythonCommand();
+  if (fs.existsSync(profilePath) && fs.existsSync(migrateScript) && python) {
+    try {
+      const resPlan = spawnSync(python.cmd, [...python.args, migrateScript, 'plan', '--profile', profilePath, '--root', cwd], {
+        encoding: 'utf8',
+        timeout: 10000
+      });
+      if (resPlan.stdout && resPlan.stdout.includes('Migration plan:')) {
+        console.log('\n--- Profile Migration Plan ---');
+        console.log(resPlan.stdout.trim());
+        console.log('\nTo apply this profile migration, run:');
+        console.log('  python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py apply --apply');
+      } else {
+        console.log('\nProject profile is up to date.');
+      }
+    } catch (e) {
+      // Non-fatal
+    }
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   const { command, force, agentsArg, json } = parseArgs(args);
@@ -1008,6 +1112,8 @@ function main() {
     doctorCommand(cwd, json);
   } else if (command === 'outdated') {
     outdatedCommand(cwd, json);
+  } else if (command === 'update') {
+    updateCommand(cwd);
   } else if (command === 'help') {
     console.log('Build Forge CLI');
     console.log('Commands:');
@@ -1019,6 +1125,7 @@ function main() {
     console.log('  diff');
     console.log('  doctor [--json]');
     console.log('  outdated [--json]');
+    console.log('  update');
   }
 }
 
@@ -1038,5 +1145,6 @@ module.exports = {
   statusCommand,
   diffCommand,
   doctorCommand,
-  outdatedCommand
+  outdatedCommand,
+  updateCommand
 };
