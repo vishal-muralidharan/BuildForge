@@ -5,6 +5,10 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Agent evaluation harness under `tests/evals/` with 4 fixtures (`existing-app`, `empty-folder`, `legacy-rules`, `injected-reference`) and 9 evaluation scenarios.
+- Evaluation grader CLI in `scripts/grade.py` scoring scenario outputs against `expect.yaml` without calling an LLM.
+- Evaluation runbook and recording instructions in `tests/evals/README.md`.
+- Grader integration test suite in `tests/test_eval_grader.py` verifying passing and failing states across all 9 scenarios, wired into `scripts/ci_check.py`.
 - `doctor` command in `bin/build-forge.js` diagnosing Node.js, Python 3, PyYAML, git, lockfile integrity, profile validity, references, blueprints, links, AGENTS.md, and legacy parity.
 - `outdated` command in `bin/build-forge.js` comparing installed lockfile version against latest release on npm.
 - `update` command in `bin/build-forge.js` with pre-verification safety checks and profile migration planning.
