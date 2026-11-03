@@ -79,7 +79,8 @@ def init_git_repo(workdir: Path, bare_remote: bool = False) -> dict:
         remote_dir = workdir.parent / f"{workdir.name}-remote.git"
         if remote_dir.exists():
             shutil.rmtree(remote_dir)
-        subprocess.run(["git", "init", "--bare", str(remote_dir)], env=env, check=True, capture_output=True)
+        subprocess.run(["git", "init", "--bare", "-b", "main", str(remote_dir)], env=env, check=True, capture_output=True)
+        subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=str(remote_dir), env=env, check=True, capture_output=True)
         subprocess.run(["git", "remote", "add", "origin", str(remote_dir)], cwd=str(workdir), env=env, check=True, capture_output=True)
         subprocess.run(["git", "push", "-u", "origin", "main"], cwd=str(workdir), env=env, check=True, capture_output=True)
         metadata["bare_remote"] = str(remote_dir)

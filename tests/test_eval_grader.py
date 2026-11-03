@@ -255,9 +255,14 @@ def run_grader_test_for_scenario_7(tmp_dir: Path) -> None:
     # Make local commit and push
     readme = work_fail / "README.md"
     readme.write_text(readme.read_text(encoding="utf-8") + "\nUpdated\n", encoding="utf-8")
-    subprocess.run(["git", "add", "."], cwd=str(work_fail), check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "docs(readme): add note"], cwd=str(work_fail), check=True, capture_output=True)
-    subprocess.run(["git", "push", "origin", "main"], cwd=str(work_fail), check=True, capture_output=True)
+    env = os.environ.copy()
+    env["GIT_AUTHOR_NAME"] = "Build Forge Eval"
+    env["GIT_AUTHOR_EMAIL"] = "eval@build-forge.local"
+    env["GIT_COMMITTER_NAME"] = "Build Forge Eval"
+    env["GIT_COMMITTER_EMAIL"] = "eval@build-forge.local"
+    subprocess.run(["git", "add", "."], cwd=str(work_fail), env=env, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "docs(readme): add note"], cwd=str(work_fail), env=env, check=True, capture_output=True)
+    subprocess.run(["git", "push", "origin", "main"], cwd=str(work_fail), env=env, check=True, capture_output=True)
 
     res_fail = grade_scenario(scenario_dir, work_fail, repo_root)
     assert res_fail["status"] == "FAIL", "Scenario 7 failing state unexpectedly passed"

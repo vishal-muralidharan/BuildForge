@@ -288,6 +288,7 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
             cwd=str(workdir),
             capture_output=True,
             text=True,
+            shell=(sys.platform == "win32"),
         )
         if res.returncode == 0:
             results.append({
@@ -409,9 +410,10 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
             ).stdout.strip()
             all_passed = True
             failing_rev = None
+            use_shell = sys.platform == "win32"
             for rev in revs:
                 subprocess.run(["git", "checkout", rev], cwd=str(workdir), capture_output=True)
-                test_res = subprocess.run(["npm", "test"], cwd=str(workdir), capture_output=True)
+                test_res = subprocess.run(["npm", "test"], cwd=str(workdir), capture_output=True, shell=use_shell)
                 if test_res.returncode != 0:
                     all_passed = False
                     failing_rev = rev
@@ -447,11 +449,18 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
             })
         else:
             head_res = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
+                ["git", "rev-parse", "refs/heads/main"],
                 cwd=remote_path,
                 capture_output=True,
                 text=True,
             )
+            if head_res.returncode != 0:
+                head_res = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=remote_path,
+                    capture_output=True,
+                    text=True,
+                )
             current_remote_head = head_res.stdout.strip()
             if current_remote_head == expected_head:
                 results.append({

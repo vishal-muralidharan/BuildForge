@@ -555,6 +555,7 @@ def check_allowlist(repo_root, errors):
         cwd=repo_root,
         capture_output=True,
         text=True,
+        shell=(sys.platform == "win32"),
     )
     if res.returncode == 0:
         check_allowlist_pack_output(res.stdout, errors)
