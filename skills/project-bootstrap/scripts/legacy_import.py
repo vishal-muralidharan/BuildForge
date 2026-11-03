@@ -457,9 +457,11 @@ def load_blueprints(root: Path) -> dict:
     if not bp_dir.is_dir():
         return {}
     blueprints = {}
-    for p in bp_dir.glob("*.md"):
+    for p in sorted(bp_dir.glob("*.md")):
+        area = p.stem.split("-")[0].lower()
         try:
-            blueprints[p.stem.split("-")[0]] = p.read_text(encoding="utf-8", errors="ignore")
+            content = p.read_text(encoding="utf-8", errors="ignore")
+            blueprints[area] = blueprints.get(area, "") + "\n" + content
         except Exception:
             pass
     return blueprints
@@ -789,6 +791,50 @@ def cmd_status(root: Path):
         sys.exit("Error: .agents/legacy-parity.md does not exist. Run inventory first.")
 
     statements = read_ledger(ledger_path)
+
+    # Re-check pending derivable statements against blueprints if present
+    blueprints = load_blueprints(root)
+    updated = False
+    if blueprints:
+        for s in statements:
+            if s.get("status") == "pending" and s.get("class", "").startswith("derivable-"):
+                s_class = s["class"]
+                text = s["text"]
+                if s_class == "derivable-tokens" and "tokens" in blueprints:
+                    token_matches = re.findall(r"(--[a-zA-Z0-9_-]+)", text)
+                    for tm in token_matches:
+                        if tm in blueprints["tokens"]:
+                            s["status"] = "covered"
+                            s["reason"] = f"matched blueprint token {tm}"
+                            updated = True
+                            break
+                elif s_class == "derivable-data" and "data" in blueprints:
+                    table_matches = re.findall(r"(?:model|TABLE|interface|type)\s+([A-Za-z0-9_]+)", text, re.IGNORECASE)
+                    for tm in table_matches:
+                        if tm.lower() in blueprints["data"].lower():
+                            s["status"] = "covered"
+                            s["reason"] = f"matched blueprint data model {tm}"
+                            updated = True
+                            break
+                elif s_class == "derivable-layout" and "layout" in blueprints:
+                    bp_matches = re.findall(r"(\d+px)", text)
+                    for bm in bp_matches:
+                        if bm in blueprints["layout"]:
+                            s["status"] = "covered"
+                            s["reason"] = f"matched blueprint layout {bm}"
+                            updated = True
+                            break
+                elif s_class == "derivable-ui" and "ui" in blueprints:
+                    comp_matches = re.findall(r"<([A-Z][a-zA-Z0-9]+)", text)
+                    for cm in comp_matches:
+                        if cm in blueprints["ui"]:
+                            s["status"] = "covered"
+                            s["reason"] = f"matched blueprint ui component {cm}"
+                            updated = True
+                            break
+        if updated:
+            write_ledger(ledger_path, statements)
+
     counts = {"pending": 0, "covered": 0, "accepted": 0, "dropped": 0}
     pending_blocking = 0
 
