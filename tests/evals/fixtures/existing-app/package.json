@@ -1,0 +1,10 @@
+{
+  "name": "invented-notes-app",
+  "version": "1.0.0",
+  "description": "Invented notes app for Build Forge evaluations.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --test tests/*.test.js"
+  }
+}

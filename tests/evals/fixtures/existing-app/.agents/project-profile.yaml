@@ -1,0 +1,68 @@
+schema_version: 1
+
+project:
+  name: invented-notes-app
+  summary: Invented notes application for Build Forge evaluations.
+  mode: existing
+  platforms: [web]
+
+stack:
+  language: javascript
+  framework: vanilla
+  package_manager: npm
+
+commands:
+  check: npm test
+  test: npm test
+
+design:
+  enabled: true
+  tokens_file: src/tokens.css
+  enforced_by: python3 skills/rules-to-tests/scripts/run_rule_checks.py
+
+structure:
+  layers:
+    - path: src
+      purpose: Application source code
+    - path: data
+      purpose: Application data files
+    - path: tests
+      purpose: Automated test suites
+  tests: tests-dir
+
+git:
+  commit_format: "<type>(<scope>): <subject>"
+  single_line: true
+  types: [feat, fix, refactor, style, test, docs, chore]
+  scopes: [storage, tokens, notes, ui, data]
+  push: never
+
+data:
+  protected:
+    - data/users.json
+    - Storage keys
+
+rules:
+  - id: data-protected-users
+    area: data
+    text: "Never modify data/users.json without explicit human confirmation."
+    enforced_by: manual
+  - id: tokens-no-raw-hex
+    area: tokens
+    text: "Never use raw hex colors in css files. Use tokens from src/tokens.css."
+    enforced_by: test
+    check:
+      type: forbid
+      pattern: '(?<![\w&/])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b'
+      include: ["src/**/*.css"]
+      exclude: ["src/tokens.css"]
+  - id: git-no-direct-push
+    area: git
+    text: "Never push commits to any remote repository without explicit user approval."
+    enforced_by: manual
+
+docs:
+  readme: README.md
+  agents_file: AGENTS.md
+  skills_dir: .agents/skills
+  repo_map: docs/repo-map.md
