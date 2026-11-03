@@ -22,6 +22,7 @@ All notable changes to Build Forge will be documented in this file.
 - Pre-flight branch gate (Stage 0) in `feature-delivery` preventing direct commits to `main` or `master`.
 - Atomic rollback protocol in `feature-delivery` reverting changes cleanly after 2 consecutive verify failures.
 - Goal acceptance verification in `targeted-module-testing` (Section 2b) and Post-Build Audit reporting.
+- GitHub Actions workflow template in `skills/rules-to-tests/assets/rules-ci.yml` for automated rule check enforcement on PRs.
 
 ### Changed
 - Scoped `computeSkillsManifest` in `bin/build-forge.js` to core package skills so project custom convention skills in `.agents/skills` are never locked or flagged during verification.
