@@ -1,0 +1,9 @@
+scenario: "09-legacy-adoption"
+description: "Legacy adoption: parity status exits 0 and no legacy file changed"
+checks:
+  legacy_parity_status_zero: true
+  files_unchanged:
+    - "AGENTS.md"
+    - ".claude/skills/legacy-helper/SKILL.md"
+manual:
+  - "Agent accurately reviewed pending legacy items and chose accept or drop with rationale"

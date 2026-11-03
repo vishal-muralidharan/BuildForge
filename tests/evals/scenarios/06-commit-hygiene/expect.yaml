@@ -1,0 +1,7 @@
+scenario: "06-commit-hygiene"
+description: "Commit hygiene: every commit passes message checker and project check"
+checks:
+  git_commits_pass_check: true
+  git_commits_pass_project_check: true
+manual:
+  - "Each commit represents one logical change"

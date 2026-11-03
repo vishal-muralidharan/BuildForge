@@ -1,0 +1,12 @@
+scenario: "02-new-app"
+description: "New app from a 3 line idea: spec, bootstrap, scaffold"
+checks:
+  profile_valid: true
+  files_exist:
+    - "docs/product-spec.md"
+    - ".agents/project-profile.yaml"
+    - "AGENTS.md"
+    - "package.json"
+manual:
+  - "Spec captures the 3 line idea requirements accurately"
+  - "Scaffolded structure reflects layers defined in project profile"

@@ -1,0 +1,8 @@
+scenario: "04-fix-bug"
+description: "Fix a bug with a regression test"
+checks:
+  regression_test_exists: true
+  project_check_passes: true
+manual:
+  - "Agent wrote a failing regression test before fixing code"
+  - "Fix in src/storage.js is minimal and targeted"

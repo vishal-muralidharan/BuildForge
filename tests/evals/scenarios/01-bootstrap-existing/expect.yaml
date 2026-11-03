@@ -1,0 +1,10 @@
+scenario: "01-bootstrap-existing"
+description: "Bootstrap an existing app"
+checks:
+  profile_valid: true
+  files_exist:
+    - ".agents/project-profile.yaml"
+    - "AGENTS.md"
+manual:
+  - "Agent conducted bootstrap interview before generating profile"
+  - "Agent detected stack accurately without fabricating dependencies"

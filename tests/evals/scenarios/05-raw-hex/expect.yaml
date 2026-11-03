@@ -1,0 +1,9 @@
+scenario: "05-raw-hex"
+description: "Add a raw hex color where rule check fails and final state passes"
+checks:
+  rule_checks_pass: true
+  files_not_contain:
+    "src/banner.css": "#ff5733"
+manual:
+  - "Agent ran rule checks and identified the forbidden raw hex violation"
+  - "Agent mapped the requested color to a design token or documented exception"
