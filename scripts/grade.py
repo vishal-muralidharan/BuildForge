@@ -352,11 +352,16 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
             })
         else:
             checker = repo_root / "skills" / "atomic-commits" / "scripts" / "check_commit_message.py"
+            prof_file = workdir / ".agents" / "project-profile.yaml"
             all_ok = True
             bad_msg = None
             for msg in commit_msgs:
+                cmd = [sys.executable, str(checker)]
+                if prof_file.is_file():
+                    cmd.extend(["--profile", str(prof_file)])
+                cmd.append(msg)
                 c_res = subprocess.run(
-                    [sys.executable, str(checker), msg],
+                    cmd,
                     cwd=str(workdir),
                     capture_output=True,
                     text=True,

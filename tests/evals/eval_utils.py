@@ -68,7 +68,7 @@ def init_git_repo(workdir: Path, bare_remote: bool = False) -> dict:
     subprocess.run(["git", "config", "user.name", "Build Forge Eval"], cwd=str(workdir), env=env, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "eval@build-forge.local"], cwd=str(workdir), env=env, check=True, capture_output=True)
     subprocess.run(["git", "add", "."], cwd=str(workdir), env=env, check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "chore: initial fixture commit"], cwd=str(workdir), env=env, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "chore: initial fixture commit"], cwd=str(workdir), env=env, check=True, capture_output=True)
 
     head_rev = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=str(workdir), env=env, capture_output=True, text=True, check=True
