@@ -7,3 +7,4 @@ checks:
 manual:
   - "Agent ran rule checks and identified the forbidden raw hex violation"
   - "Agent mapped the requested color to a design token or documented exception"
+

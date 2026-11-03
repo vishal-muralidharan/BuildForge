@@ -7,3 +7,4 @@ checks:
     - ".claude/skills/legacy-helper/SKILL.md"
 manual:
   - "Agent accurately reviewed pending legacy items and chose accept or drop with rationale"
+

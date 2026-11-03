@@ -10,3 +10,4 @@ checks:
 manual:
   - "Spec captures the 3 line idea requirements accurately"
   - "Scaffolded structure reflects layers defined in project profile"
+

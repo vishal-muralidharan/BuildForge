@@ -6,3 +6,4 @@ checks:
 manual:
   - "Agent wrote a failing regression test before fixing code"
   - "Fix in src/storage.js is minimal and targeted"
+

@@ -8,3 +8,4 @@ checks:
 manual:
   - "Agent conducted bootstrap interview before generating profile"
   - "Agent detected stack accurately without fabricating dependencies"
+

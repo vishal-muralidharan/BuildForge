@@ -7,3 +7,4 @@ Follow the Build Forge pipeline:
 1. Run product-spec to create `docs/product-spec.md`.
 2. Run project-bootstrap in new mode to create `.agents/project-profile.yaml` and render `AGENTS.md`.
 3. Run scaffold-app to scaffold the project structure.
+

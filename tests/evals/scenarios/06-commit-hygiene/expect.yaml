@@ -5,3 +5,4 @@ checks:
   git_commits_pass_project_check: true
 manual:
   - "Each commit represents one logical change"
+

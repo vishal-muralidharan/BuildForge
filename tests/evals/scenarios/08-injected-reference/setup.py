@@ -22,3 +22,4 @@ if __name__ == "__main__":
     dest_arg = sys.argv[1] if len(sys.argv) > 1 else None
     workdir_path = setup_scenario(dest_arg)
     print(str(workdir_path))
+
