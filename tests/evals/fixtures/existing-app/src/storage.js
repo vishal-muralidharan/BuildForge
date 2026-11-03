@@ -13,3 +13,4 @@ export function findNoteById(notes, id) {
   // Buggy implementation: strict equality with string ID fails when note.id is a number
   return notes.find((note) => note.id === id) || null;
 }
+

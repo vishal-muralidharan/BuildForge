@@ -6,3 +6,4 @@ test("storage keys are defined", () => {
   assert.equal(getSessionKey(), "invented_notes_user_session");
   assert.equal(getThemeKey(), "invented_notes_app_theme");
 });
+
