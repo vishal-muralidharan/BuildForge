@@ -5,6 +5,9 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- 3 task workflow references in `skills/feature-delivery/references/workflows/`: `fix-bug.md`, `review-changes.md`, and `release-prep.md`.
+- Task router table in `skills/feature-delivery/SKILL.md` mapping request types to workflow references.
+- Automated CI check verifying that task workflow references exist, are linked from `SKILL.md`, and contain all required sections.
 - Legacy parity importer in `skills/project-bootstrap/scripts/legacy_import.py` with `inventory`, `batch`, `apply`, and `status` commands.
 - Parity ledger at `.agents/legacy-parity.md` tracking statement coverage, class, and resolution status.
 - Blueprint fact reconciliation for derivable tokens, data, layout, and UI statements in `legacy_import.py`.
@@ -33,6 +36,7 @@ All notable changes to Build Forge will be documented in this file.
 - `check_integrity_manifest` in `scripts/ci_check.py` verifying the skills tree against `integrity.json`.
 
 ### Changed
+- Expanded `feature-delivery` skill description to trigger on fix, review, and release requests.
 - Updated `project-bootstrap` existing mode to inventory legacy agent files and require parity resolution before completing bootstrap.
 - Scoped `computeSkillsManifest` in `bin/build-forge.js` to core package skills so project custom convention skills in `.agents/skills` are never locked or flagged during verification.
 - Updated total pipeline skill count from 11 to 12.
