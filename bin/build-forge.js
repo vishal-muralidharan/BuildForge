@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 const AGENTS = [
   {
@@ -82,11 +83,14 @@ function parseArgs(args) {
   const positional = [];
   let force = false;
   let agentsArg = null;
+  let json = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--force') {
       force = true;
+    } else if (a === '--json') {
+      json = true;
     } else if (a === '--agents') {
       agentsArg = args[++i];
     } else if (a.startsWith('--agents=')) {
@@ -100,12 +104,12 @@ function parseArgs(args) {
 
   if (positional.length > 0) {
     const first = positional[0].toLowerCase();
-    if (['install', 'link', 'unlink', 'verify', 'status', 'diff', 'help'].includes(first)) {
+    if (['install', 'link', 'unlink', 'verify', 'status', 'diff', 'doctor', 'outdated', 'update', 'help'].includes(first)) {
       command = first;
     }
   }
 
-  return { command, force, agentsArg };
+  return { command, force, agentsArg, json };
 }
 
 function resolveSelectedAgents(agentsArg, cwd) {
@@ -603,9 +607,307 @@ function diffCommand(cwd) {
   }
 }
 
+function findPythonCommand() {
+  const candidates = [
+    { cmd: 'python3', args: [] },
+    { cmd: '/opt/homebrew/bin/python3', args: [] },
+    { cmd: '/usr/local/bin/python3', args: [] },
+    { cmd: '/usr/bin/python3', args: [] },
+    { cmd: 'python', args: [] },
+    { cmd: 'py', args: ['-3'] }
+  ];
+  for (const c of candidates) {
+    try {
+      const res = spawnSync(c.cmd, [...c.args, '--version'], { encoding: 'utf8', timeout: 5000 });
+      if (res.status === 0) {
+        const out = ((res.stdout || '') + ' ' + (res.stderr || '')).trim();
+        if (out.includes('Python 3')) {
+          return { cmd: c.cmd, args: c.args, versionStr: out };
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+function doctorCommand(cwd, isJson) {
+  const checks = [];
+
+  function addCheck(name, status, message, hint = '') {
+    checks.push({ name, status, message, hint });
+  }
+
+  // 1. Node version
+  const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+  if (nodeMajor >= 18) {
+    addCheck('Node.js', 'OK', `v${process.versions.node}`);
+  } else {
+    addCheck('Node.js', 'FAIL', `v${process.versions.node} (requires >= 18)`, 'Upgrade Node.js to version 18 or higher.');
+  }
+
+  // 2. Python 3
+  const python = findPythonCommand();
+  if (python) {
+    addCheck('Python 3', 'OK', `${python.cmd} (${python.versionStr})`);
+  } else {
+    addCheck('Python 3', 'FAIL', 'Python 3 not found in PATH', 'Install Python 3 and add it to your PATH.');
+  }
+
+  // 3. PyYAML
+  if (python) {
+    try {
+      const resYaml = spawnSync(python.cmd, [...python.args, '-c', 'import yaml'], { encoding: 'utf8', timeout: 5000 });
+      if (resYaml.status === 0) {
+        addCheck('PyYAML', 'OK', 'PyYAML is installed');
+      } else {
+        addCheck('PyYAML', 'FAIL', 'PyYAML module not found', 'Run: pip install pyyaml');
+      }
+    } catch (e) {
+      addCheck('PyYAML', 'FAIL', 'Could not run PyYAML check', 'Run: pip install pyyaml');
+    }
+  } else {
+    addCheck('PyYAML', 'FAIL', 'Cannot verify PyYAML without Python 3', 'Install Python 3 then run: pip install pyyaml');
+  }
+
+  // 4. Git
+  try {
+    const resGit = spawnSync('git', ['--version'], { encoding: 'utf8', timeout: 5000 });
+    if (resGit.status === 0) {
+      addCheck('Git', 'OK', (resGit.stdout || '').trim());
+    } else {
+      addCheck('Git', 'FAIL', 'git command returned non-zero', 'Ensure git is working properly.');
+    }
+  } catch (e) {
+    addCheck('Git', 'FAIL', 'git command not found', 'Install git and ensure it is available in your PATH.');
+  }
+
+  // 5. Lock file and verify result
+  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
+  const targetSkillsDir = path.resolve(cwd, '.agents', 'skills');
+  if (!fs.existsSync(lockFilePath)) {
+    addCheck('Lock file', 'FAIL', '.agents/build-forge.lock.json not found', 'Run: npx @v1006/build-forge install');
+  } else {
+    let lockData = null;
+    try {
+      lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+    } catch (e) {
+      lockData = null;
+    }
+    if (!lockData || typeof lockData !== 'object') {
+      addCheck('Lock file', 'FAIL', 'Invalid JSON in .agents/build-forge.lock.json', 'Run: npx @v1006/build-forge install --force');
+    } else {
+      const packageSkillsDir = path.join(__dirname, '..', 'skills');
+      const allowedSkills = new Set();
+      if (fs.existsSync(packageSkillsDir)) {
+        for (const name of fs.readdirSync(packageSkillsDir)) {
+          if (fs.statSync(path.join(packageSkillsDir, name)).isDirectory()) {
+            allowedSkills.add(name);
+          }
+        }
+      }
+      for (const key of Object.keys(lockData)) {
+        const parts = key.split('/');
+        if (parts.length >= 2 && parts[0] === 'skills') {
+          allowedSkills.add(parts[1]);
+        }
+      }
+      const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
+      let diffCount = 0;
+      for (const [relFile, expectedHash] of Object.entries(lockData)) {
+        if (relFile.startsWith('_') || relFile === 'version') continue;
+        const curHash = currentManifest[relFile];
+        if (!curHash || curHash !== expectedHash) {
+          diffCount++;
+        }
+      }
+      if (diffCount > 0) {
+        addCheck('Lock file', 'FAIL', `${diffCount} skill file(s) modified or missing`, 'Run: npx @v1006/build-forge install --force');
+      } else {
+        addCheck('Lock file', 'OK', `All skills match lock file (${Object.keys(lockData).length} files)`);
+      }
+    }
+  }
+
+  // 6. Profile validity
+  const profilePath = path.join(cwd, '.agents', 'project-profile.yaml');
+  if (!fs.existsSync(profilePath)) {
+    addCheck('Profile', 'WARN', '.agents/project-profile.yaml not found', 'Run project-bootstrap to create .agents/project-profile.yaml');
+  } else {
+    let valScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
+    if (!fs.existsSync(valScript)) {
+      valScript = path.join(__dirname, '..', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
+    }
+    if (python && fs.existsSync(valScript)) {
+      try {
+        const resVal = spawnSync(python.cmd, [...python.args, valScript, '--profile', profilePath, '--root', cwd], {
+          encoding: 'utf8',
+          timeout: 10000
+        });
+        if (resVal.status === 0) {
+          addCheck('Profile', 'OK', '.agents/project-profile.yaml is valid');
+        } else {
+          addCheck('Profile', 'FAIL', 'Profile validation errors found', 'Run: python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .');
+        }
+      } catch (e) {
+        addCheck('Profile', 'FAIL', `Could not run profile validator: ${e.message}`, 'Check Python configuration.');
+      }
+    } else {
+      addCheck('Profile', 'OK', '.agents/project-profile.yaml exists');
+    }
+  }
+
+  // 7. References verify (if any)
+  const refsYaml = path.join(cwd, '.agents', 'references.yaml');
+  const refsLock = path.join(cwd, '.agents', 'references.lock.json');
+  if (!fs.existsSync(refsYaml) && !fs.existsSync(refsLock)) {
+    addCheck('References', 'OK', 'No external references configured');
+  } else {
+    let refsScript = path.join(cwd, '.agents', 'skills', 'extend-pipeline', 'scripts', 'refs.py');
+    if (!fs.existsSync(refsScript)) {
+      refsScript = path.join(__dirname, '..', 'skills', 'extend-pipeline', 'scripts', 'refs.py');
+    }
+    if (python && fs.existsSync(refsScript)) {
+      try {
+        const resRefs = spawnSync(python.cmd, [...python.args, refsScript, 'verify', '--root', cwd], {
+          encoding: 'utf8',
+          timeout: 10000
+        });
+        if (resRefs.status === 0) {
+          addCheck('References', 'OK', 'All external references verified');
+        } else {
+          addCheck('References', 'FAIL', 'External references verification failed', 'Run: python3 .agents/skills/extend-pipeline/scripts/refs.py restore');
+        }
+      } catch (e) {
+        addCheck('References', 'FAIL', `Could not verify references: ${e.message}`, 'Check references installation.');
+      }
+    } else {
+      addCheck('References', 'OK', 'External references present');
+    }
+  }
+
+  // 8. Blueprint stale (if any)
+  const bpManifest = path.join(cwd, '.agents', 'blueprints', 'manifest.json');
+  const bpDir = path.join(cwd, '.agents', 'blueprints');
+  if (!fs.existsSync(bpManifest) && !fs.existsSync(bpDir)) {
+    addCheck('Blueprints', 'OK', 'No blueprints configured');
+  } else {
+    let bpScript = path.join(cwd, '.agents', 'skills', 'project-blueprints', 'scripts', 'blueprint.py');
+    if (!fs.existsSync(bpScript)) {
+      bpScript = path.join(__dirname, '..', 'skills', 'project-blueprints', 'scripts', 'blueprint.py');
+    }
+    if (python && fs.existsSync(bpScript)) {
+      try {
+        const resBp = spawnSync(python.cmd, [...python.args, bpScript, 'stale', '--root', cwd], {
+          encoding: 'utf8',
+          timeout: 10000
+        });
+        if (resBp.status === 0 && (!resBp.stdout || resBp.stdout.trim() === '')) {
+          addCheck('Blueprints', 'OK', 'Blueprints are up to date');
+        } else {
+          addCheck('Blueprints', 'WARN', 'Blueprints are stale', 'Run: python3 .agents/skills/project-blueprints/scripts/blueprint.py extract');
+        }
+      } catch (e) {
+        addCheck('Blueprints', 'OK', 'Blueprints present');
+      }
+    } else {
+      addCheck('Blueprints', 'OK', 'Blueprints present');
+    }
+  }
+
+  // 9. Links and pointer files
+  let brokenLinks = [];
+  let missingPointers = [];
+  for (const agent of AGENTS) {
+    if (agent.skillsFolder) {
+      const sp = path.join(cwd, agent.skillsFolder);
+      let lstat = null;
+      try { lstat = fs.lstatSync(sp); } catch (e) {}
+      if (lstat && lstat.isSymbolicLink()) {
+        try { fs.statSync(sp); } catch (e) { brokenLinks.push(agent.skillsFolder); }
+      }
+    }
+    if (agent.pointerFile) {
+      const ptr = path.join(cwd, agent.pointerFile);
+      if (!fs.existsSync(ptr)) {
+        missingPointers.push(agent.pointerFile);
+      }
+    }
+  }
+  if (brokenLinks.length > 0) {
+    addCheck('Agent links', 'FAIL', `${brokenLinks.length} broken symlink(s): ${brokenLinks.join(', ')}`, 'Run: npx @v1006/build-forge link');
+  } else if (missingPointers.length > 0) {
+    addCheck('Agent links', 'WARN', `${missingPointers.length} agent pointer file(s) not created`, 'Run: npx @v1006/build-forge link --agents auto');
+  } else {
+    addCheck('Agent links', 'OK', 'All agent links and pointer files valid');
+  }
+
+  // 10. AGENTS.md exists
+  const agentsMd = path.join(cwd, 'AGENTS.md');
+  if (fs.existsSync(agentsMd)) {
+    addCheck('AGENTS.md', 'OK', 'AGENTS.md present in project root');
+  } else {
+    addCheck('AGENTS.md', 'WARN', 'AGENTS.md not found in project root', 'Run project-bootstrap or render.py to generate AGENTS.md');
+  }
+
+  // 11. Legacy parity status (if a ledger exists)
+  const ledgerPath = path.join(cwd, '.agents', 'legacy-parity.md');
+  if (!fs.existsSync(ledgerPath)) {
+    addCheck('Legacy parity', 'OK', 'No legacy parity ledger found');
+  } else {
+    let legScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'legacy_import.py');
+    if (!fs.existsSync(legScript)) {
+      legScript = path.join(__dirname, '..', 'skills', 'project-bootstrap', 'scripts', 'legacy_import.py');
+    }
+    if (python && fs.existsSync(legScript)) {
+      try {
+        const resLeg = spawnSync(python.cmd, [...python.args, legScript, 'status', '--root', cwd], {
+          encoding: 'utf8',
+          timeout: 10000
+        });
+        if (resLeg.status === 0) {
+          addCheck('Legacy parity', 'OK', 'Legacy parity complete (0 pending items)');
+        } else {
+          addCheck('Legacy parity', 'WARN', 'Legacy parity has pending items', 'Run: python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area <area>');
+        }
+      } catch (e) {
+        addCheck('Legacy parity', 'OK', 'Legacy parity ledger present');
+      }
+    } else {
+      addCheck('Legacy parity', 'OK', 'Legacy parity ledger present');
+    }
+  }
+
+  const okCount = checks.filter(c => c.status === 'OK').length;
+  const warnCount = checks.filter(c => c.status === 'WARN').length;
+  const failCount = checks.filter(c => c.status === 'FAIL').length;
+  const hasFail = failCount > 0;
+
+  if (isJson) {
+    console.log(JSON.stringify({
+      status: hasFail ? 'FAIL' : (warnCount > 0 ? 'WARN' : 'OK'),
+      checks,
+      summary: { ok: okCount, warn: warnCount, fail: failCount }
+    }, null, 2));
+  } else {
+    console.log('Build Forge Doctor\n');
+    for (const c of checks) {
+      const tag = c.status === 'OK' ? '[OK]  ' : (c.status === 'WARN' ? '[WARN]' : '[FAIL]');
+      console.log(`  ${tag} ${c.name}: ${c.message}`);
+      if (c.hint && c.status !== 'OK') {
+        console.log(`         Hint: ${c.hint}`);
+      }
+    }
+    console.log(`\nResult: ${okCount} passed, ${warnCount} warning(s), ${failCount} failure(s).`);
+  }
+
+  if (hasFail) {
+    process.exit(1);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
-  const { command, force, agentsArg } = parseArgs(args);
+  const { command, force, agentsArg, json } = parseArgs(args);
   const cwd = process.cwd();
 
   if (command === 'install') {
@@ -620,6 +922,8 @@ function main() {
     statusCommand(cwd);
   } else if (command === 'diff') {
     diffCommand(cwd);
+  } else if (command === 'doctor') {
+    doctorCommand(cwd, json);
   } else if (command === 'help') {
     console.log('Build Forge CLI');
     console.log('Commands:');
@@ -629,6 +933,7 @@ function main() {
     console.log('  verify');
     console.log('  status');
     console.log('  diff');
+    console.log('  doctor [--json]');
   }
 }
 
@@ -645,5 +950,6 @@ module.exports = {
   unlinkCommand,
   verifyCommand,
   statusCommand,
-  diffCommand
+  diffCommand,
+  doctorCommand
 };
