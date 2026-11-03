@@ -1,6 +1,6 @@
 ---
 name: feature-delivery
-description: Run any goal in a project end to end through the build pipeline with an iterative verification loop that runs until the goal is achieved. Audit, plan, build one atomic step at a time, verify, commit, sync docs, verify goal invariants, deploy if enabled, and report. Use it for every request to add, build, implement, fix, refactor, change or ship something in a repo that has a .agents/project-profile.yaml.
+description: Run any goal in a project end to end through the build pipeline with an iterative verification loop. Dispatches features, bug fixes, code reviews, and release preparation through specialized workflows. Use it for every request to add, build, fix, review, audit, release, refactor, change or ship code in a repo that has a .agents/project-profile.yaml.
 compatibility: Needs file read, file edit, shell, git, and Python 3.
 ---
 
