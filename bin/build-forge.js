@@ -169,6 +169,12 @@ function installCommand(cwd, force, agentsArg) {
     fs.readdirSync(packageSkillsDir).filter(name => fs.statSync(path.join(packageSkillsDir, name)).isDirectory())
   );
   const manifest = computeSkillsManifest(targetSkillsDir, packageSkills);
+  let pkgVersion = '0.1.0';
+  try {
+    const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    pkgVersion = pkgJson.version || pkgVersion;
+  } catch (e) {}
+  manifest['_version'] = pkgVersion;
   fs.writeFileSync(lockFilePath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
   console.log(`Build Forge: ${added.length} skill(s) installed in .agents/skills`);
@@ -427,6 +433,7 @@ function verifyCommand(cwd) {
   }
   const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
   for (const [relFile, expectedHash] of Object.entries(lockData)) {
+    if (relFile.startsWith('_') || relFile === 'version') continue;
     const currentHash = currentManifest[relFile];
     if (!currentHash) {
       console.error(`  missing   .agents/${relFile}`);
@@ -437,6 +444,7 @@ function verifyCommand(cwd) {
     }
   }
   for (const relFile of Object.keys(currentManifest)) {
+    if (relFile.startsWith('_') || relFile === 'version') continue;
     if (!lockData[relFile]) {
       console.error(`  extra     .agents/${relFile}`);
       failed = true;
@@ -905,6 +913,80 @@ function doctorCommand(cwd, isJson) {
   }
 }
 
+function compareSemver(v1, v2) {
+  const p1 = (v1 || '0.0.0').split('.').map(n => parseInt(n, 10) || 0);
+  const p2 = (v2 || '0.0.0').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    if (p1[i] < p2[i]) return -1;
+    if (p1[i] > p2[i]) return 1;
+  }
+  return 0;
+}
+
+function outdatedCommand(cwd, isJson) {
+  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
+  let installedVersion = '0.1.0';
+  if (fs.existsSync(lockFilePath)) {
+    try {
+      const lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+      if (lockData._version) {
+        installedVersion = lockData._version;
+      } else if (lockData.version) {
+        installedVersion = lockData.version;
+      }
+    } catch (e) {}
+  } else {
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+      installedVersion = pkgJson.version || installedVersion;
+    } catch (e) {}
+  }
+
+  let latestVersion = null;
+  try {
+    const res = spawnSync('npm', ['view', '@v1006/build-forge', 'version'], {
+      encoding: 'utf8',
+      timeout: 4000
+    });
+    if (res.status === 0 && res.stdout) {
+      latestVersion = res.stdout.trim();
+    }
+  } catch (e) {
+    latestVersion = null;
+  }
+
+  if (!latestVersion) {
+    if (isJson) {
+      console.log(JSON.stringify({
+        installed: installedVersion,
+        latest: null,
+        offline: true,
+        note: 'Offline: skipped version check (network unavailable).'
+      }, null, 2));
+    } else {
+      console.log('Offline: skipped version check (network unavailable).');
+      console.log(`Installed version in lock: ${installedVersion}`);
+    }
+    return;
+  }
+
+  const isOutdated = compareSemver(installedVersion, latestVersion) < 0;
+  if (isJson) {
+    console.log(JSON.stringify({
+      installed: installedVersion,
+      latest: latestVersion,
+      outdated: isOutdated
+    }, null, 2));
+  } else {
+    if (isOutdated) {
+      console.log(`@v1006/build-forge is outdated: installed ${installedVersion}, latest ${latestVersion}.`);
+      console.log('Run: npx @v1006/build-forge update');
+    } else {
+      console.log(`@v1006/build-forge is up to date (version ${installedVersion}).`);
+    }
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   const { command, force, agentsArg, json } = parseArgs(args);
@@ -924,6 +1006,8 @@ function main() {
     diffCommand(cwd);
   } else if (command === 'doctor') {
     doctorCommand(cwd, json);
+  } else if (command === 'outdated') {
+    outdatedCommand(cwd, json);
   } else if (command === 'help') {
     console.log('Build Forge CLI');
     console.log('Commands:');
@@ -934,6 +1018,7 @@ function main() {
     console.log('  status');
     console.log('  diff');
     console.log('  doctor [--json]');
+    console.log('  outdated [--json]');
   }
 }
 
@@ -945,11 +1030,13 @@ module.exports = {
   AGENTS,
   POINTER_CONTENT,
   parseArgs,
+  compareSemver,
   installCommand,
   linkCommand,
   unlinkCommand,
   verifyCommand,
   statusCommand,
   diffCommand,
-  doctorCommand
+  doctorCommand,
+  outdatedCommand
 };
