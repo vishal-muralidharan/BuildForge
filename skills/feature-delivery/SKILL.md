@@ -27,6 +27,17 @@ Agents often stop once a task checklist is complete, even if the user's ultimate
 
 Open only what each stage needs. Do not load every skill at the start. That wastes context and slows the work.
 
+## Task router
+
+Pick the workflow matching the request type:
+
+| Request type | Workflow file |
+|---|---|
+| Bug fix or regression | `references/workflows/fix-bug.md` |
+| Code review or diff audit | `references/workflows/review-changes.md` |
+| Release preparation or version bump | `references/workflows/release-prep.md` |
+| Feature or general delivery | Stages 0 to 7 below |
+
 ## Stages and gates
 
 | # | Stage | Skill to use | Gate: do not continue until |
