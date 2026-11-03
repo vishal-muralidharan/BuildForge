@@ -115,6 +115,78 @@ To see differences between installed skills and bundled package skills without o
 npx @v1006/build-forge diff
 ```
 
+## Lifecycle management
+
+Build Forge provides lifecycle commands to diagnose environment issues, check for updates, upgrade skills safely, and migrate project profiles across schema versions.
+
+### Diagnosing project health: doctor
+
+Run `doctor` to verify your environment, dependencies, lockfile integrity, and project configuration without modifying anything:
+
+```bash
+npx @v1006/build-forge doctor
+```
+
+Add `--json` for machine-readable output:
+
+```bash
+npx @v1006/build-forge doctor --json
+```
+
+`doctor` checks:
+- Node.js version (requires 18+)
+- Python 3 availability (`python3`, `python`, or `py -3`)
+- PyYAML installation
+- Git availability
+- Lockfile integrity and skill file modifications
+- Project profile validity
+- External references integrity (if configured)
+- Blueprint staleness (if configured)
+- Agent links and pointer files
+- AGENTS.md existence
+- Legacy parity status (if ledger exists)
+
+Prints OK, WARN, or FAIL with 1 fix hint each. Exits with code 1 on any FAIL.
+
+### Checking for updates: outdated
+
+Compare your installed Build Forge version against the latest release on npm:
+
+```bash
+npx @v1006/build-forge outdated
+```
+
+When offline or when npm is unreachable, it skips the check with an informational note. It never runs automatically in the background.
+
+### Updating pipeline skills: update
+
+Update installed pipeline skills safely to match the latest package version:
+
+```bash
+npx @v1006/build-forge update
+```
+
+`update` runs `verify` first. If any pipeline skill was modified by hand, it stops immediately, lists the modified files, and aborts.
+
+If verify passes, it updates pipeline skills in `.agents/skills` and regenerates the lockfile. Generated files, vendor files, the profile, and blueprints are never touched.
+
+If a profile migration is available, `update` displays the migration plan diff and the command to apply it.
+
+### Migrating the project profile: migrate
+
+When a package update introduces a new `schema_version` for `.agents/project-profile.yaml`, inspect and apply migrations:
+
+1. **Preview changes (plan)**:
+   ```bash
+   python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py plan
+   ```
+2. **Apply changes**:
+   ```bash
+   python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py apply --apply
+   ```
+
+A migration never deletes any rule or field added by the user. Unknown and custom fields are preserved intact. No backup files are created because git tracks the change.
+
 ## Quick start
 
 ### Path 1: New app

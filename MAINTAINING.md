@@ -78,6 +78,37 @@ Build Forge follows semantic versioning (MAJOR.MINOR.PATCH):
 - **Minor**: A new skill is added, a new optional profile field is introduced, or a new check type is added.
 - **Patch**: Wording fixes, documentation updates, and bug fixes.
 
+## Writing a profile migration
+
+When introducing a new `schema_version` to `.agents/project-profile.yaml`:
+
+1. Define a migration function in `skills/project-bootstrap/scripts/migrate_profile.py`:
+   ```python
+   def migrate_vX_to_vY(profile: dict, root: Path) -> dict:
+       updated = dict(profile)
+       updated["schema_version"] = Y
+       # Add new default fields or transform existing structures
+       return updated
+   ```
+2. Register the function in the `MIGRATIONS` registry dictionary:
+   ```python
+   MIGRATIONS = {
+       1: migrate_v1_to_v2,
+       2: migrate_v2_to_v3,
+   }
+   ```
+3. Migration rules:
+   - Never delete or rename user-added rules.
+   - Never delete fields added by the user. All unknown fields must survive.
+   - Migrations must be deterministic.
+   - Do not create backup files; git shows the diff.
+4. Test the migration with:
+   ```bash
+   python3 skills/project-bootstrap/scripts/migrate_profile.py plan --profile <path>
+   python3 skills/project-bootstrap/scripts/migrate_profile.py apply --profile <path> --apply
+   ```
+5. Update `tests/test_lifecycle.py` and run `python3 scripts/ci_check.py`.
+
 [CHANGELOG.md](CHANGELOG.md) uses the Keep a Changelog headings.
 
 Deprecation policy: [CONFIRM: deprecation policy]

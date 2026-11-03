@@ -5,6 +5,12 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `doctor` command in `bin/build-forge.js` diagnosing Node.js, Python 3, PyYAML, git, lockfile integrity, profile validity, references, blueprints, links, AGENTS.md, and legacy parity.
+- `outdated` command in `bin/build-forge.js` comparing installed lockfile version against latest release on npm.
+- `update` command in `bin/build-forge.js` with pre-verification safety checks and profile migration planning.
+- Profile migration framework in `skills/project-bootstrap/scripts/migrate_profile.py` supporting `plan` and `apply` across schema versions while preserving user rules and custom fields.
+- Lifecycle integration test suite in `tests/test_lifecycle.py` integrated into `scripts/ci_check.py`.
+- Lifecycle management guide in `README.md` and migration authoring guide in `MAINTAINING.md`.
 - 3 task workflow references in `skills/feature-delivery/references/workflows/`: `fix-bug.md`, `review-changes.md`, and `release-prep.md`.
 - Task router table in `skills/feature-delivery/SKILL.md` mapping request types to workflow references.
 - Automated CI check verifying that task workflow references exist, are linked from `SKILL.md`, and contain all required sections.
