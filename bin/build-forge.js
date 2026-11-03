@@ -4,7 +4,6 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const childProcess = require('child_process');
 
 const AGENTS = [
   {
@@ -200,20 +199,12 @@ function removeSymlinkOrJunction(p) {
 }
 
 function createSymlinkOrCopy(target, linkPath, isDir, label) {
-  if (process.platform === 'win32' && isDir) {
-    // Windows junctions are more reliable than fs.symlinkSync('junction') in CI environments.
-    // mklink /J does not require elevated privileges or Developer Mode.
-    const absTarget = path.resolve(path.dirname(linkPath), target);
-    try {
-      childProcess.execSync(`cmd /c mklink /J "${linkPath}" "${absTarget}"`, { stdio: 'ignore' });
-      return;
-    } catch (junctionErr) {
-      // Junction failed: fall through to fs.symlinkSync then copy.
-      process.stderr.write(`Warning: mklink /J failed for ${label}: ${junctionErr.message}\n`);
-    }
-  }
+  // Use 'dir' on Windows for directory symlinks. GitHub runners have Developer Mode
+  // enabled (SeCreateSymbolicLinkPrivilege), so 'dir' symlinks work without UAC.
+  // Junctions (mklink /J) are NOT true symlinks: Python os.path.islink() returns
+  // False for them, which breaks the CI link tests.
+  const symlinkType = isDir ? 'dir' : 'file';
   try {
-    const symlinkType = process.platform === 'win32' ? 'file' : (isDir ? 'dir' : 'file');
     fs.symlinkSync(target, linkPath, symlinkType);
   } catch (err) {
     if (isDir) {
