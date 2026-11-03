@@ -24,16 +24,23 @@ Scripts live in this skill's `scripts/` folder. Run them with the full path to t
 
 ## Existing mode
 
-1. Read the discovery JSON. Also read `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, and any agent instruction files when they exist. They hold rules the code cannot show.
-2. Copy `assets/project-profile.template.yaml` to `.agents/project-profile.yaml`. Fill only what the evidence supports.
+1. Run legacy inventory:
+   Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py inventory --root <repo_root>`.
+   This inventories statements from existing agent instruction files and legacy skills into `.agents/legacy-parity.md`. Never delete or move the legacy files.
+2. Read the discovery JSON and the legacy parity ledger. Also read `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, and any agent instruction files when they exist. They hold rules the code cannot show.
+3. Copy `assets/project-profile.template.yaml` to `.agents/project-profile.yaml`. Fill only what the evidence supports.
    - Commands: use `commands_suggested`. If there is no single `check` command, propose one that chains lint, test and build, and ask before adding it to `package.json`.
    - Naming: state a style only when it covers at least 80% of files of that kind. Otherwise leave a TODO and ask.
    - Commit rules: copy the style from `git` facts only when `conventional_ratio` is at least 0.8.
    - Layers: use `layers`. Write one plain purpose per folder. Mark a guessed purpose as TODO.
-3. Move every rule from existing guideline files into the `rules` list. One sentence each, imperative, with an id and an area. Set `enforced_by` to `test` or `lint` only after you find the test or lint rule that enforces it. Otherwise use `manual`.
-4. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
-5. Run the external references step below.
-6. Validate, render and report (see "Finish").
+4. Reconcile legacy statements:
+   Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area <area>` for each area with pending items. Propose defaults and ask the user whether to accept or drop each item:
+   `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py apply --accept <ids> --drop <ids> --reason "<reason>"`
+   Do not finish bootstrap while `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status` exits 1.
+5. Move every remaining uninventoried rule from guideline files into the `rules` list. One sentence each, imperative, with an id and an area. Set `enforced_by` to `test` or `lint` only after you find the test or lint rule that enforces it. Otherwise use `manual`.
+6. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
+7. Run the external references step below.
+8. Validate, render and report (see "Finish").
 
 ## New mode
 
@@ -56,12 +63,14 @@ Ask once whether the user wants third party skills. If yes, run the extend-pipel
 
 ## Finish
 
-1. Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root>`. Fix every error. Show the user any remaining TODO.
-2. Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root <repo_root>`. It never overwrites existing files. If `AGENTS.md` exists it writes `AGENTS.generated.md`. Help the user merge it, then offer to delete the generated copy.
-3. Report in this shape:
+1. In existing mode, run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status --root <repo_root>`. It must exit 0. Do not finish while status exits 1.
+2. Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root>`. Fix every error. Show the user any remaining TODO.
+3. Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root <repo_root>`. It never overwrites existing files. If `AGENTS.md` exists it writes `AGENTS.generated.md`. Help the user merge it, then offer to delete the generated copy.
+4. Report in this shape:
 
 ```
 Detected: <stack and commands found, with the file each came from>
+Legacy parity: <coverage percent and summary counts>
 Asked and answered: <questions and the user's answers>
 Still TODO: <unresolved fields>
 Files written: <paths>
@@ -69,7 +78,7 @@ External references: <declared, installed, or none>
 Next step: <one sentence>
 ```
 
-4. Do not commit. The user commits, or the commit stage of the pipeline does.
+5. Do not commit. The user commits, or the commit stage of the pipeline does.
 
 ## Reference files
 
