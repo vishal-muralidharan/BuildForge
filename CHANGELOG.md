@@ -58,6 +58,10 @@ All notable changes to Build Forge will be documented in this file.
 - Standardized Python execution on `python3` across all skills.
 
 ### Fixed
+- Resolved cross-platform CI failures on Windows by invoking `npm` with `shell=(sys.platform == "win32")` in `scripts/ci_check.py` and `scripts/grade.py`.
+- Fixed bare git remote HEAD resolution on Linux and macOS CI runners in evaluation scenario 7 by explicitly initializing bare remotes with `-b main` and pointing symbolic-ref to `refs/heads/main`.
+- Added repository `.gitignore` ignoring local agent skills (`.agents/`), caches, and build artifacts.
+- Documented cross-platform CI failure causes and prevention rules in `MAINTAINING.md`.
 - Removed third-party skill folders that were included in the package without authorisation.
 
 ## [0.1.0] - 2026-11-02

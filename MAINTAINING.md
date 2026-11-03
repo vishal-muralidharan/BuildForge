@@ -109,6 +109,19 @@ When introducing a new `schema_version` to `.agents/project-profile.yaml`:
    ```
 5. Update `tests/test_lifecycle.py` and run `python3 scripts/ci_check.py`.
 
+## CI failure history and cross-platform prevention
+
+To keep the test matrix (Ubuntu, macOS, Windows; Node 18, 22) green across all CI runners:
+
+1. **Windows command spawning**:
+   `npm` is a batch script (`npm.cmd`) on Windows. Always use `shell=(sys.platform == "win32")` when running `npm` via `subprocess.run`.
+2. **Bare git remote default branches**:
+   On Linux, `git init --bare` defaults `HEAD` to `master`. When testing push policies with bare remotes, always pass `-b main` and run `git symbolic-ref HEAD refs/heads/main`. In verification scripts, check `refs/heads/main` before falling back to `HEAD`.
+3. **Python bytecode creation**:
+   Test scripts importing internal modules must set `sys.dont_write_bytecode = True` and pass `PYTHONDONTWRITEBYTECODE=1` in subprocess environments to prevent creating `__pycache__` directories.
+4. **Git author in CI runners**:
+   Always provide `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` in test fixture environments so `git commit` succeeds in headless environments.
+
 [CHANGELOG.md](CHANGELOG.md) uses the Keep a Changelog headings.
 
 Deprecation policy: [CONFIRM: deprecation policy]
