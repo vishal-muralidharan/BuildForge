@@ -256,6 +256,36 @@ rules:
 
 See [check-patterns.md](skills/rules-to-tests/references/check-patterns.md) for patterns.
 
+## Legacy rule parity
+
+When adopting Build Forge in a codebase with existing agent files (`AGENTS.md`, `.cursor/rules`, `.claude/skills`, or custom skills), `legacy_import.py` audits and imports existing rules so nothing is lost.
+
+### Commands
+
+1. **Inventory**: Find existing agent files, split them into atomic statements, classify each statement, and record them in a ledger:
+   ```bash
+   python3 .agents/skills/project-bootstrap/scripts/legacy_import.py inventory
+   ```
+   This generates `.agents/legacy-parity.md` with statement IDs (`L001`, `L002`), source `file:line`, class, destination, and a coverage score.
+
+2. **Review in batches**: Inspect pending statements for a specific area 15 at a time:
+   ```bash
+   python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area naming
+   ```
+
+3. **Apply decisions**: Accept rules into the profile with source evidence, drop obsolete statements with a reason, and send notes to `.agents/notes/<area>.md`:
+   ```bash
+   python3 .agents/skills/project-bootstrap/scripts/legacy_import.py apply --accept L001,L003 --drop L002 --reason "Handled by ESLint"
+   ```
+
+4. **Verify parity**: Confirm all rule candidates and derivable items are resolved:
+   ```bash
+   python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status
+   ```
+   Exits 1 while any rule candidate or derivable statement remains pending.
+
+Existing legacy files are never edited, moved, or deleted.
+
 ## Third party skills
 
 A third party skill is untrusted text that an agent will read. Only add sources you trust.

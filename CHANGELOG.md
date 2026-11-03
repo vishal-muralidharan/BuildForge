@@ -5,6 +5,10 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Legacy parity importer in `skills/project-bootstrap/scripts/legacy_import.py` with `inventory`, `batch`, `apply`, and `status` commands.
+- Parity ledger at `.agents/legacy-parity.md` tracking statement coverage, class, and resolution status.
+- Blueprint fact reconciliation for derivable tokens, data, layout, and UI statements in `legacy_import.py`.
+- Integration test fixture in `tests/test_legacy_import.py` and wired into `scripts/ci_check.py`.
 - `extend-pipeline` skill to manage third party references with security vetting and commit pinning.
 - `skills/extend-pipeline/scripts/refs.py` CLI to fetch, vet, add, list, verify, update, remove, restore, and check due references.
 - Security vetting specification in `skills/extend-pipeline/references/vetting.md` covering 9 risk categories.
@@ -29,6 +33,7 @@ All notable changes to Build Forge will be documented in this file.
 - `check_integrity_manifest` in `scripts/ci_check.py` verifying the skills tree against `integrity.json`.
 
 ### Changed
+- Updated `project-bootstrap` existing mode to inventory legacy agent files and require parity resolution before completing bootstrap.
 - Scoped `computeSkillsManifest` in `bin/build-forge.js` to core package skills so project custom convention skills in `.agents/skills` are never locked or flagged during verification.
 - Updated total pipeline skill count from 11 to 12.
 - Integrated reference checks into `audit-and-planning`, `targeted-module-testing`, `feature-delivery`, `scaffold-app`, `legal-and-settings-pages`, and `sync-skills-and-docs`.
