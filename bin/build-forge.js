@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const childProcess = require('child_process');
 
 const AGENTS = [
   {
@@ -199,18 +200,27 @@ function removeSymlinkOrJunction(p) {
 }
 
 function createSymlinkOrCopy(target, linkPath, isDir, label) {
+  if (process.platform === 'win32' && isDir) {
+    // Windows junctions are more reliable than fs.symlinkSync('junction') in CI environments.
+    // mklink /J does not require elevated privileges or Developer Mode.
+    const absTarget = path.resolve(path.dirname(linkPath), target);
+    try {
+      childProcess.execSync(`cmd /c mklink /J "${linkPath}" "${absTarget}"`, { stdio: 'ignore' });
+      return;
+    } catch (junctionErr) {
+      // Junction failed: fall through to fs.symlinkSync then copy.
+      process.stderr.write(`Warning: mklink /J failed for ${label}: ${junctionErr.message}\n`);
+    }
+  }
   try {
-    const symlinkType = process.platform === 'win32' ? (isDir ? 'junction' : 'file') : (isDir ? 'dir' : 'file');
-    const symlinkTarget = (process.platform === 'win32' && symlinkType === 'junction')
-      ? path.resolve(path.dirname(linkPath), target)
-      : target;
-    fs.symlinkSync(symlinkTarget, linkPath, symlinkType);
+    const symlinkType = process.platform === 'win32' ? 'file' : (isDir ? 'dir' : 'file');
+    fs.symlinkSync(target, linkPath, symlinkType);
   } catch (err) {
-    // If linking fails, copy and warn
     if (isDir) {
+      // Last resort: copy so the agent can at least read the skills.
       const absTarget = path.resolve(path.dirname(linkPath), target);
       fs.cpSync(absTarget, linkPath, { recursive: true });
-      console.warn(`Warning: Linking failed for ${label}. Copied folder instead. Note that copies do not update on their own.`);
+      process.stderr.write(`Warning: Linking failed for ${label}: ${err.message}. Copied folder instead.\n`);
     } else {
       throw err;
     }
