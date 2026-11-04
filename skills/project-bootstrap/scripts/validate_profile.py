@@ -34,6 +34,7 @@ CHECK_KEYS = {"type", "pattern", "include", "exclude", "path"}
 NAMING_KEYS = {"item", "style", "example"}
 LAYER_KEYS = {"path", "purpose"}
 BP_KEYS = {"from", "layout"}
+SCOPE_KEYS = {"name", "purpose", "paths"}
 
 
 def stray(entry, allowed):
@@ -122,6 +123,53 @@ def main():
         errors.append("git.push must be never, ask or allowed")
     if not get(prof, "git.commit_format"):
         errors.append("git.commit_format is required")
+
+    scopes = get(prof, "git.scopes")
+    if scopes is not None:
+        if not isinstance(scopes, list):
+            errors.append("git.scopes must be a list")
+        else:
+            seen_scope_names = set()
+            for idx, sc in enumerate(scopes):
+                if isinstance(sc, str):
+                    sname = sc
+                    if not re.match(r"^[a-z0-9]+(-[a-z0-9]+)*$", sname):
+                        errors.append(f"git.scopes[{idx}] '{sname}' must be kebab-case")
+                    if sname in seen_scope_names:
+                        errors.append(f"duplicate scope name: {sname}")
+                    seen_scope_names.add(sname)
+                elif isinstance(sc, dict):
+                    if stray(sc, SCOPE_KEYS):
+                        errors.append(f"git.scopes[{idx}] has unexpected keys {stray(sc, SCOPE_KEYS)}")
+                    sname = sc.get("name")
+                    if sname is None or not isinstance(sname, str) or not sname.strip():
+                        errors.append(f"git.scopes[{idx}].name must be a non-empty string")
+                    else:
+                        if not re.match(r"^[a-z0-9]+(-[a-z0-9]+)*$", sname):
+                            errors.append(f"git.scopes[{idx}].name '{sname}' must be kebab-case")
+                        if sname in seen_scope_names:
+                            errors.append(f"duplicate scope name: {sname}")
+                        seen_scope_names.add(sname)
+
+                    purpose = sc.get("purpose")
+                    if purpose is not None:
+                        if not isinstance(purpose, str):
+                            errors.append(f"git.scopes[{idx}].purpose must be a string")
+                        elif len(purpose) > 100:
+                            errors.append(f"git.scopes[{idx}].purpose exceeds 100 characters ({len(purpose)} chars)")
+
+                    paths = sc.get("paths")
+                    if paths is not None:
+                        if not isinstance(paths, list):
+                            errors.append(f"git.scopes[{idx}].paths must be a list")
+                        else:
+                            for pidx, pat in enumerate(paths):
+                                if not isinstance(pat, str) or not pat.strip():
+                                    errors.append(f"git.scopes[{idx}].paths[{pidx}] must be a non-empty string")
+                                elif pat.count("[") != pat.count("]") or "\x00" in pat:
+                                    errors.append(f"git.scopes[{idx}].paths[{pidx}] '{pat}' is not a valid glob")
+                else:
+                    errors.append(f"git.scopes[{idx}] must be a string or a mapping")
 
     names = set()
     root_path = Path(a.root).resolve() if a.root else Path(".").resolve()

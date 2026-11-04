@@ -27,9 +27,24 @@ File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml
 | `design.*` | mixed | If `enabled` is true, `tokens_file` is required. `enforced_by` names the test or lint rule. |
 | `responsive.*` | mixed | If `enabled`, `min_width` must be below `max_width`. `breakpoints` entries have an integer `from` and a `layout` string. |
 | `data.*` | mixed | `storage`, `schema_source`, `invariants`, `protected`. Protected items need user approval to change. |
-| `git.*` | mixed | `push` is `never`, `ask` or `allowed`. `scopes` empty means free scope. |
+| `git.*` | mixed | `push` is `never`, `ask` or `allowed`. `scopes` is a list of strings or `{name, purpose, paths}` objects. Empty means free scope. |
 | `verification.*` | mixed | `zero_warnings`, `browser_checks`, `post_build_report`. |
 | `docs.*` | paths | `skills_dir`, `agents_file`, `repo_map` are required. `spec` is optional and names the product spec file. |
+
+### Commit scopes (`git.scopes`)
+
+`git.scopes` defines the allowed commit scopes. Each entry can be:
+1. A plain kebab-case string: `"ui"`
+2. An object with `{name, purpose, paths}`:
+   ```yaml
+   - name: ui
+     purpose: User interface components and styles
+     paths:
+       - src/components/**
+       - src/styles/**
+   ```
+
+Mixed lists are allowed. `name` must be unique and kebab-case. `purpose` is optional and must be 100 characters or fewer. `paths` is an optional list of file globs used by `suggest_scope.py`.
 
 ## 2. Rules list
 
