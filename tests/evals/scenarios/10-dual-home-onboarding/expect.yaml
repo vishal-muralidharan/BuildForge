@@ -14,3 +14,4 @@ checks:
   dual_home_dedupe_checked: true
 manual:
   - "Agent reviewed collisions, deduped identical reference, and provided diff for modified collision"
+
