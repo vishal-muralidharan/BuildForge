@@ -158,7 +158,10 @@ def get_references_info(root: Path) -> tuple:
                     if r.get("name"):
                         ref_names.add(r["name"])
                     if r.get("path"):
-                        ref_paths.add(Path(r["path"]).as_posix().lstrip("./"))
+                        rp = Path(r["path"]).as_posix().strip()
+                        while rp.startswith("./"):
+                            rp = rp[2:].strip()
+                        ref_paths.add(rp)
         except Exception:
             pass
     return ref_names, ref_paths

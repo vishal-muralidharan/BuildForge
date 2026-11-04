@@ -632,7 +632,7 @@ def main():
                 fromfile=f"{rel_label} (current disk)",
                 tofile=f"{rel_label} (regenerated)",
             ))
-            lost_lines = [l[1:].rstrip("\r\n") for l in diff_lines if l.startswith("-") and not l.startswith("---")]
+            lost_lines = [l[1:].rstrip("\r\n") for l in diff_lines if l.startswith("-") and not l.startswith("---")]  # strip-chars-ok: strip trailing CR and LF
             if lost_lines:
                 print(f"NOTE  Overwriting hand edits outside custom blocks in {rel_label}. Lost lines:")
                 for lost in lost_lines:

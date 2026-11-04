@@ -25,6 +25,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+script_dir = Path(__file__).resolve().parent
+if str(script_dir) not in sys.path:
+    sys.path.insert(0, str(script_dir))
+from mdscan import sections, tables
+
 try:
     import yaml
 except ImportError:
@@ -56,6 +61,13 @@ def g(d, path, default=None):
             return default
         cur = cur[key]
     return cur if cur not in (None, "") else default
+
+
+def strip_dot_slash(path: str) -> str:
+    p = str(path).replace("\\", "/").strip()
+    while p.startswith("./"):
+        p = p[2:].strip()
+    return p
 
 
 def main():
@@ -118,24 +130,75 @@ def main():
 
     # 4. Skills named in AGENTS.md exist
     skills_dir = root / (g(prof, "docs.skills_dir") or ".agents/skills")
+    doc_scope_names = set()
     for name in (g(prof, "docs.agents_file", "AGENTS.md"), "AGENTS.generated.md"):
         f = root / name
         if not f.exists():
             continue
-        for line in f.read_text().splitlines():
-            if line.startswith("|") and "`" in line:
-                for token in re.findall(r"`([a-z0-9-]+)`", line):
-                    if token in {"npm", "npx", "git"}:
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        secs = sections(content)
+
+        # Skills read ONLY from the Areas section, Skill column
+        areas_lines = None
+        for s in secs:
+            if s["heading"].strip().lower() in ("areas", "area"):
+                areas_lines = s["lines"]
+                break
+        if areas_lines:
+            for tbl in tables(areas_lines):
+                if not tbl:
+                    continue
+                header = [c.lower() for c in tbl[0]]
+                skill_col_idx = None
+                for idx, col in enumerate(header):
+                    if "skill" in col:
+                        skill_col_idx = idx
+                        break
+                if skill_col_idx is None:
+                    continue
+                for row in tbl[1:]:
+                    if skill_col_idx >= len(row):
                         continue
-                    if (skills_dir / token).exists():
-                        continue
-                    if "skill" in line.lower() or token.count("-") >= 1:
+                    cell = row[skill_col_idx]
+                    for token in re.findall(r"`([a-z0-9-]+)`", cell):
+                        if token in {"npm", "npx", "git"}:
+                            continue
+                        if (skills_dir / token).exists():
+                            continue
                         if not (skills_dir / token / "SKILL.md").exists():
                             warnings.append(f"{name} names '{token}' but {skills_dir.relative_to(root).as_posix()}/{token}/SKILL.md is missing")
 
+        # Scope names read ONLY from the Scope guide section
+        scope_lines = None
+        for s in secs:
+            if s["heading"].strip().lower() in ("scope guide", "scopes", "scope"):
+                scope_lines = s["lines"]
+                break
+        if scope_lines:
+            for tbl in tables(scope_lines):
+                if not tbl:
+                    continue
+                header = [c.lower() for c in tbl[0]]
+                scope_col_idx = None
+                for idx, col in enumerate(header):
+                    if "scope" in col:
+                        scope_col_idx = idx
+                        break
+                if scope_col_idx is None:
+                    continue
+                for row in tbl[1:]:
+                    if scope_col_idx >= len(row):
+                        continue
+                    cell = row[scope_col_idx]
+                    for token in re.findall(r"`([a-z0-9-]+)`", cell):
+                        doc_scope_names.add(token)
+
     # 5. Commit scopes and paths validation
     raw_scopes = g(prof, "git.scopes", []) or []
-    scope_names = set()
+    scope_names = set(doc_scope_names)
     for s in raw_scopes:
         if isinstance(s, str):
             scope_names.add(s)
@@ -146,7 +209,7 @@ def main():
             if paths:
                 matched_any = False
                 for pat in paths:
-                    norm = str(pat).replace("\\", "/").strip().lstrip("./")
+                    norm = strip_dot_slash(pat)
                     if (root / norm).exists():
                         matched_any = True
                         break

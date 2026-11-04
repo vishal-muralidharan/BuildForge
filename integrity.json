@@ -27,9 +27,9 @@
   "skills/project-bootstrap/references/interview.md": "5e25df2be95d9e14342cd77c0d580ba735d8cb72b00fbbf571b899cf53080202",
   "skills/project-bootstrap/references/profile-schema.md": "8e0c47a8a27ceefc55c4f14b30df27aaf9f5a3e8e543e19d8f2b599b44d177a7",
   "skills/project-bootstrap/scripts/detect_stack.py": "7d125e114d8d4862973c52d3ff30c0d2a787bf07c53390e91e89a3d47300ba5e",
-  "skills/project-bootstrap/scripts/legacy_import.py": "470502aa45391284e21ab735f97a2eaf7f394d41c54eeefef49dbf2858fe2e71",
+  "skills/project-bootstrap/scripts/legacy_import.py": "137b0f7cd5409a13a1dedcf51514f94768b1271eec2d3a562b6887e419ab023d",
   "skills/project-bootstrap/scripts/migrate_profile.py": "7914aa09c3d083e791d2d4ae62d38c84dfa9d0ea6165d4e343a7073d06b54ecf",
-  "skills/project-bootstrap/scripts/render.py": "05145678d7975aefcde461f0078ef2c131ae71272d2c8e50e4fc29daeff64850",
+  "skills/project-bootstrap/scripts/render.py": "570d08eaa674ecbc87d49bcf219984c14de3dd6f2ef7230bcc0b9e2361ff4e6b",
   "skills/project-bootstrap/scripts/validate_profile.py": "ddd61dc6b38260975e8ec0a1370e42d56e2858b22f03d5cfa1cba35e1a199e9d",
   "skills/repo-search/SKILL.md": "3bb91666a623b91e3dc78c07302b633010013936d65f17ff54ef60b5994300cf",
   "skills/rules-to-tests/SKILL.md": "fd03a43734d8e3fe5632a4392fe4ff70bccc776b0125231221a4f585539f646e",
@@ -41,6 +41,7 @@
   "skills/scaffold-app/references/stack-recipes.md": "526e4f0cbcfcab7711d825fe5c720d789cc9ea71446de30411657e52e6fdcb8e",
   "skills/scaffold-app/scripts/ensure_check_script.py": "822773ff5fd0a13cb522f8f5dbb50a92c68937331e98c75e243a24304320b5bc",
   "skills/sync-skills-and-docs/SKILL.md": "dfb1a8cca7b1898d16b4b7997fa1b66da9a814a0f8bfe5214c5751fbd0197cd8",
-  "skills/sync-skills-and-docs/scripts/check_sync.py": "ed847fa60b9c0a5f8e78b814b399fc8d16bafd7ad71db2501d051c1fc2ec5d84",
+  "skills/sync-skills-and-docs/scripts/check_sync.py": "7c57faa216f0ffeb86baba120695a9bdb5619bb52e3b58d87ba6faeffd22d96e",
+  "skills/sync-skills-and-docs/scripts/mdscan.py": "71cf8a614fb06d7b0478addefd28a0a62aa4432c5d4775235ff2c47ec47a99b3",
   "skills/targeted-module-testing/SKILL.md": "90957956eabf817d753a76c1fcf002484b9674694fad392276f0acfe17cecbec"
 }
