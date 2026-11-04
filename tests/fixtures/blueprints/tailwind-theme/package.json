@@ -1,0 +1,7 @@
+{
+  "name": "fixture-tailwind-theme",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tailwindcss -i src/theme.css -o dist/output.css"
+  }
+}

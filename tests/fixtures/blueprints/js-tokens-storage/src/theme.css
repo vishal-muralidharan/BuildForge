@@ -1,0 +1,13 @@
+:root {
+  --color-surface: #ffffff;
+  --color-text: #111111;
+  --color-action: #0066cc;
+  --spacing-base: 8px;
+  --radius-md: 6px;
+}
+
+.dark {
+  --color-surface: #1e1e1e;
+  --color-text: #eeeeee;
+  --color-action: #3399ff;
+}

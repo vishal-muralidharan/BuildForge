@@ -1,0 +1,7 @@
+{
+  "name": "fixture-secret-env",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node src/index.js"
+  }
+}

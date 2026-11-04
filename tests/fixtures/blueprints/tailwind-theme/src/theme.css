@@ -1,0 +1,6 @@
+@theme {
+  --color-brand: #ff0000;
+  --color-surface: #f9f9f9;
+  --font-sans: "Inter", sans-serif;
+  --spacing-container: 1200px;
+}
