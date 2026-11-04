@@ -57,6 +57,13 @@ def normalize_lf(text: str) -> str:
     return text.replace("\r\n", "\n")
 
 
+def write_text_lf(path: Path, content: str) -> None:
+    """Write text file with strictly LF line endings across all operating systems."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(normalize_lf(content))
+
+
 def strip_stamp(text: str) -> str:
     """Remove stamp line if present."""
     return STAMP_RE.sub("", text)
@@ -185,9 +192,9 @@ def log_render_action(root: Path, rel_path: str, action: str, line_count: int) -
         existing = log_file.read_text(encoding="utf-8")
         if not existing.startswith("# Render Log"):
             existing = header + existing
-        log_file.write_text(existing.rstrip() + "\n" + entry, encoding="utf-8")
+        write_text_lf(log_file, existing.rstrip() + "\n" + entry)
     else:
-        log_file.write_text(header + entry, encoding="utf-8")
+        write_text_lf(log_file, header + entry)
 
 
 def check_git_dirty(root: Path, targets: list, allow_dirty: bool) -> None:
@@ -277,9 +284,9 @@ def route_overflow(root: Path, dest: Path, block_name: str, block_content: str, 
         existing = notes_file.read_text(encoding="utf-8")
         if not existing.startswith(f"# Notes for {skill_name}"):
             existing = header + existing
-        notes_file.write_text(existing.rstrip() + "\n\n" + block_entry, encoding="utf-8")
+        write_text_lf(notes_file, existing.rstrip() + "\n\n" + block_entry)
     else:
-        notes_file.write_text(header + block_entry, encoding="utf-8")
+        write_text_lf(notes_file, header + block_entry)
 
     # In dest, replace the block content with pointer
     if dest.is_file():
@@ -289,7 +296,7 @@ def route_overflow(root: Path, dest: Path, block_name: str, block_content: str, 
             re.DOTALL
         )
         replacement = f"<!-- BEGIN CUSTOM: {block_name} -->\nMoved to .agents/notes/{skill_name}.md\n<!-- END CUSTOM: {block_name} -->\n"
-        dest.write_text(pat.sub(replacement, txt, count=1), encoding="utf-8")
+        write_text_lf(dest, pat.sub(replacement, txt, count=1))
 
     log_render_action(root, rel_label, f"notes ({block_name} -> .agents/notes/{skill_name}.md)", lines_count)
     print(f"ROUTED  Custom block '{block_name}' from {rel_label} to .agents/notes/{skill_name}.md")
@@ -399,9 +406,9 @@ def append_orphans(orphans: list, root: Path) -> None:
         existing = orphans_file.read_text(encoding="utf-8")
         if not existing.startswith("# Custom Block Orphans"):
             existing = header + existing
-        orphans_file.write_text(existing.rstrip() + "\n\n" + "\n".join(entries), encoding="utf-8")
+        write_text_lf(orphans_file, existing.rstrip() + "\n\n" + "\n".join(entries))
     else:
-        orphans_file.write_text(header + "\n".join(entries), encoding="utf-8")
+        write_text_lf(orphans_file, header + "\n".join(entries))
 
 
 def g(d, path, default=None):
@@ -784,7 +791,7 @@ def main():
             final_content = stamp_text(raw_tmpl, body_hash)
             if not a.dry_run:
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_text(final_content, encoding="utf-8")
+                write_text_lf(dest, final_content)
             created.append(dest)
             prefix = "DRY RUN " if a.dry_run else ""
             print(f"{prefix}WROTE   {rel_label}")
@@ -819,7 +826,7 @@ def main():
                 new_body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(merged, new_body_hash)
                 if not a.dry_run:
-                    dest.write_text(final_content, encoding="utf-8")
+                    write_text_lf(dest, final_content)
 
                 if needs_adopt and not a.dry_run:
                     route_overflow(root, dest, "legacy", existing_body, rel_label)
@@ -839,7 +846,7 @@ def main():
                 body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(raw_tmpl, body_hash)
                 if not a.dry_run:
-                    dest.write_text(final_content, encoding="utf-8")
+                    write_text_lf(dest, final_content)
                 updated.append((dest, 0, 0))
                 print(f"OVERWROTE {rel_label} (unstamped; forced with --overwrite-unstamped)")
                 continue
@@ -849,7 +856,7 @@ def main():
                 body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(raw_tmpl, body_hash)
                 if not a.dry_run:
-                    gen_dest.write_text(final_content, encoding="utf-8")
+                    write_text_lf(gen_dest, final_content)
                 created.append(gen_dest)
                 print(f"NOTE  {dest.name} exists. Router written to {gen_dest.name}. Merge it by hand.")
                 continue
@@ -876,7 +883,7 @@ def main():
                 body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(raw_tmpl, body_hash)
                 if not a.dry_run:
-                    gen_dest.write_text(final_content, encoding="utf-8")
+                    write_text_lf(gen_dest, final_content)
                 created.append(gen_dest)
                 print(f"NOTE  {dest.name} exists. Router written to {gen_dest.name}. Merge it by hand.")
             else:
@@ -928,7 +935,7 @@ def main():
         new_body_hash = compute_body_hash(raw_tmpl)
         final_content = stamp_text(merged, new_body_hash)
         if not a.dry_run:
-            dest.write_text(final_content, encoding="utf-8")
+            write_text_lf(dest, final_content)
 
         # Route overflow blocks if in salvage run
         if is_salvage_run and not a.dry_run:

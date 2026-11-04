@@ -250,14 +250,22 @@ class TestRenderSalvage(unittest.TestCase):
 
     def test_05_dirty_tree_guard_refuses_unless_allow_dirty(self):
         """Point 5: Git dirty tree guard refuses uncommitted changes unless --allow-dirty."""
-        subprocess.run(["git", "init"], cwd=str(self.root), capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.name", "TestUser"], cwd=str(self.root), check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(self.root), check=True)
+        git_env = os.environ.copy()
+        git_env.update({
+            "GIT_AUTHOR_NAME": "TestUser",
+            "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "TestUser",
+            "GIT_COMMITTER_EMAIL": "test@example.com",
+        })
+        subprocess.run(["git", "init"], cwd=str(self.root), capture_output=True, env=git_env, check=True)
+        subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=str(self.root), capture_output=True, env=git_env, check=True)
+        subprocess.run(["git", "config", "user.name", "TestUser"], cwd=str(self.root), capture_output=True, env=git_env, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(self.root), capture_output=True, env=git_env, check=True)
 
         self.run_render(check=True)
 
-        subprocess.run(["git", "add", "."], cwd=str(self.root), check=True)
-        subprocess.run(["git", "commit", "-m", "initial"], cwd=str(self.root), check=True)
+        subprocess.run(["git", "add", "."], cwd=str(self.root), capture_output=True, env=git_env, check=True)
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=str(self.root), capture_output=True, env=git_env, check=True)
 
         # Modify stamped file to create uncommitted change
         bui = self.root / ".agents" / "skills" / "build-ui" / "SKILL.md"

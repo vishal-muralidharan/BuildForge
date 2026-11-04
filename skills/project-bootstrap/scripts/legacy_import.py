@@ -31,6 +31,13 @@ IGNORE_DIRS = {
     ".venv", "venv", "__pycache__", ".turbo", ".vercel", ".netlify", "target", "out"
 }
 
+def write_text_lf(path: Path, content: str) -> None:
+    """Write text file with strictly LF line endings across all operating systems."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(content.replace("\r\n", "\n"))
+
+
 # Documented thresholds for legacy import source classification
 THIRD_PARTY_SIGNAL_THRESHOLD = 2
 THIRD_PARTY_FRONTMATTER_KEYS = {
@@ -1058,7 +1065,7 @@ def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = No
         row = f"| {s['id']} | {s['file']}:{s['line']} | {s['class']} | {s['proposed_destination']} | {s['status']} | {escape_table_cell(details)} | {source_class} |"
         lines.append(row)
 
-    ledger_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_text_lf(ledger_path, "\n".join(lines) + "\n")
 
 
 def read_ledger(ledger_path: Path) -> list:
@@ -1241,7 +1248,7 @@ def ensure_blueprint_file(root: Path, area: str) -> Path:
                 "<!-- BEGIN CUSTOM: contracts -->\n"
                 "<!-- END CUSTOM: contracts -->\n"
             )
-            target.write_text(content, encoding="utf-8")
+            write_text_lf(target, content)
 
     idx_file = bp_dir / "index.md"
     if not idx_file.is_file():
@@ -1252,12 +1259,12 @@ def ensure_blueprint_file(root: Path, area: str) -> Path:
             f"- [{area.title()} Blueprint]({area}.md)",
             ""
         ]
-        idx_file.write_text("\n".join(idx_lines), encoding="utf-8")
+        write_text_lf(idx_file, "\n".join(idx_lines))
     else:
         try:
             c = idx_file.read_text(encoding="utf-8", errors="ignore")
             if f"{area}.md" not in c:
-                idx_file.write_text(c.rstrip() + f"\n- [{area.title()} Blueprint]({area}.md)\n", encoding="utf-8")
+                write_text_lf(idx_file, c.rstrip() + f"\n- [{area.title()} Blueprint]({area}.md)\n")
         except Exception:
             pass
 
@@ -1289,7 +1296,7 @@ def route_statement_to_blueprint(root: Path, stmt: dict):
     else:
         new_content = content.rstrip() + f"\n\n<!-- BEGIN CUSTOM: contracts -->\n{entry_str}\n<!-- END CUSTOM: contracts -->\n"
 
-    target_file.write_text(new_content, encoding="utf-8")
+    write_text_lf(target_file, new_content)
 
     stmt["status"] = "routed"
     stmt["reason"] = f"routed to .agents/blueprints/{area}.md (contracts)"
@@ -1444,10 +1451,10 @@ def cmd_apply(root: Path, accept_ids: list, drop_ids: list, route_ids: list, rou
             note_file = notes_dir / f"{area}.md"
             note_entry = f"- [{stmt['file']}:{stmt['line']}] {stmt['text']}\n"
             if not note_file.exists():
-                note_file.write_text(f"# Notes: {area}\n\n{note_entry}", encoding="utf-8")
+                write_text_lf(note_file, f"# Notes: {area}\n\n{note_entry}")
             else:
-                with open(note_file, "a", encoding="utf-8") as nf:
-                    nf.write(note_entry)
+                with open(note_file, "a", encoding="utf-8", newline="\n") as nf:
+                    nf.write(note_entry.replace("\r\n", "\n"))
             accepted_notes_added += 1
 
         elif s_class.startswith("derivable-"):
@@ -1459,7 +1466,7 @@ def cmd_apply(root: Path, accept_ids: list, drop_ids: list, route_ids: list, rou
 
     # Save profile
     if prof_data is not None and accepted_rules_added > 0:
-        prof_path.write_text(yaml.safe_dump(prof_data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        write_text_lf(prof_path, yaml.safe_dump(prof_data, sort_keys=False, allow_unicode=True))
 
     # Save ledger
     write_ledger(ledger_path, statements)

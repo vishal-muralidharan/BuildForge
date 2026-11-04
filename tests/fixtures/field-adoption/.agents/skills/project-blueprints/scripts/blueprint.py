@@ -40,6 +40,13 @@ CUSTOM_BLOCK_RE = re.compile(
 )
 
 
+def write_text_lf(path: Path, content: str) -> None:
+    """Write text file with strictly LF line endings across all operating systems."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(content.replace("\r\n", "\n"))
+
+
 def load_profile(root: Path) -> dict:
     """Load project profile if available."""
     p_file = root / ".agents" / "project-profile.yaml"
@@ -135,7 +142,7 @@ def cmd_extract(root: Path, selected_areas: list = None) -> int:
                         out_lines.append("")
                         out_lines.append(bcontent)
 
-            p_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+            write_text_lf(p_file, "\n".join(out_lines) + "\n")
             generated_files.append(fname)
 
         # Collect source hashes for manifest
@@ -162,7 +169,7 @@ def cmd_extract(root: Path, selected_areas: list = None) -> int:
         for c in all_candidates:
             c_lines.append(f"- **{c['id']}** ({c['area']}): {c['rule']}")
             c_lines.append(f"  - Evidence: `{c['evidence']}`")
-    c_file.write_text("\n".join(c_lines) + "\n", encoding="utf-8")
+    write_text_lf(c_file, "\n".join(c_lines) + "\n")
 
     # Write index.md (strictly budget <= 60 lines)
     idx_file = bp_dir / "index.md"
@@ -182,7 +189,7 @@ def cmd_extract(root: Path, selected_areas: list = None) -> int:
     if unsupported_langs:
         idx_lines.append(f"- Unsupported languages: {', '.join(sorted(unsupported_langs))}")
 
-    idx_file.write_text("\n".join(idx_lines[:58]) + "\n", encoding="utf-8")
+    write_text_lf(idx_file, "\n".join(idx_lines[:58]) + "\n")
 
     # Write manifest.json
     manifest_data = {
@@ -191,7 +198,7 @@ def cmd_extract(root: Path, selected_areas: list = None) -> int:
         "areas": manifest_sources
     }
     m_file = bp_dir / "manifest.json"
-    m_file.write_text(json.dumps(manifest_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_lf(m_file, json.dumps(manifest_data, indent=2, sort_keys=True) + "\n")
 
     print(f"Extracted blueprints to .agents/blueprints/ ({len(generated_files)} files).")
     return 0
@@ -369,7 +376,7 @@ def cmd_init(root: Path, selected_areas: list = None) -> int:
                 "<!-- BEGIN CUSTOM: contracts -->\n"
                 "<!-- END CUSTOM: contracts -->\n"
             )
-        target.write_text(content, encoding="utf-8")
+        write_text_lf(target, content)
         print(f"Initialized .agents/blueprints/{area}.md from template.")
         created_files.append(f"{area}.md")
 
@@ -383,7 +390,7 @@ def cmd_init(root: Path, selected_areas: list = None) -> int:
         ]
         for cf in sorted(created_files):
             idx_lines.append(f"- [{cf}]({cf})")
-        idx_file.write_text("\n".join(idx_lines[:58]) + "\n", encoding="utf-8")
+        write_text_lf(idx_file, "\n".join(idx_lines[:58]) + "\n")
 
     return 0
 
@@ -467,15 +474,15 @@ def cmd_adopt(root: Path, from_file: str, block_name: str, area: str) -> int:
     try:
         for p_idx, (fname, p_lines) in enumerate(parts):
             p_file = bp_dir / fname
-            p_file.write_text("\n".join(p_lines) + "\n", encoding="utf-8")
+            write_text_lf(p_file, "\n".join(p_lines) + "\n")
             written_files.append((p_file, p_file.read_text(encoding="utf-8") if p_file.is_file() else ""))
 
-        from_path.write_text(new_src_content, encoding="utf-8")
+        write_text_lf(from_path, new_src_content)
     except Exception as e:
         # Rollback all writes
         try:
-            from_path.write_text(backup_src, encoding="utf-8")
-            target_bp.write_text(backup_bp, encoding="utf-8")
+            write_text_lf(from_path, backup_src)
+            write_text_lf(target_bp, backup_bp)
         except Exception:
             pass
         print(f"Error during atomic adopt: {e}. Rolled back all changes.", file=sys.stderr)
@@ -491,7 +498,7 @@ def cmd_adopt(root: Path, from_file: str, block_name: str, area: str) -> int:
                 link_entry = f"- [{fname}]({fname})"
                 if link_entry not in idx_lines:
                     idx_lines.append(link_entry)
-            idx_file.write_text("\n".join(idx_lines[:58]) + "\n", encoding="utf-8")
+            write_text_lf(idx_file, "\n".join(idx_lines[:58]) + "\n")
 
     print(f"Adopted custom block '{block_name}' from '{from_file}' into '{area}.md' contracts.")
     return 0
