@@ -5,6 +5,11 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Fictional reference profile `example-profile.yaml` for invented app `Pocketlog` with explicit warning banner.
+- Scope candidate generation in `detect_stack.py` with validation that each candidate path matches existing files.
+- Path and glob coverage validation in `validate_profile.py --root R` and strict failure mode with `--strict-paths`.
+- Grouped glob and path validation in `check_sync.py`.
+- Integration and unit tests in `tests/test_validate_profile.py` for glob mismatch warnings and strict validation.
 - Markdown scanner `skills/sync-skills-and-docs/scripts/mdscan.py` for section and table extraction that ignores fenced code blocks.
 - Python AST linter `scripts/lint_py.py` that fails on multi-character strip operations without `# strip-chars-ok:` comments and `./` prefixes in glob patterns.
 - Integration test suite `tests/test_check_sync.py` verifying glob normalization, code block isolation, and AST linting rules.

@@ -286,13 +286,13 @@ Here is a snippet from that example file:
 schema_version: 1
 
 project:
-  name: NeMo
-  summary: Fast, local first expense and income tracker.
+  name: Pocketlog
+  summary: Fast, offline-first personal journaling and habit tracking application.
   mode: existing
-  platforms: [web, pwa]
+  platforms: [web, mobile]
 
 stack:
-  language: javascript
+  language: typescript
   framework: React 19
   bundler: Vite
   styling: Tailwind v4
@@ -301,10 +301,10 @@ stack:
   package_manager: npm
   test_runner: Vitest
   linter: Oxlint
-  backend: Supabase (optional sync)
-  auth: Supabase
-  database: Supabase Postgres
-  hosting: Vercel
+  backend: SQLite (local storage)
+  auth: none
+  database: SQLite
+  hosting: static
 ```
 
 ## Automatic rule checks
