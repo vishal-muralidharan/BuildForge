@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Integration tests for the evaluation grader across all 9 scenarios.
+"""Integration tests for the evaluation grader across all 10 scenarios.
 
 Tests that scripts/grade.py correctly scores:
 1. A hand-made passing state (expect 0 failures).
