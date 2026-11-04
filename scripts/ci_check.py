@@ -842,6 +842,14 @@ def run_project_blueprints_tests(repo_root, errors):
         if res.returncode != 0:
             errors.append(f"Project blueprints integration tests failed:\n{res.stderr or res.stdout}".strip())
 
+    lifecycle_script = os.path.join(repo_root, "tests", "test_blueprint_lifecycle.py")
+    if os.path.isfile(lifecycle_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", lifecycle_script], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Blueprint lifecycle integration tests failed:\n{res.stderr or res.stdout}".strip())
+
 
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

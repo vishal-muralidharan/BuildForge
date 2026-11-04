@@ -168,7 +168,8 @@ def cmd_extract(root: Path, selected_areas: list = None) -> int:
         "Deterministic, verified facts extracted directly from codebase evidence.\n",
         "## Areas\n"
     ]
-    for g in sorted(generated_files):
+    all_bp_files = sorted([f.name for f in bp_dir.glob("*.md") if f.name not in ("index.md", "candidates.md")])
+    for g in all_bp_files:
         idx_lines.append(f"- [{g}]({g})")
 
     idx_lines.append("\n## Generator\n")
