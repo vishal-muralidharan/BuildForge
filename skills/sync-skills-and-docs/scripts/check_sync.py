@@ -131,7 +131,7 @@ def main():
                         continue
                     if "skill" in line.lower() or token.count("-") >= 1:
                         if not (skills_dir / token / "SKILL.md").exists():
-                            warnings.append(f"{name} names '{token}' but {skills_dir.relative_to(root)}/{token}/SKILL.md is missing")
+                            warnings.append(f"{name} names '{token}' but {skills_dir.relative_to(root).as_posix()}/{token}/SKILL.md is missing")
 
     # 5. Commit scopes and paths validation
     raw_scopes = g(prof, "git.scopes", []) or []
@@ -190,7 +190,7 @@ def main():
     for gf in gen_candidates:
         txt = gf.read_text(encoding="utf-8").replace("\r\n", "\n")
         sm = STAMP_RE.search(txt)
-        rel_label = str(gf.relative_to(root))
+        rel_label = gf.relative_to(root).as_posix()
         if sm:
             stamp_h = sm.group(1)
             clean = STAMP_RE.sub("", txt)

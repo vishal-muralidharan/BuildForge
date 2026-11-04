@@ -35,3 +35,4 @@ A rule that only lives in prose gets broken the first time an agent is in a hurr
 - Never weaken or delete a check to make a build pass. If a rule should change, change the rule in the profile through `sync-skills-and-docs`, with the user's yes.
 - Do not claim a rule is enforced unless its check ran and passed in this session.
 - Excluded paths must be listed explicitly in `exclude`. Do not hide violations behind broad globs.
+- Cross-platform paths: Check runners and rule scripts must normalize file paths using POSIX slashes (such as `Path.as_posix()`) before matching against globs or regexes so checks behave identically across Linux, macOS and Windows.

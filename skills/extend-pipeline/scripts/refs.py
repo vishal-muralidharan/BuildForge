@@ -288,7 +288,7 @@ def remove_agent_links_for_skill(root_path: Path, skill_dir_name: str) -> list:
                         dest = item.resolve()
                         if dest == target_skill_path:
                             item.unlink()
-                            removed_links.append(str(item.relative_to(root_path)))
+                            removed_links.append(item.relative_to(root_path).as_posix())
                     except Exception:
                         pass
     return removed_links

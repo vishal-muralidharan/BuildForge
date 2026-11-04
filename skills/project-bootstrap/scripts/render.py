@@ -453,6 +453,13 @@ def render_repo_map(p, pn):
     return "\n".join(lines) + "\n"
 
 
+def rel_posix(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", required=True)
@@ -468,10 +475,7 @@ def main():
     if not prof_path.is_file():
         sys.exit(f"Profile not found: {prof_path}")
     p = yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
-    try:
-        pn = prof_path.relative_to(root).as_posix()
-    except ValueError:
-        pn = prof_path.as_posix()
+    pn = rel_posix(prof_path, root)
 
     skills_dir = root / (g(p, "docs.skills_dir") or ".agents/skills")
     generated = build_skills(p, pn)
@@ -519,8 +523,8 @@ def main():
 
             stamp_hash = m.group(1)
             disk_body_hash = compute_body_hash(disk_text)
-            disk_blocks = extract_custom_blocks(disk_text, str(dest.relative_to(root)))
-            warns = validate_custom_blocks(disk_blocks, str(dest.relative_to(root)))
+            disk_blocks = extract_custom_blocks(disk_text, rel_posix(dest, root))
+            warns = validate_custom_blocks(disk_blocks, rel_posix(dest, root))
             all_warnings.extend(warns)
 
             if disk_body_hash != stamp_hash:
@@ -533,8 +537,8 @@ def main():
                 diff_lines = list(difflib.unified_diff(
                     disk_text.splitlines(keepends=True),
                     candidate_stamped.splitlines(keepends=True),
-                    fromfile=f"{dest.relative_to(root)} (current)",
-                    tofile=f"{dest.relative_to(root)} (expected clean)",
+                    fromfile=f"{rel_posix(dest, root)} (current)",
+                    tofile=f"{rel_posix(dest, root)} (expected clean)",
                 ))
                 refusal_diffs[dest] = "".join(diff_lines)
                 refused.append((dest, "hand edits outside custom blocks"))
@@ -543,20 +547,20 @@ def main():
             for w in all_warnings:
                 print(w)
             for dest, diff in refusal_diffs.items():
-                print(f"\nREFUSED {dest.relative_to(root)} (hand edits outside custom blocks):\n")
+                print(f"\nREFUSED {rel_posix(dest, root)} (hand edits outside custom blocks):\n")
                 print(diff)
             print("\nRender summary:")
             print("  created:   none")
             print("  updated:   none")
             print("  refused:")
             for r, reason in refused:
-                print(f"    - {r.relative_to(root)} ({reason})")
+                print(f"    - {rel_posix(r, root)} ({reason})")
             print("  skipped:   none")
             sys.exit(1)
 
     # Process all targets
     for dest, raw_tmpl, kind in targets:
-        rel_label = str(dest.relative_to(root))
+        rel_label = rel_posix(dest, root)
         if not dest.is_file():
             # Fresh file
             body_hash = compute_body_hash(raw_tmpl)
@@ -652,10 +656,10 @@ def main():
         skill_file = skills_dir / skill_name / "SKILL.md"
         if skill_file.is_file() and skill_file not in active_dest_paths:
             content = skill_file.read_text(encoding="utf-8")
-            blocks = extract_custom_blocks(content, str(skill_file.relative_to(root)))
+            blocks = extract_custom_blocks(content, rel_posix(skill_file, root))
             for bname, bcontent in blocks.items():
                 if bcontent.strip():
-                    all_orphans.append((str(skill_file.relative_to(root)), bname, bcontent))
+                    all_orphans.append((rel_posix(skill_file, root), bname, bcontent))
 
     if not a.dry_run:
         append_orphans(all_orphans, root)
@@ -672,28 +676,28 @@ def main():
     if created:
         print("  created:")
         for c in created:
-            print(f"    - {c.relative_to(root)}")
+            print(f"    - {rel_posix(c, root)}")
     else:
         print("  created:   none")
 
     if updated:
         print("  updated:")
         for u, n_blk in updated:
-            print(f"    - {u.relative_to(root)} (preserved {n_blk} block(s))")
+            print(f"    - {rel_posix(u, root)} (preserved {n_blk} block(s))")
     else:
         print("  updated:   none")
 
     if refused:
         print("  refused:")
         for r, reason in refused:
-            print(f"    - {r.relative_to(root)} ({reason})")
+            print(f"    - {rel_posix(r, root)} ({reason})")
     else:
         print("  refused:   none")
 
     if skipped:
         print("  skipped:")
         for s, reason in skipped:
-            print(f"    - {s.relative_to(root)} ({reason})")
+            print(f"    - {rel_posix(s, root)} ({reason})")
     else:
         print("  skipped:   none")
 

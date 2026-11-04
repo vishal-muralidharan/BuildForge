@@ -32,6 +32,8 @@ Fix every failure at its cause. Do not edit a test or loosen a rule just to get 
 - Assert on roles, labels and test ids. Do not assert on class names or colors.
 - If `design.enforced_by` is set, that test or lint rule enforces the design rules. It must pass. Do not edit it to make a change pass unless the user agrees the rule should change. If the rule should change, change the profile through `sync-skills-and-docs`.
 - Know what your test environment fakes (timers, layout, device APIs). Note any behavior that only a real browser can confirm.
+- Cross-platform path assertions: When tests check CLI console output, file paths, or diffs, normalize path separators (`/` vs `\`) or use POSIX formatting (`Path.as_posix()`). Never assert hardcoded Unix slashes against raw host OS paths.
+- Windows execution: When spawning child processes or npm commands in tests on Windows, pass `shell=(sys.platform == "win32")` for batch scripts (`npm.cmd`), and avoid shell wildcard expansion in npm test script targets.
 
 ## 2b. Goal Acceptance Verification
 

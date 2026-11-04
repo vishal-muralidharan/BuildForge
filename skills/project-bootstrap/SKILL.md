@@ -14,7 +14,7 @@ The 5 process skills (`audit-and-planning`, `repo-search`, `atomic-commits`, `ta
 
 Bootstrap never edits application source code. It writes only `.agents/`, the AGENTS.md router and the skills folder.
 
-Scripts live in this skill's `scripts/` folder. Run them with the full path to that folder. If python3 is not found, use python or py -3.
+Scripts live in this skill's `scripts/` folder. Run them with the full path to that folder. If python3 is not found, use python or py -3. All pipeline scripts and render tools output and store relative paths in POSIX format using forward slashes (via `Path.as_posix()`). Never emit raw host backslashes into generated files, diffs, or console summaries.
 
 ## Step 0: Pick the mode
 

@@ -18,6 +18,7 @@ Use this workflow when fixing a reported bug, defect, regression, or broken chec
 2. **Stage 2: Write failing regression test first**
    - Add an automated test that fails because of the bug.
    - Confirm the test fails with the expected failure mode.
+   - Ensure the regression test is cross-platform safe: normalize path separators with `as_posix()` and avoid platform-specific shell constructs.
    - Gate: Test fails before any application code is changed.
 
 3. **Stage 3: Make smallest fix**
