@@ -397,6 +397,20 @@ def render_agents(p, pn, skill_names, root):
     git = p.get("git") or {}
     push_text = {"never": "Never run `git push` unless the user says to push.", "ask": "Ask before you push.", "allowed": "Pushing is allowed."}[git.get("push", "never")]
     lines += ["## Git", "", f"Format: `{git.get('commit_format')}`." + (" One line only." if git.get("single_line") else ""), push_text, ""]
+    scopes_list = git.get("scopes") or []
+    if scopes_list:
+        scope_rows = []
+        for s in scopes_list:
+            if isinstance(s, str):
+                scope_rows.append((f"`{s}`", ""))
+            elif isinstance(s, dict) and s.get("name"):
+                scope_rows.append((f"`{s['name']}`", s.get("purpose", "")))
+        if scope_rows:
+            lines += ["### Scope guide", ""]
+            lines += table(["Scope", "Purpose"], scope_rows[:25])
+            if len(scope_rows) > 25:
+                lines += ["", f"See the profile (`{pn}`) for the full list of {len(scope_rows)} scopes."]
+            lines.append("")
     caps = {k: v for k, v in (p.get("capabilities") or {}).items() if isinstance(v, dict) and v.get("enabled")}
     if caps:
         lines += ["## Capabilities", "", "Run these stages only because they are enabled in the profile:", ""]

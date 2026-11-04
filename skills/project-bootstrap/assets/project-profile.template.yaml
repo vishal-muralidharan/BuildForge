@@ -70,7 +70,7 @@ git:
   commit_format: "<type>(<scope>): <subject>"
   single_line: true
   types: [feat, fix, refactor, style, test, docs, chore]
-  scopes: []                # empty means free scope
+  scopes: []                # list of strings or {name, purpose, paths} objects. Empty means free scope
   push: never               # never | ask | allowed
   stage: granular           # granular | all
 

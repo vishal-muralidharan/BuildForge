@@ -31,7 +31,7 @@ Scripts live in this skill's `scripts/` folder. Run them with the full path to t
 3. Copy `assets/project-profile.template.yaml` to `.agents/project-profile.yaml`. Fill only what the evidence supports.
    - Commands: use `commands_suggested`. If there is no single `check` command, propose one that chains lint, test and build, and ask before adding it to `package.json`.
    - Naming: state a style only when it covers at least 80% of files of that kind. Otherwise leave a TODO and ask.
-   - Commit rules: copy the style from `git` facts only when `conventional_ratio` is at least 0.8.
+   - Commit rules: copy the style from `git` facts only when `conventional_ratio` is at least 0.8. Seed `git.scopes` from `detect_stack` git facts (`most_used_scopes` in history) and from layer names. Ask the user for a purpose for each scope, with a default taken from the matching layer purpose.
    - Layers: use `layers`. Write one plain purpose per folder. Mark a guessed purpose as TODO.
 4. Reconcile legacy statements:
    Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area <area>` for each area with pending items. Propose defaults and ask the user whether to accept or drop each item:

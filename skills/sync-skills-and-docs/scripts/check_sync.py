@@ -132,14 +132,38 @@ def main():
                         if not (skills_dir / token / "SKILL.md").exists():
                             warnings.append(f"{name} names '{token}' but {skills_dir.relative_to(root)}/{token}/SKILL.md is missing")
 
-    # 5. Recent commit scopes
-    scopes = set(g(prof, "git.scopes", []) or [])
-    if scopes and (root / ".git").exists():
+    # 5. Commit scopes and paths validation
+    raw_scopes = g(prof, "git.scopes", []) or []
+    scope_names = set()
+    for s in raw_scopes:
+        if isinstance(s, str):
+            scope_names.add(s)
+        elif isinstance(s, dict) and s.get("name"):
+            sname = str(s["name"])
+            scope_names.add(sname)
+            paths = s.get("paths") or []
+            if paths:
+                matched_any = False
+                for pat in paths:
+                    norm = str(pat).replace("\\", "/").strip().lstrip("./")
+                    if (root / norm).exists():
+                        matched_any = True
+                        break
+                    try:
+                        if any(root.glob(norm)):
+                            matched_any = True
+                            break
+                    except Exception:
+                        pass
+                if not matched_any:
+                    warnings.append(f"scope '{sname}' has paths {paths} that match no files in the repository")
+
+    if scope_names and (root / ".git").exists():
         try:
             subs = subprocess.run(["git", "-C", str(root), "log", "-n", "50", "--pretty=%s"],
                                   capture_output=True, text=True, timeout=20).stdout.splitlines()
             used = {m.group(1) for s in subs for m in [re.match(r"^\w+\(([^)]+)\)", s)] if m}
-            for s in sorted(used - scopes):
+            for s in sorted(used - scope_names):
                 warnings.append(f"recent commits use scope '{s}' which is not in git.scopes")
         except Exception:
             pass

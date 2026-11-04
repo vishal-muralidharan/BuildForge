@@ -54,7 +54,13 @@ def main():
     git = prof.get("git") or {}
     fmt = git.get("commit_format") or "<type>(<scope>): <subject>"
     types = git.get("types") or []
-    scopes = git.get("scopes") or []
+    raw_scopes = git.get("scopes") or []
+    scopes = []
+    for s in raw_scopes:
+        if isinstance(s, str):
+            scopes.append(s)
+        elif isinstance(s, dict) and s.get("name"):
+            scopes.append(str(s["name"]))
     msg = a.message.rstrip("\n")
 
     errors, warnings = [], []

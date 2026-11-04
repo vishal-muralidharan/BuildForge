@@ -53,7 +53,17 @@ After a multi unit task, you can prove it with `git rebase -x "<commands.check>"
 
 ### 4. Write the message
 
-Use the format in `git.commit_format`. Use a type from `git.types`. If `git.scopes` has entries, pick one. If none fits, do not invent one silently. Use the closest scope, finish the commit, and tell the user a new scope is needed so `sync-skills-and-docs` can add it to the profile.
+Use the format in `git.commit_format`. Use a type from `git.types`.
+
+If `git.scopes` has entries, run `suggest_scope.py` on the files in the commit before choosing:
+
+```bash
+python3 .agents/skills/atomic-commits/scripts/suggest_scope.py --profile .agents/project-profile.yaml --files <files>
+```
+
+Or for staged changes: `python3 .agents/skills/atomic-commits/scripts/suggest_scope.py --profile .agents/project-profile.yaml --staged`.
+
+Pick a suggested scope. If none fits, do not invent one silently. Use the closest scope, finish the commit, and ask the user for confirmation to add a new scope so `sync-skills-and-docs` can add it to the profile.
 
 If `git.single_line` is true, write the subject line only. No body, no footer.
 
