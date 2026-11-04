@@ -5,6 +5,11 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Added `project-blueprints` pipeline skill (`skills/project-blueprints/`) with analyzers for data, tokens, UI, layout, auth, and config facts.
+- Added `blueprint.py` CLI supporting `extract`, `verify`, `stale`, `show`, and `candidates` commands with line budget limits, secret scanning, and deterministic LF hashing.
+- Added optional `blueprints` configuration and rule `evidence` path checking to `validate_profile.py`.
+- Added blueprint querying hooks to `render.py` convention skills, `audit-and-planning`, `feature-delivery`, `check_sync.py`, and `targeted-module-testing`.
+- Added integration test suite `tests/test_project_blueprints.py` and 4 test fixtures.
 - Skill contracts verification script `scripts/skill_contracts.py` and allowlist `scripts/contracts-allow.txt` enforcing script mentions, path existence, subcommand validity, and required text contracts.
 - Skill contracts test suite `tests/test_skill_contracts.py` integrated into `scripts/ci_check.py`.
 - Fictional reference profile `example-profile.yaml` for invented app `Pocketlog` with explicit warning banner.

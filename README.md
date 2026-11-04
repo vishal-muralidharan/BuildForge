@@ -60,7 +60,7 @@ cp -r skills .agents/skills
 
 ### What install writes
 
-The installer copies the 12 pipeline skills into `.agents/skills/`. It writes `.agents/build-forge.lock.json` with a hash of every pipeline skill file.
+The installer copies the 13 pipeline skills into `.agents/skills/`. It writes `.agents/build-forge.lock.json` with a hash of every pipeline skill file.
 
 ### Overwrite existing skills
 
@@ -253,7 +253,7 @@ The pipeline is goal-oriented rather than task-oriented: it does not stop merely
 AGENTS.md                       # Generated: Router read by agents
 ```
 
-- **Build Forge files**: The 12 pipeline skills in `.agents/skills/` and `.agents/build-forge.lock.json`. These are read only files from the npm package.
+- **Build Forge files**: The 13 pipeline skills in `.agents/skills/` and `.agents/build-forge.lock.json`. These are read only files from the npm package.
 - **Generated files**: `.agents/project-profile.yaml`, `AGENTS.md`, `.agents/repo-map.md`, `.agents/checks/`, and convention skills like `build-ui`. These files adapt to your project, belong to you, and may be edited freely.
 
 ## Skills
@@ -266,6 +266,7 @@ AGENTS.md                       # Generated: Router read by agents
 | `feature-delivery` | Conductor for the build pipeline with gates between all 7 stages. | For every task to add, build, fix, refactor or ship code in a project with a profile. |
 | `legal-and-settings-pages` | Adds settings, legal pages, data management, terms consent, and account deletion. | When adding settings, privacy policies, terms, GDPR/CCPA pages, or account deletion. |
 | `product-spec` | Turns rough app ideas into specs with users, core flows, milestones and steps. | At the very start of a new app, or to cut big features into milestones. |
+| `project-blueprints` | Extracts verified facts (data, tokens, UI, layout, auth, config) into queryable blueprints. | When asking what is in this codebase, inspecting schemas or tokens, or regenerating context. |
 | `project-bootstrap` | Sets up the build pipeline and creates the profile, AGENTS.md, skills, and repo map. | When onboarding a repo, starting a new app, or updating project guidelines. |
 | `repo-search` | Performs read-only discovery of symbols, components, tokens, and fields. | Before creating new files or functions, or when refreshing the repo map. |
 | `rules-to-tests` | Turns written project rules into automatic checks that fail the build when broken. | After bootstrap or scaffolding, or when conventions need automated enforcement. |
@@ -327,6 +328,47 @@ rules:
 ```
 
 See [check-patterns.md](skills/rules-to-tests/references/check-patterns.md) for patterns.
+
+## Project blueprints
+
+Blueprints capture verifiable facts about a codebase so agents do not rescan files repeatedly. Facts are extracted from code with source file and line evidence. Rules and contracts are never derived automatically; they are proposed in `candidates.md` for the user to confirm.
+
+Blueprints live in `.agents/blueprints/` and cover 6 areas:
+- `data.md`: Database tables (SQL, Prisma), storage keys, and schema names.
+- `tokens.md`: CSS variables, role mappings, and light and dark theme palettes.
+- `ui.md`: Exported UI components, props types, variants, and state primitives.
+- `layout.md`: Breakpoints, navigation shells, and mobile viewport constraints.
+- `auth.md`: Authentication providers, route guards, and logout cleanup paths.
+- `config.md`: Environment variable names and route mappings.
+
+### Blueprint commands
+
+1. **Extract**: Run analyzers and generate verified blueprints:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py extract
+   ```
+2. **Verify**: Check that every evidence line in blueprints matches current code:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py verify
+   ```
+3. **Stale check**: Check if sources changed since extraction:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py stale
+   ```
+4. **Query (show)**: Query facts within a line budget:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area ui --paths src/components/Button.tsx --budget 120
+   ```
+5. **Candidates**: Review candidate rules proposed from codebase facts:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py candidates
+   ```
+
+### Protection and budgets
+
+- **Custom blocks**: Human contracts live in `<!-- BEGIN CUSTOM: contracts --> ... <!-- END CUSTOM: contracts -->`. They are preserved byte for byte on re-extraction.
+- **Secret protection**: Secret values from `.env` files are never read or stored. Only variable names are recorded. Every output file is scanned for secrets before writing.
+- **Budgets**: `index.md` is 60 lines or fewer. Generated sections are 250 lines or fewer per file. Larger areas split into `<area>-part-2.md` parts.
 
 ## Legacy rule parity
 
@@ -610,7 +652,7 @@ This deletes and recopies pipeline skills. Any extra files added inside pipeline
 
 ### Uninstall
 
-1. Delete the 12 pipeline skill folders from `.agents/skills/`.
+1. Delete the 13 pipeline skill folders from `.agents/skills/`.
 2. Delete `.agents/build-forge.lock.json`.
 
 All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention skills, and the repo map) remain in your repository and stay yours.
