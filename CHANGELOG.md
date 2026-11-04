@@ -5,6 +5,10 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Blueprint lifecycle commands `init`, `adopt`, `link-check`, and `drift` in `skills/project-blueprints/scripts/blueprint.py`.
+- Canonical blueprint templates in `skills/project-blueprints/assets/templates/` for data, tokens, UI, and layout areas.
+- Contract evidence anchor validation and custom block adoption pointers in `blueprint.py`.
+- Test suite `tests/test_blueprint_lifecycle.py` verifying blueprint init idempotency, adopt atomicity, secret refusal, and anchor drift.
 - Added `project-blueprints` pipeline skill (`skills/project-blueprints/`) with analyzers for data, tokens, UI, layout, auth, and config facts.
 - Added `blueprint.py` CLI supporting `extract`, `verify`, `stale`, `show`, and `candidates` commands with line budget limits, secret scanning, and deterministic LF hashing.
 - Added optional `blueprints` configuration and rule `evidence` path checking to `validate_profile.py`.

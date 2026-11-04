@@ -343,23 +343,39 @@ Blueprints live in `.agents/blueprints/` and cover 6 areas:
 
 ### Blueprint commands
 
-1. **Extract**: Run analyzers and generate verified blueprints:
+1. **Scaffold (init)**: Scaffold missing canonical blueprint files from templates without overwriting:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py init
+   ```
+2. **Extract**: Run analyzers and generate verified blueprints:
    ```bash
    python3 .agents/skills/project-blueprints/scripts/blueprint.py extract
    ```
-2. **Verify**: Check that every evidence line in blueprints matches current code:
+3. **Adopt**: Move an over-limit custom block from a convention skill into blueprint contracts:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py adopt --from .agents/skills/build-ui/SKILL.md --block contracts --area ui
+   ```
+4. **Link check**: Verify skills link to existing blueprints, index lists all files, and custom blocks are under 80 lines:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py link-check
+   ```
+5. **Drift check**: Verify facts, detect stale sources, check links, and validate contract evidence anchors:
+   ```bash
+   python3 .agents/skills/project-blueprints/scripts/blueprint.py drift
+   ```
+6. **Verify**: Check that every evidence line in blueprints matches current code:
    ```bash
    python3 .agents/skills/project-blueprints/scripts/blueprint.py verify
    ```
-3. **Stale check**: Check if sources changed since extraction:
+7. **Stale check**: Check if sources changed since extraction:
    ```bash
    python3 .agents/skills/project-blueprints/scripts/blueprint.py stale
    ```
-4. **Query (show)**: Query facts within a line budget:
+8. **Query (show)**: Query facts within a line budget:
    ```bash
    python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area ui --paths src/components/Button.tsx --budget 120
    ```
-5. **Candidates**: Review candidate rules proposed from codebase facts:
+9. **Candidates**: Review candidate rules proposed from codebase facts:
    ```bash
    python3 .agents/skills/project-blueprints/scripts/blueprint.py candidates
    ```

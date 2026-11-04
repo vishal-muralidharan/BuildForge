@@ -55,6 +55,29 @@ Every fact must list:
    - `low`: Heuristic match.
 3. If an analyzer cannot determine a fact, write `unknown`. Never guess.
 
+## Contract evidence anchors
+
+Human-written facts inside `<!-- BEGIN CUSTOM: contracts -->` can specify evidence anchors:
+```markdown
+- Payment session payload shape
+  Evidence: `src/api/payment.ts:42` contains: `PaymentSessionResponse`
+```
+When `blueprint.py drift` runs:
+1. It verifies that `src/api/payment.ts` exists.
+2. If `contains:` is provided, it verifies that the text `PaymentSessionResponse` appears within 5 lines of line 42.
+
+## Blueprint lifecycle commands
+
+- `init`: Scaffolds missing canonical blueprint files (`data`, `tokens`, `ui`, `layout`, `auth`, `config`) from templates without overwriting existing files.
+- `extract`: Analyzes codebase facts and rewrites the generated portions of blueprint files, preserving custom blocks.
+- `adopt`: Moves an over-limit custom block out of a convention skill into blueprint contracts and replaces it with a `show` pointer.
+- `link-check`: Verifies convention skills link to existing blueprints, `index.md` lists all files, and skill custom blocks are under 80 lines.
+- `drift`: Runs verify, stale, link-check, and contract evidence anchor validation.
+- `verify`: Confirms all evidence references point to existing files and valid line numbers.
+- `stale`: Checks whether any source files changed since extraction.
+- `show`: Queries facts for touched paths within a specified line budget.
+- `candidates`: Lists candidate rules extracted from codebase patterns for user confirmation.
+
 ## Determinism and hashing
 
 - Content uses LF line endings.
