@@ -24,6 +24,7 @@ import json
 import hashlib
 import fnmatch
 import subprocess
+import difflib
 from pathlib import Path
 
 try:
@@ -123,6 +124,174 @@ def save_lock(lock_path, lock_data):
     with open(lock_path, "w", encoding="utf-8") as f:
         json.dump(lock_data, f, indent=2, sort_keys=True)
         f.write("\n")
+
+
+# -------------------------------------------------------------------------
+# Collision Detection & Deduplication Helpers
+# -------------------------------------------------------------------------
+def get_skill_frontmatter_name(skill_md_path: Path) -> str:
+    """Read skill name from YAML frontmatter if present."""
+    if not skill_md_path.is_file():
+        return ""
+    try:
+        content = skill_md_path.read_text(encoding="utf-8", errors="ignore")
+        m = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+        if m:
+            data = yaml.safe_load(m.group(1)) or {}
+            if isinstance(data, dict):
+                return str(data.get("name", "")).strip()
+    except Exception:
+        pass
+    return ""
+
+
+def classify_folders(dir_vendor: Path, dir_skills: Path) -> tuple:
+    """Compare normalized file hash trees between vendor and skills directories."""
+    if not dir_vendor.is_dir() or not dir_skills.is_dir():
+        return "modified", [("directory", "missing")]
+    hashes_v = compute_dir_hashes(dir_vendor)
+    hashes_s = compute_dir_hashes(dir_skills)
+    if hashes_v == hashes_s:
+        return "identical", []
+    diffs = []
+    all_files = sorted(set(hashes_v.keys()) | set(hashes_s.keys()))
+    for f in all_files:
+        if f not in hashes_v:
+            diffs.append((f, "added in skills (missing in vendor)"))
+        elif f not in hashes_s:
+            diffs.append((f, "removed in skills (missing in skills)"))
+        elif hashes_v[f] != hashes_s[f]:
+            diffs.append((f, "content differs"))
+    return "modified", diffs
+
+
+def find_reference_collisions(root_path: Path, ref_data: dict = None) -> list:
+    """Detect collisions between .agents/vendor and .agents/skills.
+
+    For a pipeline-only reference: collision if .agents/skills/<name> exists or frontmatter name matches.
+    For a native reference: collision if .agents/vendor/<name> exists.
+    Also handles non-reference vendor folders that match skills.
+    """
+    if ref_data is None:
+        _, yaml_path, _ = get_paths(root_path)
+        ref_data = load_references(yaml_path)
+
+    skills_dir = root_path / ".agents" / "skills"
+    vendor_dir = root_path / ".agents" / "vendor"
+
+    collisions = []
+    seen_pairs = set()
+
+    skill_folders = {}
+    if skills_dir.is_dir():
+        for d in sorted(skills_dir.iterdir()):
+            if d.is_dir() and not d.name.startswith("."):
+                fm_name = get_skill_frontmatter_name(d / "SKILL.md")
+                skill_folders[d.name] = fm_name
+
+    refs = ref_data.get("references", [])
+    known_ref_names = set()
+
+    for r in refs:
+        rname = r.get("name")
+        if not rname:
+            continue
+        known_ref_names.add(rname)
+        act = r.get("activation", "pipeline-only")
+
+        if act == "native":
+            v_path = vendor_dir / rname
+            s_path = skills_dir / rname
+            if v_path.is_dir() and s_path.is_dir():
+                pair_key = (rname, rname)
+                if pair_key not in seen_pairs:
+                    seen_pairs.add(pair_key)
+                    cls, diffs = classify_folders(v_path, s_path)
+                    collisions.append({
+                        "name": rname,
+                        "skill_dir_name": rname,
+                        "vendor_path": v_path,
+                        "skills_path": s_path,
+                        "classification": cls,
+                        "diff_files": diffs
+                    })
+        else:
+            v_path = vendor_dir / rname
+            # Check direct name match
+            if (skills_dir / rname).is_dir():
+                pair_key = (rname, rname)
+                if pair_key not in seen_pairs:
+                    seen_pairs.add(pair_key)
+                    s_path = skills_dir / rname
+                    cls, diffs = classify_folders(v_path, s_path) if v_path.is_dir() else ("modified", [("vendor", "missing")])
+                    collisions.append({
+                        "name": rname,
+                        "skill_dir_name": rname,
+                        "vendor_path": v_path,
+                        "skills_path": s_path,
+                        "classification": cls,
+                        "diff_files": diffs
+                    })
+            # Check frontmatter name match
+            for sdir_name, fm_name in skill_folders.items():
+                if fm_name == rname and sdir_name != rname:
+                    pair_key = (rname, sdir_name)
+                    if pair_key not in seen_pairs:
+                        seen_pairs.add(pair_key)
+                        s_path = skills_dir / sdir_name
+                        cls, diffs = classify_folders(v_path, s_path) if v_path.is_dir() else ("modified", [("vendor", "missing")])
+                        collisions.append({
+                            "name": rname,
+                            "skill_dir_name": sdir_name,
+                            "vendor_path": v_path,
+                            "skills_path": s_path,
+                            "classification": cls,
+                            "diff_files": diffs
+                        })
+
+    # Non-reference vendor folders
+    if vendor_dir.is_dir():
+        for vd in sorted(vendor_dir.iterdir()):
+            if vd.is_dir() and not vd.name.startswith(".") and vd.name not in known_ref_names:
+                vname = vd.name
+                if (skills_dir / vname).is_dir():
+                    pair_key = (vname, vname)
+                    if pair_key not in seen_pairs:
+                        seen_pairs.add(pair_key)
+                        s_path = skills_dir / vname
+                        cls, diffs = classify_folders(vd, s_path)
+                        collisions.append({
+                            "name": vname,
+                            "skill_dir_name": vname,
+                            "vendor_path": vd,
+                            "skills_path": s_path,
+                            "classification": cls,
+                            "diff_files": diffs
+                        })
+
+    return collisions
+
+
+def remove_agent_links_for_skill(root_path: Path, skill_dir_name: str) -> list:
+    """Find and remove symlinks pointing to .agents/skills/<skill_dir_name>."""
+    target_skill_path = (root_path / ".agents" / "skills" / skill_dir_name).resolve()
+    removed_links = []
+    for candidate in [
+        root_path / ".claude" / "skills",
+        root_path / ".cursor" / "skills",
+        root_path / ".windsurf" / "skills",
+    ]:
+        if candidate.is_dir():
+            for item in candidate.iterdir():
+                if item.is_symlink():
+                    try:
+                        dest = item.resolve()
+                        if dest == target_skill_path:
+                            item.unlink()
+                            removed_links.append(str(item.relative_to(root_path)))
+                    except Exception:
+                        pass
+    return removed_links
 
 
 # -------------------------------------------------------------------------
@@ -387,11 +556,27 @@ def cmd_add(args):
     subpath = args.subpath or ""
     ref = args.ref or "HEAD"
 
-    # Resolve target directory
+    # Resolve target directory and check for collisions
     if activation == "native":
         target_dir = root_path / ".agents" / "skills" / name
+        alt_dir = root_path / ".agents" / "vendor" / name
+        if alt_dir.exists():
+            sys.exit(
+                f"Error: Collision detected. .agents/vendor/{name} already exists.\n"
+                f"Options:\n"
+                f"  1. Dedupe first: python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe --name {name}\n"
+                f"  2. Choose a different reference name with --name <new-name>"
+            )
     else:
         target_dir = root_path / ".agents" / "vendor" / name
+        alt_dir = root_path / ".agents" / "skills" / name
+        if alt_dir.exists():
+            sys.exit(
+                f"Error: Collision detected. .agents/skills/{name} already exists.\n"
+                f"Options:\n"
+                f"  1. Dedupe first: python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe --name {name}\n"
+                f"  2. Choose a different reference name with --name <new-name>"
+            )
 
     if target_dir.exists():
         sys.exit(f"Error: Target installation folder '{target_dir}' already exists.")
@@ -489,8 +674,10 @@ def cmd_list(args):
         print("No references configured in .agents/references.yaml.")
         return
 
-    print(f"{'NAME':<20} {'CATEGORY':<14} {'STATUS':<10} {'MODE':<10} {'SCRIPTS':<8} {'STAGES':<20} {'PATH'}")
-    print("-" * 100)
+    collisions = {c["name"]: c for c in find_reference_collisions(root_path, ref_data)}
+
+    print(f"{'NAME':<20} {'CATEGORY':<14} {'STATUS':<10} {'MODE':<10} {'SCRIPTS':<8} {'DUAL-HOME':<11} {'STAGES':<20} {'PATH'}")
+    print("-" * 112)
     for r in refs:
         name = r.get("name", "")
         cat = r.get("category", "")
@@ -499,7 +686,8 @@ def cmd_list(args):
         scripts = "yes" if r.get("allow_scripts") else "no"
         stages = ", ".join(r.get("used_by", []))
         path_str = r.get("path", "")
-        print(f"{name:<20} {cat:<14} {status:<10} {mode:<10} {scripts:<8} {stages:<20} {path_str}")
+        dual_home = collisions[name]["classification"] if name in collisions else "-"
+        print(f"{name:<20} {cat:<14} {status:<10} {mode:<10} {scripts:<8} {dual_home:<11} {stages:<20} {path_str}")
 
 
 # -------------------------------------------------------------------------
@@ -508,6 +696,24 @@ def cmd_list(args):
 def cmd_verify(args):
     root_path, yaml_path, lock_path = get_paths(args.root)
     ref_data = load_references(yaml_path)
+
+    # 1. Collision warnings
+    collisions = find_reference_collisions(root_path, ref_data)
+    for c in collisions:
+        print(
+            f"WARN: Dual-homed skill collision for '{c['name']}': exists in both "
+            f".agents/vendor/{c['name']} and .agents/skills/{c['skill_dir_name']} ({c['classification']}). "
+            f"Run: python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe"
+        )
+
+    # 2. Orphan vendor folders
+    vendor_dir = root_path / ".agents" / "vendor"
+    if vendor_dir.is_dir():
+        known_vendor_names = {r.get("name") for r in ref_data.get("references", [])}
+        for item in sorted(vendor_dir.iterdir()):
+            if item.is_dir() and item.name not in known_vendor_names and not item.name.startswith("."):
+                print(f"WARN: Orphan vendor folder found: .agents/vendor/{item.name} has no entry in .agents/references.yaml")
+
     refs = [r for r in ref_data.get("references", []) if r.get("status") == "installed"]
 
     if not refs:
@@ -557,6 +763,81 @@ def cmd_verify(args):
 
     print("Verify ok: All installed third party references match the lock file.")
     sys.exit(0)
+
+
+# -------------------------------------------------------------------------
+# Subcommand: dedupe
+# -------------------------------------------------------------------------
+def cmd_dedupe(args):
+    root_path, yaml_path, _ = get_paths(args.root)
+    ref_data = load_references(yaml_path)
+    collisions = find_reference_collisions(root_path, ref_data)
+
+    if args.name:
+        collisions = [c for c in collisions if c["name"] == args.name]
+        if not collisions:
+            print(f"No collision found for reference '{args.name}'.")
+            return
+
+    if not collisions:
+        print("No dual-homed skill collisions found.")
+        return
+
+    print("Dual-homed skill collisions detected:")
+    has_modified_refusal = False
+
+    for c in collisions:
+        name = c["name"]
+        skill_folder = c["skill_dir_name"]
+        cls = c["classification"]
+        skill_path = c["skills_path"]
+        vendor_path = c["vendor_path"]
+        print(f"\nCollision: {name}")
+        print(f"  Vendor path: {vendor_path.relative_to(root_path).as_posix()}")
+        print(f"  Skills path: {skill_path.relative_to(root_path).as_posix()}")
+        print(f"  Classification: {cls}")
+
+        if not args.approved:
+            if cls == "identical":
+                print(f"  Plan: Propose deleting duplicate folder .agents/skills/{skill_folder} and its agent links.")
+                print(f"  To apply: python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe --name {name} --approved")
+            else:
+                print(f"  Plan: Refuse automatic dedupe. Hand edits detected in {len(c['diff_files'])} file(s).")
+                print("  Resolution: The user must inspect differences and decide manually.")
+        else:
+            if cls == "identical":
+                rel_check = skill_path.relative_to(root_path).as_posix()
+                if not rel_check.startswith(".agents/skills/"):
+                    sys.exit(f"Safety error: Refusing to delete path outside .agents/skills: {rel_check}")
+
+                shutil.rmtree(skill_path)
+                print(f"  Removed duplicate folder: {rel_check}")
+                removed_links = remove_agent_links_for_skill(root_path, skill_folder)
+                for lk in removed_links:
+                    print(f"  Removed agent link: {lk}")
+            else:
+                has_modified_refusal = True
+                print(f"  ERROR: Refusing to dedupe modified collision for '{name}'.")
+                print(f"  The following files differ between {vendor_path.relative_to(root_path).as_posix()} and {skill_path.relative_to(root_path).as_posix()}:")
+                for rel_file, reason in c["diff_files"]:
+                    print(f"    - {rel_file}: {reason}")
+                    vf = vendor_path / rel_file
+                    sf = skill_path / rel_file
+                    if vf.is_file() and sf.is_file():
+                        try:
+                            v_lines = vf.read_text(encoding="utf-8", errors="ignore").splitlines()
+                            s_lines = sf.read_text(encoding="utf-8", errors="ignore").splitlines()
+                            diff_lines = list(difflib.unified_diff(v_lines, s_lines, fromfile=f"vendor/{rel_file}", tofile=f"skills/{rel_file}", lineterm=""))
+                            if diff_lines:
+                                print("      Diff preview (first 10 lines):")
+                                for dl in diff_lines[:10]:
+                                    print(f"        {dl}")
+                        except Exception:
+                            pass
+                print("  Resolution: You must decide by hand whether to keep your local edits or use the vendor version.")
+
+    if has_modified_refusal:
+        sys.exit(1)
 
 
 # -------------------------------------------------------------------------
@@ -896,6 +1177,12 @@ def main():
     p_mig = subparsers.add_parser("migrate")
     p_mig.add_argument("--root", default=".")
 
+    # dedupe
+    p_ded = subparsers.add_parser("dedupe")
+    p_ded.add_argument("--name", default=None)
+    p_ded.add_argument("--approved", action="store_true")
+    p_ded.add_argument("--root", default=".")
+
     args = parser.parse_args()
 
     handlers = {
@@ -908,7 +1195,8 @@ def main():
         "remove": cmd_remove,
         "restore": cmd_restore,
         "due": cmd_due,
-        "migrate": cmd_migrate
+        "migrate": cmd_migrate,
+        "dedupe": cmd_dedupe
     }
 
     handlers[args.subcommand](args)

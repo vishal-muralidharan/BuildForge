@@ -85,6 +85,17 @@ Default installation puts files in `.agents/vendor/<name>`. To make the agent di
 
 This command pins the commit hash in `.agents/references.yaml` and writes file hashes into `.agents/references.lock.json`.
 
+When installing the first reference in a project, propose adding this rule to `.agents/project-profile.yaml`:
+```yaml
+- id: refs-no-dual-home
+  area: structure
+  text: "A reference lives in .agents/vendor or .agents/skills, never both."
+  enforced_by: test
+  check:
+    type: no_dual_homed_skills
+```
+Ask for user confirmation before writing this rule.
+
 ### 6. Link capability slots and re-render
 
 If the reference fulfills a capability slot in `.agents/project-profile.yaml`:
@@ -126,5 +137,13 @@ Report to the user:
 - Restore vendor files from lock:
   ```bash
   python3 .agents/skills/extend-pipeline/scripts/refs.py restore
+  ```
+- Deduplicate dual-homed skills:
+  ```bash
+  # Plan mode: show all collisions and actions
+  python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe
+
+  # Approved removal: ask user to type "yes dedupe <name>" before running
+  python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe --name <name> --approved
   ```
 
