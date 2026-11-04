@@ -72,7 +72,12 @@ class TestRenderCustomBlocks(unittest.TestCase):
 
     def run_render(self, *extra_args, check=False):
         cmd = [sys.executable, str(RENDER_PY), "--profile", str(self.profile_path), "--root", str(self.root)] + list(extra_args)
-        return subprocess.run(cmd, cwd=str(self.root), capture_output=True, text=True, check=check)
+        res = subprocess.run(cmd, cwd=str(self.root), capture_output=True, text=True, check=check)
+        if res.stdout:
+            res.stdout = res.stdout.replace("\\", "/")
+        if res.stderr:
+            res.stderr = res.stderr.replace("\\", "/")
+        return res
 
     def test_01_fresh_render_adds_notes_block_and_stamp(self):
         """Fresh render adds the stamp line and an empty notes block to generated files."""
