@@ -10,10 +10,14 @@ Checks:
   4. Skills named in AGENTS.md exist in the skills folder.
   5. Recent commit scopes are listed in git.scopes.
   6. Installed external references exist on disk.
+  7. Generated files have no edits outside custom blocks.
+  8. Custom blocks do not exceed line limits.
+  9. Orphan custom blocks in .agents/custom-orphans.md.
 
 Exit 1 on errors. Warnings are advice. Needs PyYAML (pip install pyyaml).
 """
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -27,6 +31,21 @@ except ImportError:
 
 IGNORE = {"node_modules", "dist", "build", ".git", ".next", ".nuxt", "coverage", ".venv",
           "venv", "__pycache__", ".turbo", ".vercel", ".netlify", "target", "out"}
+
+CONVENTION_SKILLS = {
+    "build-ui",
+    "maintain-design-system",
+    "review-responsive-design",
+    "review-directory-structure",
+    "file-folder-naming",
+    "review-db-structure",
+}
+
+STAMP_RE = re.compile(r"^<!-- build-forge:generated v1 body=([0-9a-f]{64}) -->\n?", re.MULTILINE)
+CUSTOM_BLOCK_RE = re.compile(
+    r"<!-- BEGIN CUSTOM: ([a-z0-9-]{1,40}) -->\n?(.*?)<!-- END CUSTOM: \1 -->\n?",
+    re.DOTALL
+)
 
 
 def g(d, path, default=None):
@@ -129,6 +148,55 @@ def main():
     for r in prof.get("external_references") or []:
         if r.get("status") == "installed" and r.get("path") and not (root / r["path"]).exists():
             errors.append(f"installed reference '{r.get('name')}' not found at {r['path']}")
+
+    # 7 & 8. Generated files: check body hashes and custom block limits
+    gen_candidates = []
+    agents_f = root / (g(prof, "docs.agents_file") or "AGENTS.md")
+    if agents_f.is_file():
+        gen_candidates.append(agents_f)
+    repo_map_f = root / (g(prof, "docs.repo_map") or ".agents/repo-map.md")
+    if repo_map_f.is_file():
+        gen_candidates.append(repo_map_f)
+    for cskill in CONVENTION_SKILLS:
+        cf = skills_dir / cskill / "SKILL.md"
+        if cf.is_file():
+            gen_candidates.append(cf)
+
+    for gf in gen_candidates:
+        txt = gf.read_text(encoding="utf-8").replace("\r\n", "\n")
+        sm = STAMP_RE.search(txt)
+        rel_label = str(gf.relative_to(root))
+        if sm:
+            stamp_h = sm.group(1)
+            clean = STAMP_RE.sub("", txt)
+            clean = CUSTOM_BLOCK_RE.sub("", clean)
+            body_h = hashlib.sha256(clean.encode("utf-8")).hexdigest()
+            if body_h != stamp_h:
+                errors.append(f"generated file '{rel_label}' has edits outside custom blocks (run render.py --update or --force)")
+
+        # Check block limits
+        total_custom = 0
+        for m in CUSTOM_BLOCK_RE.finditer(txt):
+            bname = m.group(1)
+            bcontent = m.group(2)
+            lines = len(bcontent.splitlines())
+            total_custom += lines
+            if lines > 160:
+                errors.append(f"custom block '{bname}' in '{rel_label}' has {lines} lines (> 160; facts belong in blueprints or profile)")
+            elif lines > 80:
+                warnings.append(f"custom block '{bname}' in '{rel_label}' has {lines} lines (> 80; facts belong in blueprints or profile)")
+
+        if total_custom > 600:
+            errors.append(f"file '{rel_label}' has {total_custom} total custom lines (> 600; facts belong in blueprints or profile)")
+        elif total_custom > 300:
+            warnings.append(f"file '{rel_label}' has {total_custom} total custom lines (> 300; facts belong in blueprints or profile)")
+
+    # 9. Orphan custom blocks
+    orphans_f = root / ".agents" / "custom-orphans.md"
+    if orphans_f.is_file():
+        otxt = orphans_f.read_text(encoding="utf-8")
+        if "<!-- BEGIN CUSTOM:" in otxt:
+            warnings.append("orphan custom blocks exist in .agents/custom-orphans.md (review and merge or remove)")
 
     for w in sorted(set(warnings)):
         print(f"WARN  {w}")
