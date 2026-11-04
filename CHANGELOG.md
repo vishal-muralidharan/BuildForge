@@ -5,6 +5,11 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Legacy import volume guard in `skills/project-bootstrap/scripts/legacy_import.py` quarantining folders producing > 100 statements or > 40% candidate share to `needs-decision`.
+- Legacy import status grouping in `legacy_import.py` by source folder and class with selective exit 1 for pending local rule candidates, local derivables, or needs-decision sources.
+- Blueprint contract routing via `legacy_import.py apply --route <ids>` and `apply --route-class derivable --yes` routing statements verbatim to `.agents/blueprints/<area>.md` under `contracts` blocks with evidence anchors.
+- Multiline statement and interface table support in `legacy_import.py` preserving tables > 10 lines as 1 unit with roundtrip ledger escaping.
+- Integration test suite `tests/test_legacy_import_routing.py` covering volume guard, interface table routing, evidence anchor generation, and selective exit 1 behavior.
 - Content salvage and migration in `skills/project-bootstrap/scripts/render.py`: `--salvage` moves hand edits outside custom blocks into `salvaged` custom blocks, and `--migrate-custom` wraps unstamped skills into `legacy` blocks.
 - Overflow routing in `render.py` moving blocks over limits (or unstamped files with tables/code blocks > 20 lines) through `blueprint adopt` or to `.agents/notes/<skill>.md`.
 - Safeguards in `render.py`: `--force` behaves like `--salvage` by default; content discarding requires `--discard-edits` and `--yes-discard` together; uncommitted git changes guard with `--allow-dirty`; secret scan refusal.

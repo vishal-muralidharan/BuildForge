@@ -37,7 +37,10 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
    - Commit rules: copy the style from `git` facts only when `conventional_ratio` is at least 0.8. Seed `git.scopes` from `detect_stack` git facts (`most_used_scopes` in history) and from layer names. Ask the user for a purpose for each scope, with a default taken from the matching layer purpose.
    - Layers: use `layers`. Write one plain purpose per folder. Mark a guessed purpose as TODO.
 4. Reconcile legacy statements:
-   Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area <area>` for each area with pending items. Propose defaults and ask the user whether to accept or drop each item:
+   Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area <area>` for each area with pending items. Propose defaults and ask the user whether to accept, drop, or route each item.
+   Route derivable statements (data, tokens, UI, layout) into blueprint contracts in batches:
+   `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py apply --route <ids>` or `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py apply --route-class derivable --yes`
+   Accept profile rules or notes, and drop unwanted statements:
    `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py apply --accept <ids> --drop <ids> --reason "<reason>"`
    Do not finish bootstrap while `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status` exits 1.
 5. Scaffold and extract blueprints on day 0:

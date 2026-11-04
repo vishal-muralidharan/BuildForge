@@ -317,7 +317,8 @@ def find_and_classify_sources(root: Path, include_skipped: bool = False):
     decision_sources = []
     source_counts = {
         "local": 0, "modified-fork": 0, "vendor-dup": 0,
-        "likely-third-party": 0, "build-forge": 0, "generated": 0, "reference": 0
+        "likely-third-party": 0, "build-forge": 0, "generated": 0, "reference": 0,
+        "needs-decision": 0
     }
 
     def count_stmts(p: Path) -> int:
@@ -394,19 +395,72 @@ def find_and_classify_sources(root: Path, include_skipped: bool = False):
     # 5. .agents/skills
     skills_dir = root / ".agents" / "skills"
     if skills_dir.is_dir():
+        candidate_folders = []
         for item in sorted(skills_dir.iterdir()):
             if not item.is_dir() or item.name.startswith("."):
                 continue
             c_info = classify_skill_folder(item, root, bf_skills, ref_names, ref_paths)
             s_class = c_info["class"]
-            reason = c_info["reason"]
-            diff_files = set(c_info.get("diff_files", []))
 
             skill_files = []
             for p in sorted(item.rglob("*")):
                 if p.is_file() and p.suffix.lower() in (".md", ".txt"):
                     if not should_ignore_file(p, item):
                         skill_files.append(p)
+
+            s_cnt = sum(count_stmts(sf) for sf in skill_files)
+            candidate_folders.append({
+                "item": item,
+                "c_info": c_info,
+                "s_class": s_class,
+                "skill_files": skill_files,
+                "s_cnt": s_cnt
+            })
+
+        # Calculate candidate statements across non-build-forge/non-reference folders
+        total_candidate_stmts = sum(
+            cf["s_cnt"] for cf in candidate_folders
+            if cf["s_class"] not in ("build-forge", "generated", "reference", "vendor-dup")
+        )
+
+        for cf in candidate_folders:
+            item = cf["item"]
+            c_info = cf["c_info"]
+            s_class = cf["s_class"]
+            reason = c_info["reason"]
+            diff_files = set(c_info.get("diff_files", []))
+            skill_files = cf["skill_files"]
+            s_cnt = cf["s_cnt"]
+
+            # Volume guard: if 1 source folder produces > 100 statements, or > 40% of all statements, mark needs-decision
+            is_volume_tripped = False
+            if s_class not in ("build-forge", "generated", "reference", "vendor-dup"):
+                if s_cnt > 100:
+                    is_volume_tripped = True
+                elif len(candidate_folders) > 1 and total_candidate_stmts > 50 and s_cnt > 10 and (s_cnt / total_candidate_stmts) > 0.40:
+                    is_volume_tripped = True
+
+            if is_volume_tripped:
+                s_class = "needs-decision"
+                guard_msg = f"{s_cnt} statements from .agents/skills/{item.name} look like reference or third party content"
+                source_counts["needs-decision"] += s_cnt
+                decision_sources.append({
+                    "path": f".agents/skills/{item.name}",
+                    "class": "needs-decision",
+                    "signals": f"{s_cnt} statements (> volume threshold)",
+                    "proposed_action": guard_msg
+                })
+                skipped_sources.append({
+                    "path": f".agents/skills/{item.name}",
+                    "class": "needs-decision",
+                    "reason": guard_msg,
+                    "count": s_cnt
+                })
+                print(f"Warning: {guard_msg}")
+                if include_skipped:
+                    for sf in skill_files:
+                        active_files.append((sf, "needs-decision", guard_msg))
+                continue
 
             if s_class == "local":
                 for sf in skill_files:
@@ -438,7 +492,6 @@ def find_and_classify_sources(root: Path, include_skipped: bool = False):
                         "count": skip_count
                     })
             else:
-                s_cnt = sum(count_stmts(sf) for sf in skill_files)
                 source_counts[s_class] += s_cnt
                 skipped_sources.append({
                     "path": f".agents/skills/{item.name}",
@@ -488,7 +541,8 @@ def split_statements(file_path: Path, root: Path) -> list:
     code_lines = []
 
     in_table = False
-    table_headers_passed = False
+    table_start_line = 0
+    table_lines = []
 
     current_bullet_line = 0
     current_bullet_lines = []
@@ -496,6 +550,32 @@ def split_statements(file_path: Path, root: Path) -> list:
     current_heading = ""
     current_heading_line = 0
     current_paragraph_lines = []
+
+    def flush_table():
+        nonlocal in_table, table_start_line, table_lines
+        if table_lines:
+            if len(table_lines) > 10:
+                # Table longer than 10 lines routes as 1 unit
+                table_text = "\n".join(table_lines).strip()
+                statements.append({
+                    "file": rel_path,
+                    "line": table_start_line,
+                    "text": table_text,
+                    "raw": "\n".join(table_lines)
+                })
+            else:
+                for i, tline in enumerate(table_lines):
+                    s_t = tline.strip()
+                    if i == 0 or re.match(r"^\|(\s*:?-+:?\s*\|)+$", s_t):
+                        continue
+                    statements.append({
+                        "file": rel_path,
+                        "line": table_start_line + i,
+                        "text": s_t,
+                        "raw": s_t
+                    })
+            table_lines = []
+            in_table = False
 
     def flush_bullet():
         nonlocal current_bullet_line, current_bullet_lines
@@ -532,6 +612,7 @@ def split_statements(file_path: Path, root: Path) -> list:
         if stripped.startswith("```"):
             flush_bullet()
             flush_paragraph()
+            flush_table()
             if not in_code_block:
                 in_code_block = True
                 code_start_line = idx
@@ -556,27 +637,15 @@ def split_statements(file_path: Path, root: Path) -> list:
         if stripped.startswith("|") and stripped.endswith("|"):
             flush_bullet()
             flush_paragraph()
-            # Check if separator row
-            if re.match(r"^\|(\s*:?-+:?\s*\|)+$", stripped):
-                table_headers_passed = True
-                in_table = True
-                continue
             if not in_table:
-                # Header row
                 in_table = True
-                table_headers_passed = False
-                continue
-            # Content table row
-            statements.append({
-                "file": rel_path,
-                "line": idx,
-                "text": stripped,
-                "raw": stripped
-            })
+                table_start_line = idx
+                table_lines = [line]
+            else:
+                table_lines.append(line)
             continue
-        else:
-            in_table = False
-            table_headers_passed = False
+        elif in_table:
+            flush_table()
 
         # Handle headings
         if stripped.startswith("#"):
@@ -620,6 +689,7 @@ def split_statements(file_path: Path, root: Path) -> list:
 
     flush_bullet()
     flush_paragraph()
+    flush_table()
 
     return statements
 
@@ -674,7 +744,7 @@ def classify_statement(stmt: dict, seen_statements: list, profile_rules: list, b
 
     # 3. Check derivable
     # 3a. derivable-tokens
-    if "--" in text or ":root" in t_lower or "@theme" in t_lower or re.search(r"#[0-9a-fA-F]{3,8}\b", text) or any(k in t_lower for k in ("color palette", "design tokens", "spacing tokens")):
+    if re.search(r"--[a-zA-Z][a-zA-Z0-9_-]*", text) or ":root" in t_lower or "@theme" in t_lower or re.search(r"#[0-9a-fA-F]{3,8}\b", text) or any(k in t_lower for k in ("color palette", "design tokens", "spacing tokens")):
         status = "pending"
         matched_fact = ""
         if blueprints and "tokens" in blueprints:
@@ -693,7 +763,7 @@ def classify_statement(stmt: dict, seen_statements: list, profile_rules: list, b
         }
 
     # 3b. derivable-data
-    if any(k in text for k in ("CREATE TABLE", "ALTER TABLE", "PRIMARY KEY", "FOREIGN KEY", "localStorage.", "sessionStorage.", "model ", "enum ")) or re.search(r"(?:interface|type)\s+[A-Z]\w+\s*=\s*\{", text) or re.search(r"interface\s+[A-Z]\w+\s*\{", text):
+    if any(k in text for k in ("CREATE TABLE", "ALTER TABLE", "PRIMARY KEY", "FOREIGN KEY", "localStorage.", "sessionStorage.", "model ", "enum ")) or re.search(r"(?:interface|type)\s+[A-Z]\w+", text):
         status = "pending"
         matched_fact = ""
         if blueprints and "data" in blueprints:
@@ -730,7 +800,7 @@ def classify_statement(stmt: dict, seen_statements: list, profile_rules: list, b
             }
 
     # 3d. derivable-ui
-    if any(k in t_lower for k in ("component catalog", "exported components", "ui primitives", "props table")):
+    if any(k in t_lower for k in ("component catalog", "exported components", "ui primitives", "props table", "interface table", "prop | type", "interface | type")):
         status = "pending"
         matched_fact = ""
         if blueprints and "ui" in blueprints:
@@ -800,7 +870,7 @@ def calculate_coverage(statements: list) -> tuple:
     relevant = [s for s in statements if s["class"] in (
         "rule-candidate", "derivable-data", "derivable-tokens", "derivable-ui", "derivable-layout"
     )]
-    covered_or_accepted = [s for s in relevant if s["status"] in ("covered", "accepted")]
+    covered_or_accepted = [s for s in relevant if s["status"] in ("covered", "accepted", "routed")]
     if not relevant:
         return 100.0, 0, 0
     ratio = len(covered_or_accepted) / len(relevant)
@@ -808,12 +878,20 @@ def calculate_coverage(statements: list) -> tuple:
 
 
 def escape_table_cell(text: str) -> str:
-    cleaned = text.replace("\n", " ").replace("|", "\\|")
-    return re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = text.replace("\r\n", "\n").replace("\n", "<br>").replace("|", "\\|")
+    return cleaned.strip()
 
 
 def unescape_table_cell(text: str) -> str:
-    return text.replace("\\|", "|").strip()
+    return text.replace("\\|", "|").replace("<br>", "\n").strip()
+
+
+def split_table_row(line: str) -> list:
+    stripped = line.strip()
+    if stripped.startswith("|") and stripped.endswith("|"):
+        stripped = stripped[1:-1]
+    tokens = re.findall(r"(?:\\\||[^|])+", stripped)
+    return [t.strip() for t in tokens]
 
 
 def extract_section(content: str, header: str) -> str:
@@ -827,11 +905,39 @@ def extract_section(content: str, header: str) -> str:
     return content[start:next_idx].strip()
 
 
+def read_ledger_decision_sources(ledger_path: Path) -> list:
+    if not ledger_path.is_file():
+        return []
+    try:
+        text = ledger_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return []
+    sec = extract_section(text, "## Needs a Decision")
+    if not sec or "_No sources needing decision._" in sec:
+        return []
+    decision_sources = []
+    for line in sec.splitlines():
+        line = line.strip()
+        if not line.startswith("|") or not line.endswith("|"):
+            continue
+        if re.match(r"^\|(\s*:?-+:?\s*\|)+$", line) or "| Source | Class |" in line:
+            continue
+        parts = split_table_row(line)
+        if len(parts) >= 2:
+            decision_sources.append({
+                "path": unescape_table_cell(parts[0]),
+                "class": unescape_table_cell(parts[1]),
+                "signals": unescape_table_cell(parts[2]) if len(parts) > 2 else "",
+                "proposed_action": unescape_table_cell(parts[3]) if len(parts) > 3 else ""
+            })
+    return decision_sources
+
+
 def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = None, decision_sources: list = None, source_counts: dict = None):
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     cov_pct, cov_count, rel_count = calculate_coverage(statements)
 
-    counts_status = {"pending": 0, "covered": 0, "accepted": 0, "dropped": 0}
+    counts_status = {"pending": 0, "covered": 0, "accepted": 0, "dropped": 0, "routed": 0}
     counts_class = {
         "covered": 0, "derivable-data": 0, "derivable-tokens": 0,
         "derivable-ui": 0, "derivable-layout": 0, "rule-candidate": 0,
@@ -862,6 +968,7 @@ def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = No
         "- Status counts:",
         f"  - pending: {counts_status['pending']}",
         f"  - covered: {counts_status['covered']}",
+        f"  - routed: {counts_status['routed']}",
         f"  - accepted: {counts_status['accepted']}",
         f"  - dropped: {counts_status['dropped']}",
         "",
@@ -971,7 +1078,7 @@ def read_ledger(ledger_path: Path) -> list:
                 continue
             if not line.startswith("|") or not line.endswith("|"):
                 continue
-            parts = [p.strip() for p in line.split("|")[1:-1]]
+            parts = split_table_row(line)
             if len(parts) >= 6:
                 sid = parts[0]
                 src = parts[1]
@@ -1000,7 +1107,8 @@ def read_ledger(ledger_path: Path) -> list:
                     "proposed_destination": dest,
                     "status": status,
                     "text": details,
-                    "reason": details if status in ("dropped", "covered") else ""
+                    "raw": details,
+                    "reason": details if status in ("dropped", "covered", "routed") else ""
                 })
 
     return statements
@@ -1017,6 +1125,9 @@ def cmd_inventory(root: Path, include_skipped: bool = False):
         for st in stmts:
             st["source_class"] = s_class
         raw_statements.extend(stmts)
+
+    # Process local statements first so duplicates from vendor/forks yield to local
+    raw_statements.sort(key=lambda st: 0 if st.get("source_class") == "local" else 1)
 
     classified_statements = []
     counter = 1
@@ -1067,6 +1178,124 @@ def cmd_inventory(root: Path, include_skipped: bool = False):
     print(f"\nLedger written to {ledger_path.relative_to(root).as_posix()}.")
 
 
+def resolve_blueprint_area_for_statement(stmt: dict) -> str:
+    s_class = stmt.get("class", "")
+    if s_class == "derivable-tokens":
+        return "tokens"
+    if s_class == "derivable-data":
+        return "data"
+    if s_class == "derivable-ui":
+        return "ui"
+    if s_class == "derivable-layout":
+        return "layout"
+
+    dest = stmt.get("proposed_destination", "").lower()
+    for area in ("tokens", "data", "ui", "layout", "auth", "config"):
+        if f"/{area}.md" in dest or f"area: {area}" in dest:
+            return area
+    inferred = infer_area(stmt.get("text", "")).lower()
+    if inferred in ("tokens", "data", "ui", "layout", "auth", "config"):
+        return inferred
+    if inferred == "design":
+        return "ui"
+    if inferred == "responsive":
+        return "layout"
+    return "ui"
+
+
+def find_evidence_anchor(root: Path, text: str) -> str:
+    matches = re.findall(r"`?([a-zA-Z0-9_\-\./\\]+\.[a-zA-Z0-9]{1,6})(?::(\d+))?`?", text)
+    for path_str, line_str in matches:
+        path_str = path_str.strip()
+        if not path_str or path_str.startswith("http") or path_str.startswith(".git"):
+            continue
+        norm_path = path_str.replace("\\", "/")
+        candidate = root / norm_path
+        if candidate.is_file():
+            line_no = line_str if line_str else "1"
+            return f"{norm_path}:{line_no}"
+    return ""
+
+
+def ensure_blueprint_file(root: Path, area: str) -> Path:
+    bp_dir = root / ".agents" / "blueprints"
+    bp_dir.mkdir(parents=True, exist_ok=True)
+    target = bp_dir / f"{area}.md"
+    if not target.is_file():
+        bp_script = None
+        cand1 = root / ".agents" / "skills" / "project-blueprints" / "scripts" / "blueprint.py"
+        cand2 = Path(__file__).resolve().parent.parent.parent / "project-blueprints" / "scripts" / "blueprint.py"
+        if cand1.is_file():
+            bp_script = cand1
+        elif cand2.is_file():
+            bp_script = cand2
+
+        if bp_script:
+            import subprocess
+            subprocess.run([sys.executable, "-B", str(bp_script), "init", "--areas", area, "--root", str(root)], check=False)
+
+        if not target.is_file():
+            content = (
+                f"# {area.title()} Blueprint\n\n"
+                f"Canonical {area} facts and contracts.\n\n"
+                "<!-- BEGIN CUSTOM: contracts -->\n"
+                "<!-- END CUSTOM: contracts -->\n"
+            )
+            target.write_text(content, encoding="utf-8")
+
+    idx_file = bp_dir / "index.md"
+    if not idx_file.is_file():
+        idx_lines = [
+            "# Project Blueprints Index\n",
+            "Deterministic, verified facts extracted directly from codebase evidence.\n",
+            "## Areas",
+            f"- [{area.title()} Blueprint]({area}.md)",
+            ""
+        ]
+        idx_file.write_text("\n".join(idx_lines), encoding="utf-8")
+    else:
+        try:
+            c = idx_file.read_text(encoding="utf-8", errors="ignore")
+            if f"{area}.md" not in c:
+                idx_file.write_text(c.rstrip() + f"\n- [{area.title()} Blueprint]({area}.md)\n", encoding="utf-8")
+        except Exception:
+            pass
+
+    return target
+
+
+def route_statement_to_blueprint(root: Path, stmt: dict):
+    area = resolve_blueprint_area_for_statement(stmt)
+    target_file = ensure_blueprint_file(root, area)
+
+    raw_text = stmt.get("raw") or stmt.get("text", "")
+    evidence = find_evidence_anchor(root, raw_text)
+
+    entry_lines = [f"- source: legacy {stmt['id']} {stmt['file']}:{stmt['line']}"]
+    if evidence:
+        entry_lines.append(f"  Evidence: {evidence}")
+    entry_lines.append(raw_text)
+    entry_str = "\n".join(entry_lines)
+
+    content = target_file.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"(<!-- BEGIN CUSTOM:\s*contracts\s*-->)([\s\S]*?)(<!-- END CUSTOM:\s*contracts\s*-->)", content)
+    if m:
+        body = m.group(2).strip()
+        if body:
+            new_body = f"\n{body}\n\n{entry_str}\n"
+        else:
+            new_body = f"\n{entry_str}\n"
+        new_content = content[:m.start(2)] + new_body + content[m.end(2):]
+    else:
+        new_content = content.rstrip() + f"\n\n<!-- BEGIN CUSTOM: contracts -->\n{entry_str}\n<!-- END CUSTOM: contracts -->\n"
+
+    target_file.write_text(new_content, encoding="utf-8")
+
+    stmt["status"] = "routed"
+    stmt["reason"] = f"routed to .agents/blueprints/{area}.md (contracts)"
+    stmt["proposed_destination"] = f".agents/blueprints/{area}.md"
+
+
 def cmd_batch(root: Path, area: str, limit: int):
     ledger_path = root / ".agents" / "legacy-parity.md"
     if not ledger_path.is_file():
@@ -1094,7 +1323,7 @@ def cmd_batch(root: Path, area: str, limit: int):
         print(f"Class:  {s['class']}")
         print(f"Text:   {s['text']}")
         if s["class"] == "rule-candidate":
-            slug = re.sub(r"[^a-z0-9]+", "-", s["text"].lower()[:40]).strip("-")
+            slug = re.sub(r"[^a-z0-9]+", "-", s["text"].lower()[:40]).strip("-") # strip-chars-ok: cleaning slug
             rule_id = f"{area}-{slug or s['id'].lower()}"
             print("Proposed Profile Rule:")
             print(f"  id: {rule_id}")
@@ -1103,6 +1332,9 @@ def cmd_batch(root: Path, area: str, limit: int):
             print("  enforced_by: manual")
             print("  evidence:")
             print(f"    - {s['file']}:{s['line']}")
+        elif s["class"].startswith("derivable-"):
+            bp_area = resolve_blueprint_area_for_statement(s)
+            print(f"Proposed destination: .agents/blueprints/{bp_area}.md contracts ([{s['id']}] ({s['class']} -> {bp_area}.md))")
         else:
             print(f"Proposed destination: {s['proposed_destination']}")
         print()
@@ -1111,13 +1343,36 @@ def cmd_batch(root: Path, area: str, limit: int):
         print(f"{total_pending - limit} more pending statement(s) remain in area '{area}'.")
 
 
-def cmd_apply(root: Path, accept_ids: list, drop_ids: list, reason: str):
+def cmd_apply(root: Path, accept_ids: list, drop_ids: list, route_ids: list, route_class: str, is_yes: bool, reason: str):
     ledger_path = root / ".agents" / "legacy-parity.md"
     if not ledger_path.is_file():
         sys.exit("Error: .agents/legacy-parity.md does not exist. Run inventory first.")
 
     statements = read_ledger(ledger_path)
     stmt_map = {s["id"]: s for s in statements}
+
+    # Handle --route-class
+    if route_class:
+        target_class = route_class.strip().lower()
+        pending_derivable = [
+            s for s in statements
+            if s.get("status") == "pending" and (
+                (target_class == "derivable" and s.get("class", "").startswith("derivable-")) or
+                s.get("class", "").lower() == target_class
+            )
+        ]
+        if not is_yes:
+            print(f"Pending derivable statements ({len(pending_derivable)}):")
+            for s in pending_derivable:
+                bp_area = resolve_blueprint_area_for_statement(s)
+                first_line = (s.get("text", "")).splitlines()[0][:80]
+                print(f"  [{s['id']}] ({s['class']} -> {bp_area}.md): {first_line}")
+            print(f"\nPass --yes to route these {len(pending_derivable)} statement(s) into blueprint contracts.")
+            return
+
+        for s in pending_derivable:
+            if s["id"] not in route_ids:
+                route_ids.append(s["id"])
 
     prof_path = root / ".agents" / "project-profile.yaml"
     prof_data = None
@@ -1130,6 +1385,7 @@ def cmd_apply(root: Path, accept_ids: list, drop_ids: list, reason: str):
     accepted_rules_added = 0
     accepted_notes_added = 0
     dropped_count = 0
+    routed_count = 0
 
     # 1. Process drops
     for sid in drop_ids:
@@ -1141,7 +1397,16 @@ def cmd_apply(root: Path, accept_ids: list, drop_ids: list, reason: str):
         else:
             print(f"Warning: ID {sid} not found in ledger.")
 
-    # 2. Process accepts
+    # 2. Process routes
+    for sid in route_ids:
+        if sid in stmt_map:
+            stmt = stmt_map[sid]
+            route_statement_to_blueprint(root, stmt)
+            routed_count += 1
+        else:
+            print(f"Warning: ID {sid} not found in ledger.")
+
+    # 3. Process accepts
     for sid in accept_ids:
         if sid not in stmt_map:
             print(f"Warning: ID {sid} not found in ledger.")
@@ -1156,7 +1421,7 @@ def cmd_apply(root: Path, accept_ids: list, drop_ids: list, reason: str):
         if s_class == "rule-candidate":
             stmt["status"] = "accepted"
             if prof_data is not None:
-                slug = re.sub(r"[^a-z0-9]+", "-", stmt["text"].lower()[:40]).strip("-")
+                slug = re.sub(r"[^a-z0-9]+", "-", stmt["text"].lower()[:40]).strip("-") # strip-chars-ok: cleaning slug
                 rule_id = f"imported-{area}-{slug or sid.lower()}"
                 rules = prof_data.setdefault("rules", [])
                 existing_ids = {r.get("id") for r in rules if isinstance(r, dict)}
@@ -1200,9 +1465,10 @@ def cmd_apply(root: Path, accept_ids: list, drop_ids: list, reason: str):
     write_ledger(ledger_path, statements)
 
     cov_pct, cov_count, rel_count = calculate_coverage(statements)
-    print(f"Applied updates:")
+    print("Applied updates:")
     print(f"  Accepted rules added to profile: {accepted_rules_added}")
     print(f"  Accepted notes added to .agents/notes/: {accepted_notes_added}")
+    print(f"  Routed to blueprint contracts: {routed_count}")
     print(f"  Dropped statements: {dropped_count}")
     print(f"Coverage is now {cov_pct}% ({cov_count}/{rel_count} rule-candidate and derivable statements covered or accepted).")
 
@@ -1257,28 +1523,71 @@ def cmd_status(root: Path):
         if updated:
             write_ledger(ledger_path, statements)
 
-    counts = {"pending": 0, "covered": 0, "accepted": 0, "dropped": 0}
-    pending_blocking = 0
+    counts = {"pending": 0, "covered": 0, "accepted": 0, "dropped": 0, "routed": 0}
+    pending_by_folder_and_class = {}
+    pending_local_rule_count = 0
+    pending_local_derivable_count = 0
 
     for s in statements:
         st = s.get("status", "pending")
         counts[st] = counts.get(st, 0) + 1
-        if st == "pending" and s.get("class") in (
-            "rule-candidate", "derivable-data", "derivable-tokens", "derivable-ui", "derivable-layout"
-        ):
-            pending_blocking += 1
+        if st == "pending":
+            s_file = s.get("file", "")
+            p = Path(s_file)
+            if len(p.parts) > 1:
+                if len(p.parts) >= 3 and p.parts[0] == ".agents" and p.parts[1] == "skills":
+                    folder = "/".join(p.parts[:3])
+                else:
+                    folder = str(p.parent).replace("\\", "/")
+            else:
+                folder = "."
+            s_class = s.get("class", "unknown")
+            src_class = s.get("source_class", "local")
 
+            key = (folder, src_class)
+            pending_by_folder_and_class.setdefault(key, {})
+            pending_by_folder_and_class[key][s_class] = pending_by_folder_and_class[key].get(s_class, 0) + 1
+
+            if src_class == "local":
+                if s_class == "rule-candidate":
+                    pending_local_rule_count += 1
+                elif s_class in ("derivable-data", "derivable-tokens", "derivable-ui", "derivable-layout"):
+                    pending_local_derivable_count += 1
+
+    decision_sources = read_ledger_decision_sources(ledger_path)
     cov_pct, cov_count, rel_count = calculate_coverage(statements)
 
     print("Legacy Parity Status:")
-    print(f"  Pending:  {counts['pending']} ({pending_blocking} rule-candidate or derivable blocking)")
+    print(f"  Pending:  {counts['pending']}")
     print(f"  Covered:  {counts['covered']}")
+    print(f"  Routed:   {counts['routed']}")
     print(f"  Accepted: {counts['accepted']}")
     print(f"  Dropped:  {counts['dropped']}")
     print(f"\nCoverage: {cov_pct}% ({cov_count}/{rel_count} rule-candidate and derivable statements covered or accepted).")
 
-    if pending_blocking > 0:
-        print(f"\nExit 1: {pending_blocking} rule-candidate or derivable statement(s) are still pending.")
+    if pending_by_folder_and_class:
+        print("\nPending statements by source folder and class:")
+        for (folder, src_class), class_counts in sorted(pending_by_folder_and_class.items()):
+            print(f"  {folder} ({src_class}):")
+            for c_name, cnt in sorted(class_counts.items()):
+                print(f"    {c_name}: {cnt}")
+
+    if decision_sources:
+        print(f"\nSources needing decision ({len(decision_sources)}):")
+        for ds in decision_sources:
+            print(f"  - {ds['path']} ({ds['class']}): {ds['signals']}")
+
+    exit_causes = []
+    if pending_local_rule_count > 0:
+        exit_causes.append(f"{pending_local_rule_count} pending local rule-candidate statement(s)")
+    if pending_local_derivable_count > 0:
+        exit_causes.append(f"{pending_local_derivable_count} pending local derivable statement(s)")
+    if decision_sources:
+        paths = ", ".join(ds["path"] for ds in decision_sources)
+        exit_causes.append(f"source(s) need decision: {paths}")
+
+    if exit_causes:
+        print(f"\nExit 1: {'; '.join(exit_causes)}.")
         sys.exit(1)
 
     print("\nAll rule-candidate and derivable statements resolved.")
@@ -1298,9 +1607,12 @@ def main():
     p_batch.add_argument("--limit", type=int, default=15, help="Maximum statements to show (default 15).")
     p_batch.add_argument("--root", default=".", help="Project root directory.")
 
-    p_apply = sub.add_parser("apply", help="Apply accept/drop decisions to profile and ledger.")
+    p_apply = sub.add_parser("apply", help="Apply accept/drop/route decisions to profile, blueprints, and ledger.")
     p_apply.add_argument("--accept", default="", help="Comma-separated IDs to accept.")
     p_apply.add_argument("--drop", default="", help="Comma-separated IDs to drop.")
+    p_apply.add_argument("--route", default="", help="Comma-separated IDs to route into blueprint contracts.")
+    p_apply.add_argument("--route-class", default="", help="Statement class to route (e.g. derivable).")
+    p_apply.add_argument("--yes", action="store_true", help="Confirm batch routing of a class.")
     p_apply.add_argument("--reason", default="", help="Reason for drop.")
     p_apply.add_argument("--root", default=".", help="Project root directory.")
 
@@ -1317,7 +1629,8 @@ def main():
     elif args.command == "apply":
         accept_ids = [x.strip() for x in args.accept.split(",") if x.strip()]
         drop_ids = [x.strip() for x in args.drop.split(",") if x.strip()]
-        cmd_apply(root, accept_ids, drop_ids, args.reason)
+        route_ids = [x.strip() for x in args.route.split(",") if x.strip()]
+        cmd_apply(root, accept_ids, drop_ids, route_ids, args.route_class, args.yes, args.reason)
     elif args.command == "status":
         cmd_status(root)
 

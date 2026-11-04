@@ -730,9 +730,19 @@ def run_references_tests(repo_root, errors):
 def run_legacy_parity_fixture_tests(repo_root, errors):
     test_script = os.path.join(repo_root, "tests", "test_legacy_import.py")
     if os.path.isfile(test_script):
-        res = subprocess.run([sys.executable, test_script], capture_output=True, text=True)
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_script], env=env, capture_output=True, text=True)
         if res.returncode != 0:
             errors.append(f"Legacy parity importer tests failed:\n{res.stderr or res.stdout}")
+
+    routing_script = os.path.join(repo_root, "tests", "test_legacy_import_routing.py")
+    if os.path.isfile(routing_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", routing_script], env=env, capture_output=True, text=True)
+        if res.returncode != 0:
+            errors.append(f"Legacy parity routing tests failed:\n{res.stderr or res.stdout}")
 
 
 def run_lifecycle_fixture_tests(repo_root, errors):
