@@ -1,0 +1,27 @@
+# Vendor Doc 20
+
+- Listed vendor rule 20.1: format specification requirement.
+- Listed vendor rule 20.2: format specification requirement.
+- Listed vendor rule 20.3: format specification requirement.
+- Listed vendor rule 20.4: format specification requirement.
+- Listed vendor rule 20.5: format specification requirement.
+- Listed vendor rule 20.6: format specification requirement.
+- Listed vendor rule 20.7: format specification requirement.
+- Listed vendor rule 20.8: format specification requirement.
+- Listed vendor rule 20.9: format specification requirement.
+- Listed vendor rule 20.10: format specification requirement.
+- Listed vendor rule 20.11: format specification requirement.
+- Listed vendor rule 20.12: format specification requirement.
+- Listed vendor rule 20.13: format specification requirement.
+- Listed vendor rule 20.14: format specification requirement.
+- Listed vendor rule 20.15: format specification requirement.
+- Listed vendor rule 20.16: format specification requirement.
+- Listed vendor rule 20.17: format specification requirement.
+- Listed vendor rule 20.18: format specification requirement.
+- Listed vendor rule 20.19: format specification requirement.
+- Listed vendor rule 20.20: format specification requirement.
+- Listed vendor rule 20.21: format specification requirement.
+- Listed vendor rule 20.22: format specification requirement.
+- Listed vendor rule 20.23: format specification requirement.
+- Listed vendor rule 20.24: format specification requirement.
+- Listed vendor rule 20.25: format specification requirement.

@@ -1,0 +1,27 @@
+# Unlisted Vendor Doc 21
+
+- Unlisted vendor rule 21.1: unclassified third party statement.
+- Unlisted vendor rule 21.2: unclassified third party statement.
+- Unlisted vendor rule 21.3: unclassified third party statement.
+- Unlisted vendor rule 21.4: unclassified third party statement.
+- Unlisted vendor rule 21.5: unclassified third party statement.
+- Unlisted vendor rule 21.6: unclassified third party statement.
+- Unlisted vendor rule 21.7: unclassified third party statement.
+- Unlisted vendor rule 21.8: unclassified third party statement.
+- Unlisted vendor rule 21.9: unclassified third party statement.
+- Unlisted vendor rule 21.10: unclassified third party statement.
+- Unlisted vendor rule 21.11: unclassified third party statement.
+- Unlisted vendor rule 21.12: unclassified third party statement.
+- Unlisted vendor rule 21.13: unclassified third party statement.
+- Unlisted vendor rule 21.14: unclassified third party statement.
+- Unlisted vendor rule 21.15: unclassified third party statement.
+- Unlisted vendor rule 21.16: unclassified third party statement.
+- Unlisted vendor rule 21.17: unclassified third party statement.
+- Unlisted vendor rule 21.18: unclassified third party statement.
+- Unlisted vendor rule 21.19: unclassified third party statement.
+- Unlisted vendor rule 21.20: unclassified third party statement.
+- Unlisted vendor rule 21.21: unclassified third party statement.
+- Unlisted vendor rule 21.22: unclassified third party statement.
+- Unlisted vendor rule 21.23: unclassified third party statement.
+- Unlisted vendor rule 21.24: unclassified third party statement.
+- Unlisted vendor rule 21.25: unclassified third party statement.

@@ -1,0 +1,27 @@
+# Vendor Doc 13
+
+- Listed vendor rule 13.1: format specification requirement.
+- Listed vendor rule 13.2: format specification requirement.
+- Listed vendor rule 13.3: format specification requirement.
+- Listed vendor rule 13.4: format specification requirement.
+- Listed vendor rule 13.5: format specification requirement.
+- Listed vendor rule 13.6: format specification requirement.
+- Listed vendor rule 13.7: format specification requirement.
+- Listed vendor rule 13.8: format specification requirement.
+- Listed vendor rule 13.9: format specification requirement.
+- Listed vendor rule 13.10: format specification requirement.
+- Listed vendor rule 13.11: format specification requirement.
+- Listed vendor rule 13.12: format specification requirement.
+- Listed vendor rule 13.13: format specification requirement.
+- Listed vendor rule 13.14: format specification requirement.
+- Listed vendor rule 13.15: format specification requirement.
+- Listed vendor rule 13.16: format specification requirement.
+- Listed vendor rule 13.17: format specification requirement.
+- Listed vendor rule 13.18: format specification requirement.
+- Listed vendor rule 13.19: format specification requirement.
+- Listed vendor rule 13.20: format specification requirement.
+- Listed vendor rule 13.21: format specification requirement.
+- Listed vendor rule 13.22: format specification requirement.
+- Listed vendor rule 13.23: format specification requirement.
+- Listed vendor rule 13.24: format specification requirement.
+- Listed vendor rule 13.25: format specification requirement.

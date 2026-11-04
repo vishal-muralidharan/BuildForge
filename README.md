@@ -704,8 +704,10 @@ All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention ski
 | `AGENTS.generated.md already exists` | `render.py` found an existing unstamped `AGENTS.md` and avoided overwriting it. | Merge changes from `AGENTS.generated.md` into `AGENTS.md`, or run `render.py --force --overwrite-unstamped`. |
 | `verify` exits with code 2 | Lock file is missing. | Run `npx @v1006/build-forge install` to write `.agents/build-forge.lock.json`. |
 | `verify` shows `modified` (exit code 1) | Skill files were altered or contain extra files. | Run `npx @v1006/build-forge install --force` to restore clean pipeline skills. |
+| Lost content and salvage | `render.py` refuses to overwrite files with hand edits outside custom blocks or unstamped skills. | Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --salvage` to preserve lines into `salvaged` custom blocks, or `--migrate-custom` to wrap unstamped skills in `legacy` blocks. Over-limit blocks (>160 lines) can be adopted into blueprint contracts via `python3 .agents/skills/project-blueprints/scripts/blueprint.py adopt`. |
 | Dual-homed skill collision detected | A reference exists in both `.agents/vendor/<name>` and `.agents/skills/<name>`. | Run `python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe` to inspect collisions, then pass `--approved` to remove identical duplicate copies. |
 | False warning from `check_sync` | Markdown tables outside Areas or dotted paths like `.agents/**` triggered false missing skill or path warnings. | Update Build Forge. Skill names are now read only from the Areas section and scope names from the Scope guide section using `mdscan.py`. Leading path dots are preserved. |
+| Unmatched glob or layer path warning | `validate_profile.py --strict-paths` or `check_sync.py` flags an unmatched path. | Check `structure.layers` and `git.scopes` in `.agents/project-profile.yaml`. Verify that paths exist on disk or remove unused globs. |
 
 ## License
 

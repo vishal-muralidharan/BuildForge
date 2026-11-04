@@ -109,6 +109,25 @@ When introducing a new `schema_version` to `.agents/project-profile.yaml`:
    ```
 5. Update `tests/test_lifecycle.py` and run `python3 scripts/ci_check.py`.
 
+## Skill contracts and AST linting
+
+Build Forge enforces strict structural and script execution contracts across all skills:
+
+1. **Skill contracts (`scripts/skill_contracts.py`)**:
+   Verifies that every script mentioned in any `SKILL.md` exists on disk, that all subcommands invoked in examples and instructions are valid parser options, and that required tables (like Areas and Scope guide) conform to contract rules.
+   Run contract verification with:
+   ```bash
+   python3 scripts/skill_contracts.py
+   ```
+2. **Python AST lint (`scripts/lint_py.py`)**:
+   Enforces cross-platform and safe coding patterns across all Python scripts:
+   - Prohibits multi-character string strip calls (e.g. `s.strip("abc")`) which behave as character sets rather than substring trims. If multi-character set stripping is genuinely intended, annotate the line with `# strip-chars-ok: <reason>`.
+   - Disallows leading `./` in glob patterns (e.g. `Path.glob("./*.md")`), ensuring consistent cross-platform behavior on Windows and POSIX.
+   Run AST lint checks with:
+   ```bash
+   python3 scripts/lint_py.py
+   ```
+
 ## CI failure history and cross-platform prevention
 
 To keep the test matrix (Ubuntu, macOS, Windows; Node 18, 22) green across all CI runners:

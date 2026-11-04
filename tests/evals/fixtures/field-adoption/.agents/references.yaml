@@ -1,0 +1,12 @@
+schema_version: 1
+vendor_in_git: false
+references:
+  - name: vendor-listed
+    kind: skill
+    category: other
+    status: declared
+    mode: advisory
+    activation: pipeline-only
+    used_by:
+      - audit
+    summary: Invented listed vendor reference

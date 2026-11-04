@@ -395,8 +395,79 @@ def run_grader_test_for_scenario_10(tmp_dir: Path) -> None:
     assert res_fail["summary"]["fail"] > 0
 
 
+def run_grader_test_for_scenario_11(tmp_dir: Path) -> None:
+    scenario_dir = find_scenario_dir(repo_root, "11-field-adoption")
+
+    # 1. Passing state: salvage, adopt into blueprints, extract, write ledger
+    work_pass = tmp_dir / "11-pass"
+    work_pass.mkdir(parents=True, exist_ok=True)
+    copy_fixture("field-adoption", work_pass)
+    meta = init_git_repo(work_pass)
+    save_baseline(
+        work_pass,
+        [
+            ".agents/skills/app-ui/SKILL.md",
+            ".agents/skills/app-tokens/SKILL.md",
+            ".agents/skills/app-data/SKILL.md",
+        ],
+        meta,
+    )
+
+    leg_script = repo_root / "skills" / "project-bootstrap" / "scripts" / "legacy_import.py"
+    bp_script = repo_root / "skills" / "project-blueprints" / "scripts" / "blueprint.py"
+    render_script = repo_root / "skills" / "project-bootstrap" / "scripts" / "render.py"
+
+    subprocess.run(
+        [sys.executable, "-B", str(leg_script), "inventory", "--root", "."],
+        cwd=str(work_pass),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [sys.executable, "-B", str(render_script), "--profile", ".agents/project-profile.yaml", "--root", ".", "--salvage", "--allow-dirty"],
+        cwd=str(work_pass),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [sys.executable, "-B", str(bp_script), "adopt", "--from", ".agents/skills/app-ui/SKILL.md", "--block", "oversized_contracts", "--area", "ui", "--root", "."],
+        cwd=str(work_pass),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [sys.executable, "-B", str(bp_script), "extract", "--root", "."],
+        cwd=str(work_pass),
+        check=True,
+        capture_output=True,
+    )
+
+    res_pass = grade_scenario(scenario_dir, work_pass, repo_root)
+    assert res_pass["status"] == "PASS", f"Scenario 11 passing state failed: {res_pass}"
+    assert res_pass["summary"]["fail"] == 0
+
+    # 2. Failing state: un-adopted (missing blueprints/ui.md and legacy-parity.md)
+    work_fail = tmp_dir / "11-fail"
+    work_fail.mkdir(parents=True, exist_ok=True)
+    copy_fixture("field-adoption", work_fail)
+    meta_fail = init_git_repo(work_fail)
+    save_baseline(
+        work_fail,
+        [
+            ".agents/skills/app-ui/SKILL.md",
+            ".agents/skills/app-tokens/SKILL.md",
+            ".agents/skills/app-data/SKILL.md",
+        ],
+        meta_fail,
+    )
+
+    res_fail = grade_scenario(scenario_dir, work_fail, repo_root)
+    assert res_fail["status"] == "FAIL", "Scenario 11 failing state unexpectedly passed"
+    assert res_fail["summary"]["fail"] > 0
+
+
 def run_all_eval_grader_tests() -> None:
-    print("Testing evaluation grader on all 10 scenarios...")
+    print("Testing evaluation grader on all 11 scenarios...")
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp = Path(tmp_str)
         run_grader_test_for_scenario_1(tmp)
@@ -419,7 +490,9 @@ def run_all_eval_grader_tests() -> None:
         print("  - Scenario 09 (legacy adoption): PASS and FAIL verified")
         run_grader_test_for_scenario_10(tmp)
         print("  - Scenario 10 (dual-home onboarding): PASS and FAIL verified")
-    print("All 10 scenarios scored accurately by grader.")
+        run_grader_test_for_scenario_11(tmp)
+        print("  - Scenario 11 (field adoption): PASS and FAIL verified")
+    print("All 11 scenarios scored accurately by grader.")
 
 
 if __name__ == "__main__":

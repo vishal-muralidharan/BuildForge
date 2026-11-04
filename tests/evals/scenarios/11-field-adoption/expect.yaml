@@ -1,0 +1,12 @@
+scenario: "11-field-adoption"
+description: "Field adoption: salvage hand edits, route over-limit blocks, verify blueprints, and preserve custom lines"
+checks:
+  files_exist:
+    - ".agents/project-profile.yaml"
+    - "AGENTS.md"
+    - ".agents/legacy-parity.md"
+    - ".agents/blueprints/ui.md"
+  field_adoption_checked: true
+manual:
+  - "Agent executed field adoption sequence, salvaged hand edits, and kept all custom lines intact"
+

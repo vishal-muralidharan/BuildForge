@@ -1,0 +1,18 @@
+{
+  "_version": "0.1.0",
+  "skills/project-blueprints/SKILL.md": "4a5af556f1d947fe44fb2f3782456250c5d5881b5624a4ae99a0193ef7ee2457",
+  "skills/project-blueprints/assets/templates/data.md": "135d33ed7bf76813f4e952988c0f04361e652003aa15282ab190902e0dd5a11d",
+  "skills/project-blueprints/assets/templates/layout.md": "5077b272cbda23fc0f3dc4f181354e69bb8907aa4ce05abf9d8e70b2296c8d70",
+  "skills/project-blueprints/assets/templates/tokens.md": "22f708980d6e4cd3f31c9defc693a37cd893ea4cdfa46e098c6479c8c3164e0b",
+  "skills/project-blueprints/assets/templates/ui.md": "47b178e064e3c5cbb3435193e6608c3ca779f3f2eccf4a5200b9141737bcc598",
+  "skills/project-blueprints/references/blueprint-format.md": "1c38f4f3b75a3ce7a31ca011c75476e9b13e298ac7af7b238fae3abb6dc9d408",
+  "skills/project-blueprints/scripts/analyzers/__init__.py": "3373bb6285e1d0bf2448d3fb5dba60606f130895fac7410ff05033c6801f6b5b",
+  "skills/project-blueprints/scripts/analyzers/auth.py": "010e82b95a3e6cf2c49395c0832aa4e21b9af04c0b9800e546be09c8786d22b9",
+  "skills/project-blueprints/scripts/analyzers/common.py": "ed22a1c0ed5c7ce6bd32d0f6c2c4432b4cac81c24c9e4d03bc91cdeb5430dce8",
+  "skills/project-blueprints/scripts/analyzers/config.py": "0baeb89a01dd6839facef01106f4cf32781328d7340d72feb990234afe6abfc1",
+  "skills/project-blueprints/scripts/analyzers/data.py": "d9a1f531a6309874c657befd9ad514b996bfbd553e769faa1ade05c20f4b7377",
+  "skills/project-blueprints/scripts/analyzers/layout.py": "0379ac68dec63b42ae6f3205df57aa2352be71dd9e558ff1873fc6979580b28f",
+  "skills/project-blueprints/scripts/analyzers/tokens.py": "04b19d0ec5c08ca693289a6db7f2de12bea349eb9cab2939bce6f1f6b20cc180",
+  "skills/project-blueprints/scripts/analyzers/ui.py": "ea24bde39bc110885ec3469689f18810752df857a1052ff8ead9677f3c75f433",
+  "skills/project-blueprints/scripts/blueprint.py": "854aaa18e058322e8237a55c5f1bed8f9a9b28b57fc8adcad083723e1228e02a"
+}

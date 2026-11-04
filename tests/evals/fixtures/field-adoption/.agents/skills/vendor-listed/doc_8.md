@@ -1,0 +1,27 @@
+# Vendor Doc 8
+
+- Listed vendor rule 8.1: format specification requirement.
+- Listed vendor rule 8.2: format specification requirement.
+- Listed vendor rule 8.3: format specification requirement.
+- Listed vendor rule 8.4: format specification requirement.
+- Listed vendor rule 8.5: format specification requirement.
+- Listed vendor rule 8.6: format specification requirement.
+- Listed vendor rule 8.7: format specification requirement.
+- Listed vendor rule 8.8: format specification requirement.
+- Listed vendor rule 8.9: format specification requirement.
+- Listed vendor rule 8.10: format specification requirement.
+- Listed vendor rule 8.11: format specification requirement.
+- Listed vendor rule 8.12: format specification requirement.
+- Listed vendor rule 8.13: format specification requirement.
+- Listed vendor rule 8.14: format specification requirement.
+- Listed vendor rule 8.15: format specification requirement.
+- Listed vendor rule 8.16: format specification requirement.
+- Listed vendor rule 8.17: format specification requirement.
+- Listed vendor rule 8.18: format specification requirement.
+- Listed vendor rule 8.19: format specification requirement.
+- Listed vendor rule 8.20: format specification requirement.
+- Listed vendor rule 8.21: format specification requirement.
+- Listed vendor rule 8.22: format specification requirement.
+- Listed vendor rule 8.23: format specification requirement.
+- Listed vendor rule 8.24: format specification requirement.
+- Listed vendor rule 8.25: format specification requirement.

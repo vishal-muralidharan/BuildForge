@@ -1,0 +1,53 @@
+schema_version: 1
+
+project:
+  name: field-adoption-app
+  summary: Field adoption fixture project for Build Forge release verification.
+  mode: existing
+
+stack:
+  language: typescript
+  framework: react
+  package_manager: npm
+
+commands:
+  check: npm test
+  test: npm test
+
+structure:
+  layers:
+    - path: src/components
+      purpose: UI components layer
+    - path: docs
+      purpose: Project documentation
+    - path: src/legacy_nonexistent
+      purpose: Missing legacy layer
+  tests: colocated
+
+git:
+  push: ask
+  commit_format: "<type>(<scope>): <subject>"
+  scopes:
+    - name: skills
+      purpose: Agent skill files
+      paths:
+        - .agents/skills/**
+    - name: docs
+      purpose: Documentation
+      paths:
+        - docs/**
+    - name: ui
+      purpose: UI components
+      paths:
+        - src/components/**
+
+rules:
+  - id: ui-no-inline-styles
+    area: design
+    text: Never use inline styles in UI components.
+    enforced_by: manual
+
+docs:
+  skills_dir: .agents/skills
+  agents_file: AGENTS.md
+  repo_map: .agents/repo-map.md

@@ -1,0 +1,27 @@
+# Unlisted Vendor Doc 8
+
+- Unlisted vendor rule 8.1: unclassified third party statement.
+- Unlisted vendor rule 8.2: unclassified third party statement.
+- Unlisted vendor rule 8.3: unclassified third party statement.
+- Unlisted vendor rule 8.4: unclassified third party statement.
+- Unlisted vendor rule 8.5: unclassified third party statement.
+- Unlisted vendor rule 8.6: unclassified third party statement.
+- Unlisted vendor rule 8.7: unclassified third party statement.
+- Unlisted vendor rule 8.8: unclassified third party statement.
+- Unlisted vendor rule 8.9: unclassified third party statement.
+- Unlisted vendor rule 8.10: unclassified third party statement.
+- Unlisted vendor rule 8.11: unclassified third party statement.
+- Unlisted vendor rule 8.12: unclassified third party statement.
+- Unlisted vendor rule 8.13: unclassified third party statement.
+- Unlisted vendor rule 8.14: unclassified third party statement.
+- Unlisted vendor rule 8.15: unclassified third party statement.
+- Unlisted vendor rule 8.16: unclassified third party statement.
+- Unlisted vendor rule 8.17: unclassified third party statement.
+- Unlisted vendor rule 8.18: unclassified third party statement.
+- Unlisted vendor rule 8.19: unclassified third party statement.
+- Unlisted vendor rule 8.20: unclassified third party statement.
+- Unlisted vendor rule 8.21: unclassified third party statement.
+- Unlisted vendor rule 8.22: unclassified third party statement.
+- Unlisted vendor rule 8.23: unclassified third party statement.
+- Unlisted vendor rule 8.24: unclassified third party statement.
+- Unlisted vendor rule 8.25: unclassified third party statement.

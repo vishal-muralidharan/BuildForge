@@ -1,0 +1,27 @@
+# Vendor Doc 19
+
+- Listed vendor rule 19.1: format specification requirement.
+- Listed vendor rule 19.2: format specification requirement.
+- Listed vendor rule 19.3: format specification requirement.
+- Listed vendor rule 19.4: format specification requirement.
+- Listed vendor rule 19.5: format specification requirement.
+- Listed vendor rule 19.6: format specification requirement.
+- Listed vendor rule 19.7: format specification requirement.
+- Listed vendor rule 19.8: format specification requirement.
+- Listed vendor rule 19.9: format specification requirement.
+- Listed vendor rule 19.10: format specification requirement.
+- Listed vendor rule 19.11: format specification requirement.
+- Listed vendor rule 19.12: format specification requirement.
+- Listed vendor rule 19.13: format specification requirement.
+- Listed vendor rule 19.14: format specification requirement.
+- Listed vendor rule 19.15: format specification requirement.
+- Listed vendor rule 19.16: format specification requirement.
+- Listed vendor rule 19.17: format specification requirement.
+- Listed vendor rule 19.18: format specification requirement.
+- Listed vendor rule 19.19: format specification requirement.
+- Listed vendor rule 19.20: format specification requirement.
+- Listed vendor rule 19.21: format specification requirement.
+- Listed vendor rule 19.22: format specification requirement.
+- Listed vendor rule 19.23: format specification requirement.
+- Listed vendor rule 19.24: format specification requirement.
+- Listed vendor rule 19.25: format specification requirement.

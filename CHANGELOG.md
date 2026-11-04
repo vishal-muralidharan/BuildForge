@@ -5,6 +5,11 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Field adoption integration test suite `tests/test_field_adoption.py` verifying the full 10-step sequence across validation, salvage, adoption, synchronization, drift, doctor, and non-generated line survival property test.
+- Field adoption test fixture `tests/fixtures/field-adoption` with invented stamped and unstamped convention skills, 60-line interface table, 200-line token table, oversized custom block, listed and unlisted vendor folders, and Scope guide table.
+- Evaluation scenario 11 (`11-field-adoption`) in `tests/evals/scenarios/11-field-adoption/` with task specification, expectation matrix, setup script, and grader integration in `scripts/grade.py` and `tests/test_eval_grader.py`.
+- Troubleshooting documentation in `README.md` covering lost content and salvage, collisions, false `check_sync` warnings, and unmatched glob/layer warnings.
+- Maintainer guide additions in `MAINTAINING.md` covering skill contracts (`scripts/skill_contracts.py`) and Python AST linting rules (`scripts/lint_py.py`).
 - Legacy import volume guard in `skills/project-bootstrap/scripts/legacy_import.py` quarantining folders producing > 100 statements or > 40% candidate share to `needs-decision`.
 - Legacy import status grouping in `legacy_import.py` by source folder and class with selective exit 1 for pending local rule candidates, local derivables, or needs-decision sources.
 - Blueprint contract routing via `legacy_import.py apply --route <ids>` and `apply --route-class derivable --yes` routing statements verbatim to `.agents/blueprints/<area>.md` under `contracts` blocks with evidence anchors.

@@ -1,0 +1,27 @@
+# Vendor Doc 7
+
+- Listed vendor rule 7.1: format specification requirement.
+- Listed vendor rule 7.2: format specification requirement.
+- Listed vendor rule 7.3: format specification requirement.
+- Listed vendor rule 7.4: format specification requirement.
+- Listed vendor rule 7.5: format specification requirement.
+- Listed vendor rule 7.6: format specification requirement.
+- Listed vendor rule 7.7: format specification requirement.
+- Listed vendor rule 7.8: format specification requirement.
+- Listed vendor rule 7.9: format specification requirement.
+- Listed vendor rule 7.10: format specification requirement.
+- Listed vendor rule 7.11: format specification requirement.
+- Listed vendor rule 7.12: format specification requirement.
+- Listed vendor rule 7.13: format specification requirement.
+- Listed vendor rule 7.14: format specification requirement.
+- Listed vendor rule 7.15: format specification requirement.
+- Listed vendor rule 7.16: format specification requirement.
+- Listed vendor rule 7.17: format specification requirement.
+- Listed vendor rule 7.18: format specification requirement.
+- Listed vendor rule 7.19: format specification requirement.
+- Listed vendor rule 7.20: format specification requirement.
+- Listed vendor rule 7.21: format specification requirement.
+- Listed vendor rule 7.22: format specification requirement.
+- Listed vendor rule 7.23: format specification requirement.
+- Listed vendor rule 7.24: format specification requirement.
+- Listed vendor rule 7.25: format specification requirement.

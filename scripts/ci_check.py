@@ -869,6 +869,16 @@ def run_project_blueprints_tests(repo_root, errors):
             errors.append(f"Blueprint lifecycle integration tests failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_field_adoption_tests(repo_root, errors):
+    test_script = os.path.join(repo_root, "tests", "test_field_adoption.py")
+    if os.path.isfile(test_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_script], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Field adoption integration test failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -923,6 +933,9 @@ def main():
 
     print("Running project blueprints integration tests...")
     run_project_blueprints_tests(repo_root, errors)
+
+    print("Running field adoption integration tests...")
+    run_field_adoption_tests(repo_root, errors)
 
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)

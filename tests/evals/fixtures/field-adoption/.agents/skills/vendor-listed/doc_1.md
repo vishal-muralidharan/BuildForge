@@ -1,0 +1,27 @@
+# Vendor Doc 1
+
+- Listed vendor rule 1.1: format specification requirement.
+- Listed vendor rule 1.2: format specification requirement.
+- Listed vendor rule 1.3: format specification requirement.
+- Listed vendor rule 1.4: format specification requirement.
+- Listed vendor rule 1.5: format specification requirement.
+- Listed vendor rule 1.6: format specification requirement.
+- Listed vendor rule 1.7: format specification requirement.
+- Listed vendor rule 1.8: format specification requirement.
+- Listed vendor rule 1.9: format specification requirement.
+- Listed vendor rule 1.10: format specification requirement.
+- Listed vendor rule 1.11: format specification requirement.
+- Listed vendor rule 1.12: format specification requirement.
+- Listed vendor rule 1.13: format specification requirement.
+- Listed vendor rule 1.14: format specification requirement.
+- Listed vendor rule 1.15: format specification requirement.
+- Listed vendor rule 1.16: format specification requirement.
+- Listed vendor rule 1.17: format specification requirement.
+- Listed vendor rule 1.18: format specification requirement.
+- Listed vendor rule 1.19: format specification requirement.
+- Listed vendor rule 1.20: format specification requirement.
+- Listed vendor rule 1.21: format specification requirement.
+- Listed vendor rule 1.22: format specification requirement.
+- Listed vendor rule 1.23: format specification requirement.
+- Listed vendor rule 1.24: format specification requirement.
+- Listed vendor rule 1.25: format specification requirement.

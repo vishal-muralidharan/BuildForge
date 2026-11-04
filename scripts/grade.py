@@ -155,6 +155,8 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
                 fixture_name = "legacy-rules"
             elif "10-" in scenario_name:
                 fixture_name = "dual-home-onboarding"
+            elif "11-" in scenario_name:
+                fixture_name = "field-adoption"
 
             if fixture_name:
                 fix_file = repo_root / "tests" / "evals" / "fixtures" / fixture_name / rel_path
@@ -532,6 +534,44 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
                 "type": "auto",
                 "status": "FAIL",
                 "details": f"Dedupe verification failed: {'; '.join(reasons)}",
+            })
+
+    # 14. field_adoption_checked
+    if checks.get("field_adoption_checked"):
+        bp_ui = workdir / ".agents" / "blueprints" / "ui.md"
+        legacy_ledger = workdir / ".agents" / "legacy-parity.md"
+        ui_skill = workdir / ".agents" / "skills" / "app-ui" / "SKILL.md"
+
+        has_bp_ui = bp_ui.is_file()
+        has_ledger = legacy_ledger.is_file()
+        has_salvaged_or_adopted = False
+
+        if has_bp_ui and has_ledger:
+            bp_text = bp_ui.read_text(encoding="utf-8", errors="ignore")
+            ui_text = ui_skill.read_text(encoding="utf-8", errors="ignore") if ui_skill.is_file() else ""
+            if "Custom contract line" in bp_text or "Adopted into" in ui_text:
+                has_salvaged_or_adopted = True
+
+        if has_bp_ui and has_ledger and has_salvaged_or_adopted:
+            results.append({
+                "name": "Field adoption verification",
+                "type": "auto",
+                "status": "PASS",
+                "details": "Custom lines preserved in blueprint contracts and legacy parity ledger written",
+            })
+        else:
+            reasons = []
+            if not has_bp_ui:
+                reasons.append(".agents/blueprints/ui.md was not created")
+            if not has_ledger:
+                reasons.append(".agents/legacy-parity.md was not created")
+            if not has_salvaged_or_adopted:
+                reasons.append("over-limit custom contracts were not adopted into blueprints")
+            results.append({
+                "name": "Field adoption verification",
+                "type": "auto",
+                "status": "FAIL",
+                "details": f"Field adoption verification failed: {'; '.join(reasons)}",
             })
 
     # Manual items requiring chat transcript inspection
