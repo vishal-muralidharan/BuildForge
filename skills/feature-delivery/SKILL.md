@@ -24,6 +24,7 @@ Agents often stop once a task checklist is complete, even if the user's ultimate
 3. `git status`. If the working tree has uncommitted changes you did not make, tell the user and ask whether to commit them, stash them or continue. Never mix someone else's changes into your commits.
 4. The repo map at `docs.repo_map`.
 5. Run `python3 .agents/skills/extend-pipeline/scripts/refs.py verify`. If it reports a difference, tell the user and ask.
+6. Run the stale check on blueprints and reference documentation before planning changes.
 
 Open only what each stage needs. Do not load every skill at the start. That wastes context and slows the work.
 

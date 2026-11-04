@@ -105,7 +105,8 @@ check:
   type: no_dual_homed_skills
 ```
 
-Fails when any skill exists in both `.agents/vendor` and `.agents/skills`. Takes no parameters.
+What it checks: Fails when any skill or reference exists in both `.agents/vendor` and `.agents/skills`, or when frontmatter names collide.
+When it runs: Runs during automated rule checks in CI, pre-commit checks, or when running `run_rule_checks.py`. Takes no parameters.
 
 ### A required file exists
 
