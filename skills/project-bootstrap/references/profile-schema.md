@@ -30,6 +30,7 @@ File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml
 | `git.*` | mixed | `push` is `never`, `ask` or `allowed`. `scopes` is a list of strings or `{name, purpose, paths}` objects. Empty means free scope. |
 | `verification.*` | mixed | `zero_warnings`, `browser_checks`, `post_build_report`. |
 | `docs.*` | paths | `skills_dir`, `agents_file`, `repo_map` are required. `spec` is optional and names the product spec file. |
+| `blueprints.*` | mixed | Optional. `enabled`, `dir`, and `areas`. Do not store raw lists of keys or tokens in profile. |
 
 ### Commit scopes (`git.scopes`)
 
@@ -55,6 +56,8 @@ Each rule is written once, here. Never copy a rule into AGENTS.md or a skill by 
   area: design             # design, tokens, motion, responsive, structure, naming, data, security, verify, git, docs, process
   text: No emojis anywhere.
   enforced_by: test        # manual, test or lint
+  evidence:                # optional list of source paths backing this rule
+    - src/components/Emoji.tsx
 ```
 
 - One sentence. Imperative. Plain words.

@@ -290,10 +290,62 @@ class TestProfileGlobsAndBootstrap(unittest.TestCase):
         self.assertIn(target_sentence, txt)
 
 
+class TestBlueprintsValidation(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="bf-test-bp-")
+        self.profile = Path(self.tmp) / "profile.yaml"
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_val(self, content: str, root: Path = None):
+        self.profile.write_text(content, encoding="utf-8")
+        cmd = [sys.executable, "-B", str(VAL_PY), "--profile", str(self.profile)]
+        if root:
+            cmd.extend(["--root", str(root)])
+        return subprocess.run(cmd, capture_output=True, text=True)
+
+    def test_blueprints_section_valid(self):
+        prof = BASE_PROFILE + (
+            "blueprints:\n"
+            "  enabled: true\n"
+            "  dir: .agents/blueprints\n"
+            "  areas:\n"
+            "    - data\n"
+            "    - tokens\n"
+        )
+        res = self.run_val(prof)
+        self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
+
+    def test_rule_evidence_warning_on_missing_file(self):
+        prof = BASE_PROFILE + (
+            "rules:\n"
+            "  - id: ui-no-emoji\n"
+            "    area: design\n"
+            "    text: No emojis.\n"
+            "    enforced_by: manual\n"
+            "    evidence:\n"
+            "      - src/nonexistent/file.ts\n"
+        )
+        res = self.run_val(prof, root=Path(self.tmp))
+        self.assertIn("rule ui-no-emoji evidence path does not exist", res.stdout)
+
+    def test_banned_tokens_list_fails(self):
+        prof = BASE_PROFILE + (
+            "tokens:\n"
+            "  - color-primary\n"
+            "  - color-surface\n"
+        )
+        res = self.run_val(prof)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("Do not store lists of keys or tokens", res.stdout + res.stderr)
+
+
 def run_all_validation_scope_tests():
     suite = unittest.TestSuite()
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestValidateProfileScopes))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestProfileGlobsAndBootstrap))
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestBlueprintsValidation))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     if not result.wasSuccessful():

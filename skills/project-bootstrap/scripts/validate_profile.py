@@ -28,7 +28,7 @@ ENFORCED = {"manual", "test", "lint", "check"}
 STATUS = {"declared", "installed", "rejected"}
 PUSH = {"never", "ask", "allowed"}
 MODES = {"existing", "new"}
-RULE_KEYS = {"id", "area", "text", "enforced_by", "check"}
+RULE_KEYS = {"id", "area", "text", "enforced_by", "check", "evidence"}
 CHECK_TYPES = {"forbid", "require_file", "forbid_file", "root_only", "no_dual_homed_skills"}
 CHECK_KEYS = {"type", "pattern", "include", "exclude", "path"}
 NAMING_KEYS = {"item", "style", "example"}
@@ -300,6 +300,27 @@ def main():
             if not (isinstance(ma, int) and 1 <= ma <= 10):
                 errors.append("capabilities.deploy.max_attempts must be an integer from 1 to 10")
 
+    bp = prof.get("blueprints")
+    if bp is not None:
+        if not isinstance(bp, dict):
+            errors.append("blueprints must be a mapping")
+        else:
+            bad_bp = sorted(set(bp) - {"enabled", "dir", "areas"})
+            if bad_bp:
+                errors.append(f"blueprints has unexpected keys: {bad_bp}")
+            if "enabled" in bp and not isinstance(bp["enabled"], bool):
+                errors.append("blueprints.enabled must be a boolean")
+            if "dir" in bp and not isinstance(bp["dir"], str):
+                errors.append("blueprints.dir must be a string")
+            if "areas" in bp and not isinstance(bp["areas"], list):
+                errors.append("blueprints.areas must be a list of strings")
+
+    # Prohibit storing raw lists of keys or tokens in the profile
+    for banned_path in ("tokens", "keys", "data.storage_keys", "data.keys", "design.tokens", "blueprints.tokens", "blueprints.keys"):
+        val = get(prof, banned_path)
+        if isinstance(val, (list, dict)):
+            errors.append(f"Do not store lists of keys or tokens in profile ({banned_path}). Facts belong in blueprints.")
+
     ids = set()
     for i, r in enumerate(prof.get("rules") or []):
         if not isinstance(r, dict):
@@ -319,6 +340,22 @@ def main():
             errors.append(f"rules[{i}] ({rid}) enforced_by must be one of {sorted(ENFORCED)}")
         if stray(r, RULE_KEYS):
             errors.append(f"rules[{i}] ({rid}) has unexpected keys {stray(r, RULE_KEYS)}. Quote text that contains commas.")
+        ev = r.get("evidence")
+        if ev is not None:
+            if isinstance(ev, str):
+                ev_list = [ev]
+            elif isinstance(ev, list):
+                ev_list = ev
+            else:
+                errors.append(f"rules[{i}] ({rid}) evidence must be a string or list of paths")
+                ev_list = []
+            if a.root:
+                root_path = Path(a.root)
+                for ep in ev_list:
+                    ep_clean = str(ep).split(":")[0].strip()
+                    ep_norm = strip_dot_slash(ep_clean)
+                    if ep_norm and not (root_path / ep_norm).exists():
+                        warnings.append(f"rule {rid} evidence path does not exist: '{ep}'")
         chk = r.get("check")
         if chk is not None:
             if isinstance(chk, str):
