@@ -33,9 +33,10 @@ Stage 6 of the pipeline. Rules live once, in the profile. AGENTS.md and the conv
 1. **List what changed.** Use `git diff --stat` or the commit list for the task.
 2. **Edit the profile.** Make the smallest change that makes it true. One id per rule, written once. Remove stale rules. Do not leave contradictions.
 3. **Validate.** Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .`.
-4. **Re-render.** Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root .`.
-   - It skips files that exist. Add `--force` only for generated convention skills you have not edited by hand.
-   - If the user merged AGENTS.md by hand, do not use `--force` on it. Read `AGENTS.generated.md` and apply the differences.
+4. **Re-render.** Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root . --update`.
+   - `--update` preserves custom blocks (`<!-- BEGIN CUSTOM: name -->`) byte for byte and regenerates surrounding templates.
+   - If hand edits exist outside custom blocks, `--update` refuses the file, prints a unified diff, and leaves files unchanged. Use `--force` only to overwrite hand edits outside custom blocks while preserving custom blocks.
+   - Unstamped files are never overwritten unless both `--force` and `--overwrite-unstamped` are passed.
    - If project-bootstrap is not installed, edit the generated files to match the profile by hand and say so.
 5. **Refresh the repo map.** Run `repo-search` in map mode.
 6. **Update the README** sections named in the map above.

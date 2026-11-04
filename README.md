@@ -533,7 +533,7 @@ All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention ski
 ## Safety
 
 - `project-bootstrap` writes only to `.agents/`, `AGENTS.md`, and the skills directory. It never edits application code.
-- `render.py` never overwrites existing files unless `--force` is passed.
+- `render.py` never overwrites existing files unless `--update` or `--force` is passed. It preserves custom blocks byte for byte.
 - Git push policy defaults to `never`.
 - Automated deploy capability is disabled by default.
 - `scaffold-app` runs official framework generators and requires network access during scaffolding.
@@ -548,7 +548,7 @@ All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention ski
 | Agent does not see the skills | The agent scans a folder other than `.agents/skills`. | Run `npx @v1006/build-forge link`. Check the agent's skills folder in [COMPATIBILITY.md](COMPATIBILITY.md). |
 | Windows symlink errors | Windows requires elevated permissions or developer mode for directory symlinks. | Build Forge uses directory junctions and copy fallbacks. Enable Windows Developer Mode if linking fails. |
 | Validator reports `unexpected keys` | YAML parser split an unquoted string on commas. | Wrap string values containing commas in double quotes in `.agents/project-profile.yaml`. |
-| `AGENTS.generated.md already exists` | `render.py` found an existing `AGENTS.md` and avoided overwriting it. | Merge changes from `AGENTS.generated.md` into `AGENTS.md`, or run `render.py --force`. |
+| `AGENTS.generated.md already exists` | `render.py` found an existing unstamped `AGENTS.md` and avoided overwriting it. | Merge changes from `AGENTS.generated.md` into `AGENTS.md`, or run `render.py --force --overwrite-unstamped`. |
 | `verify` exits with code 2 | Lock file is missing. | Run `npx @v1006/build-forge install` to write `.agents/build-forge.lock.json`. |
 | `verify` shows `modified` (exit code 1) | Skill files were altered or contain extra files. | Run `npx @v1006/build-forge install --force` to restore clean pipeline skills. |
 
