@@ -5,6 +5,12 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Suggest scope script in `skills/atomic-commits/scripts/suggest_scope.py` ranking commit scopes by file path globs.
+- Scope guide table rendering in `AGENTS.md` Git section from `git.scopes`.
+- Scope object support in project profile schema permitting `{name, purpose, paths}` mappings.
+- Schema validation and negative tests for commit scope objects in `validate_profile.py` and `tests/test_validate_profile.py`.
+- Suggest scope CI test suite in `tests/test_suggest_scope.py` wired into `scripts/ci_check.py`.
+- Section "Self-explaining commit scopes" in `README.md`.
 - Custom block support in `render.py` (`<!-- BEGIN CUSTOM: name -->` ... `<!-- END CUSTOM: name -->`) preserving handwritten notes byte for byte across updates.
 - Stamping mechanism in `render.py` (`<!-- build-forge:generated v1 body=<sha256> -->`) tracking generated body hashes outside custom blocks.
 - `--update` flag in `render.py` regenerating stamped files, restoring custom blocks, and refusing files with hand edits outside custom blocks with a unified diff.

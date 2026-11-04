@@ -409,6 +409,40 @@ python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/pro
 - **Size limits**: Warns above 80 lines per block and 300 custom lines per file. Fails above 160 lines per block or 600 custom lines per file. Facts belong in `.agents/blueprints/` or `.agents/project-profile.yaml`.
 - **Secret scanning**: Blocks are scanned for private keys and long credential strings. Fails on a match.
 
+## Self-explaining commit scopes
+
+In `.agents/project-profile.yaml`, `git.scopes` defines the allowed commit scopes. Scopes can be plain strings or mappings with `{name, purpose, paths}`:
+
+```yaml
+git:
+  commit_format: "<type>(<scope>): <subject>"
+  scopes:
+    - name: ui
+      purpose: Components, styles, and layout
+      paths:
+        - src/components/**
+        - src/styles/**
+    - name: data
+      purpose: Database and storage models
+      paths:
+        - src/models/**
+    - misc
+```
+
+### Suggesting scopes
+
+To find the right scope for changed files:
+
+```bash
+# Suggest scopes for specific files
+python3 .agents/skills/atomic-commits/scripts/suggest_scope.py --profile .agents/project-profile.yaml --files src/components/Button.jsx
+
+# Suggest scopes for staged files
+python3 .agents/skills/atomic-commits/scripts/suggest_scope.py --profile .agents/project-profile.yaml --staged
+```
+
+`suggest_scope.py` ranks scopes by file glob matches and prints the top 3 with their purpose. When no path matches, it prints the full list of available scopes.
+
 ## Third party skills
 
 A third party skill is untrusted text that an agent will read. Only add sources you trust.
