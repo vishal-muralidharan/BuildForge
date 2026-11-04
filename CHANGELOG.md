@@ -5,6 +5,8 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Skill contracts verification script `scripts/skill_contracts.py` and allowlist `scripts/contracts-allow.txt` enforcing script mentions, path existence, subcommand validity, and required text contracts.
+- Skill contracts test suite `tests/test_skill_contracts.py` integrated into `scripts/ci_check.py`.
 - Fictional reference profile `example-profile.yaml` for invented app `Pocketlog` with explicit warning banner.
 - Scope candidate generation in `detect_stack.py` with validation that each candidate path matches existing files.
 - Path and glob coverage validation in `validate_profile.py --root R` and strict failure mode with `--strict-paths`.

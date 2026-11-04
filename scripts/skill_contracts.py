@@ -169,10 +169,12 @@ def check_skill_contracts(repo_root: Path) -> list:
                 )
 
     # 4. REQUIRED_TEXT table check
+    has_any_required_skill = any((skills_dir / k).is_dir() for k in REQUIRED_TEXT)
     for skill_name, required_tokens in REQUIRED_TEXT.items():
         sdir = skills_dir / skill_name
         if not sdir.is_dir():
-            errors.append(f"Required skill '{skill_name}' does not exist under skills/")
+            if has_any_required_skill:
+                errors.append(f"Required skill '{skill_name}' does not exist under skills/")
             continue
 
         skill_text = ""

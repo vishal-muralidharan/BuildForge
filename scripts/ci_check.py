@@ -8,7 +8,8 @@ Verifies:
 3. Tool-specific word denylist check in skills/.
 4. No placeholder paths (<this-skill>, <project-bootstrap>) and no command uses 'python ' without the 3.
 5. Every SKILL.md has <= 500 lines.
-6. Every .py file compiles without syntax errors (using py_compile).
+6. Skill contracts: every script mentioned, valid subcommands, required text table.
+7. Every .py file compiles without syntax errors (using py_compile).
 7. AST lint checks: multi-character strip calls and leading './' in glob patterns.
 8. No __pycache__ directories or .pyc files exist in the repository tree.
 9. No file under skills/ contains an em dash or en dash.
@@ -811,6 +812,26 @@ def run_check_sync_tests(repo_root, errors):
             errors.append(f"Check sync and mdscan tests failed:\n{res.stderr or res.stdout}".strip())
 
 
+def check_skill_contracts_rule(repo_root, errors):
+    contracts_py = os.path.join(repo_root, "scripts", "skill_contracts.py")
+    if os.path.isfile(contracts_py):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", contracts_py], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Skill contracts check failed:\n{res.stdout}\n{res.stderr}".strip())
+
+
+def run_skill_contracts_tests(repo_root, errors):
+    test_script = os.path.join(repo_root, "tests", "test_skill_contracts.py")
+    if os.path.isfile(test_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_script], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Skill contracts tests failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -820,6 +841,7 @@ def main():
     print("Running CI checks...")
     check_skills(skills_dir, errors)
     check_skill_placeholders(skills_dir, errors)
+    check_skill_contracts_rule(repo_root, errors)
     check_python_files(repo_root, errors)
     check_py_ast_lint(repo_root, errors)
     check_no_cache_or_pyc(repo_root, errors)
@@ -858,6 +880,9 @@ def main():
 
     print("Running check_sync tests...")
     run_check_sync_tests(repo_root, errors)
+
+    print("Running skill contracts tests...")
+    run_skill_contracts_tests(repo_root, errors)
 
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)
