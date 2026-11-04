@@ -278,7 +278,7 @@ AGENTS.md                       # Generated: Router read by agents
 The project profile is the single source of truth for the build pipeline. It lives at `.agents/project-profile.yaml`. Every pipeline skill reads this file first. Edit the profile to change rules, commands, or layouts, then re-render guidance files.
 
 For schema details, see [profile-schema.md](skills/project-bootstrap/references/profile-schema.md).
-For a full worked example, see [example-nemo.project-profile.yaml](skills/project-bootstrap/references/example-nemo.project-profile.yaml).
+For a full worked example, see [example-profile.yaml](skills/project-bootstrap/references/example-profile.yaml).
 
 Here is a snippet from that example file:
 

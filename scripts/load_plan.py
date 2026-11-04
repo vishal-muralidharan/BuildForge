@@ -74,8 +74,8 @@ def build_stage_load_plan(repo_root: Path) -> list:
     fd_skill_path = skills_dir / "feature-delivery" / "SKILL.md"
     raw_stages = parse_stages_and_gates(fd_skill_path)
 
-    # Typical profile size benchmark from example-nemo
-    example_profile_path = skills_dir / "project-bootstrap" / "references" / "example-nemo.project-profile.yaml"
+    # Typical profile size benchmark from example-profile
+    example_profile_path = skills_dir / "project-bootstrap" / "references" / "example-profile.yaml"
     profile_stats = get_file_stats(example_profile_path)
     # Typical CURRENT_GOAL.md benchmark (~35 lines, ~900 chars)
     goal_doc_chars = 900

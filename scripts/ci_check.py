@@ -13,8 +13,8 @@ Verifies:
 8. No __pycache__ directories or .pyc files exist in the repository tree.
 9. No file under skills/ contains an em dash or en dash.
 10. Smoke tests:
-   - validate_profile.py exits 0 on example-nemo profile.
-   - render.py exits 0 on example-nemo profile.
+   - validate_profile.py exits 0 on example-profile.
+   - render.py exits 0 on example-profile.
    - check_commit_message.py exits 0 on "feat(entry): add keypad" and exits 1 on "Added keypad".
    - bin/build-forge.js installs one skill per folder in skills/ in a temporary folder.
 11. Multi-agent link and unlink tests in temporary folders.
@@ -286,7 +286,7 @@ def run_smoke_test(repo_root, errors):
     with tempfile.TemporaryDirectory() as tmpdir:
         agents_dir = os.path.join(tmpdir, ".agents")
         os.makedirs(agents_dir, exist_ok=True)
-        profile_src = os.path.join(repo_root, "skills/project-bootstrap/references/example-nemo.project-profile.yaml")
+        profile_src = os.path.join(repo_root, "skills/project-bootstrap/references/example-profile.yaml")
         profile_dst = os.path.join(agents_dir, "project-profile.yaml")
 
         if not os.path.isfile(profile_src):

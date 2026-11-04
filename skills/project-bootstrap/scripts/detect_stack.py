@@ -193,6 +193,46 @@ def main():
 
     facts["git"] = git_facts(root)
 
+    # Scope candidates from git history and layers
+    scope_candidates = []
+    seen_scope_names = set()
+
+    git_scopes = facts.get("git", {}).get("scopes", {})
+    for sname in git_scopes:
+        kname = re.sub(r"[^a-z0-9]+", "-", str(sname).lower()).strip("-")
+        if not kname or kname in seen_scope_names:
+            continue
+        matched_paths = []
+        for pat in [f"{kname}/**", f"src/{kname}/**", f"app/{kname}/**", f"packages/{kname}/**"]:
+            norm = pat.replace("/**", "")
+            target_dir = root / norm
+            if target_dir.is_dir() and any(p.is_file() for p in target_dir.rglob("*")):
+                matched_paths.append(pat)
+                break
+        if matched_paths:
+            scope_candidates.append({
+                "name": kname,
+                "paths": matched_paths
+            })
+            seen_scope_names.add(kname)
+
+    for l in layers:
+        lpath = l["path"]
+        last_seg = lpath.split("/")[-1]
+        kname = re.sub(r"[^a-z0-9]+", "-", last_seg.lower()).strip("-")
+        if not kname or kname in seen_scope_names:
+            continue
+        pat = f"{lpath}/**"
+        target_dir = root / lpath
+        if target_dir.is_dir() and any(p.is_file() for p in target_dir.rglob("*")):
+            scope_candidates.append({
+                "name": kname,
+                "paths": [pat]
+            })
+            seen_scope_names.add(kname)
+
+    facts["scope_candidates"] = scope_candidates
+
     agent_files = [n for n in ("AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "README.md", ".cursorrules") if (root / n).exists()]
     skill_dirs = []
     for d in (".agents/skills", ".claude/skills", ".cursor/rules"):

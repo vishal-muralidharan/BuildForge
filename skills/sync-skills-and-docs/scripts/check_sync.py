@@ -70,6 +70,20 @@ def strip_dot_slash(path: str) -> str:
     return p
 
 
+def path_matches(root: Path, pat: str) -> bool:
+    norm = strip_dot_slash(pat).rstrip("/")
+    if not norm:
+        return True
+    if (root / norm).exists():
+        return True
+    try:
+        if any(root.glob(norm)):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", required=True)
@@ -79,18 +93,21 @@ def main():
     prof = yaml.safe_load(Path(a.profile).read_text()) or {}
     errors, warnings = [], []
 
-    # 1. Paths exist
+    # 1. Profile paths and globs exist
     layers = [l.get("path", "").rstrip("/") for l in g(prof, "structure.layers", []) or []]
     for p in layers:
-        if p and not (root / p).exists():
+        if p and not path_matches(root, p):
             errors.append(f"layer path not found: {p}")
     for field in ("design.tokens_file", "design.enforced_by", "data.schema_source"):
         v = g(prof, field)
-        if v and ("/" in v or "." in v) and not (root / v).exists():
+        if v and not path_matches(root, v):
             errors.append(f"{field} not found: {v}")
     for d in g(prof, "design.component_dirs", []) or []:
-        if not (root / d).exists():
+        if not path_matches(root, d):
             errors.append(f"design.component_dirs not found: {d}")
+    for r in g(prof, "structure.root_allowed", []) or []:
+        if r and not path_matches(root, r):
+            warnings.append(f"structure.root_allowed pattern matches no files: {r}")
 
     # 2. Uncovered folders
     roots = sorted({p.split("/")[0] for p in layers if p})
@@ -207,19 +224,7 @@ def main():
             scope_names.add(sname)
             paths = s.get("paths") or []
             if paths:
-                matched_any = False
-                for pat in paths:
-                    norm = strip_dot_slash(pat)
-                    if (root / norm).exists():
-                        matched_any = True
-                        break
-                    try:
-                        if any(root.glob(norm)):
-                            matched_any = True
-                            break
-                    except Exception:
-                        pass
-                if not matched_any:
+                if not any(path_matches(root, pat) for pat in paths):
                     warnings.append(f"scope '{sname}' has paths {paths} that match no files in the repository")
 
     if scope_names and (root / ".git").exists():

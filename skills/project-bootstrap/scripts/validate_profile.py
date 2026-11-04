@@ -61,11 +61,33 @@ def todos(node, path=""):
         yield path
 
 
+def strip_dot_slash(path: str) -> str:
+    p = str(path).replace("\\", "/").strip()
+    while p.startswith("./"):
+        p = p[2:].strip()
+    return p
+
+
+def path_matches(root: Path, pat: str) -> bool:
+    norm = strip_dot_slash(pat).rstrip("/")
+    if not norm:
+        return True
+    if (root / norm).exists():
+        return True
+    try:
+        if any(root.glob(norm)):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", required=True)
     ap.add_argument("--root", default=None)
     ap.add_argument("--strict", action="store_true")
+    ap.add_argument("--strict-paths", action="store_true", help="Treat unmatched paths and globs as errors.")
     a = ap.parse_args()
 
     errors, warnings = [], []
@@ -330,6 +352,48 @@ def main():
     for field in ("docs.skills_dir", "docs.agents_file", "docs.repo_map"):
         if not get(prof, field):
             errors.append(f"{field} is required")
+
+    if a.root:
+        root_dir = Path(a.root).resolve()
+        record_issue = errors.append if a.strict_paths else warnings.append
+
+        # 1. structure.layers
+        for idx, l in enumerate(get(prof, "structure.layers", []) or []):
+            if isinstance(l, dict) and l.get("path"):
+                lpath = l["path"]
+                if not path_matches(root_dir, lpath):
+                    record_issue(f"unmatched path in structure.layers[{idx}]: '{lpath}'")
+
+        # 2. design.component_dirs
+        for idx, d in enumerate(get(prof, "design.component_dirs", []) or []):
+            if isinstance(d, str) and d:
+                if not path_matches(root_dir, d):
+                    record_issue(f"unmatched path in design.component_dirs[{idx}]: '{d}'")
+
+        # 3. git.scopes[].paths
+        for sidx, sc in enumerate(get(prof, "git.scopes", []) or []):
+            if isinstance(sc, dict):
+                sname = sc.get("name", str(sidx))
+                for pidx, pat in enumerate(sc.get("paths", []) or []):
+                    if isinstance(pat, str) and pat:
+                        if not path_matches(root_dir, pat):
+                            record_issue(f"unmatched path in git.scopes[{sname}].paths[{pidx}]: '{pat}'")
+
+        # 4. structure.root_allowed
+        for idx, r in enumerate(get(prof, "structure.root_allowed", []) or []):
+            if isinstance(r, str) and r:
+                if not path_matches(root_dir, r):
+                    record_issue(f"unmatched pattern in structure.root_allowed[{idx}]: '{r}'")
+
+        # 5. data.schema_source
+        ss = get(prof, "data.schema_source")
+        if ss and isinstance(ss, str) and not path_matches(root_dir, ss):
+            record_issue(f"unmatched path in data.schema_source: '{ss}'")
+
+        # 6. design.tokens_file
+        tf = get(prof, "design.tokens_file")
+        if tf and isinstance(tf, str) and not path_matches(root_dir, tf):
+            record_issue(f"unmatched path in design.tokens_file: '{tf}'")
 
     unresolved = list(todos(prof))
     for p in unresolved:

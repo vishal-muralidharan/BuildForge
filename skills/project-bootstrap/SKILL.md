@@ -24,6 +24,8 @@ Scripts live in this skill's `scripts/` folder. Run them with the full path to t
 
 ## Existing mode
 
+Derive every value from detect_stack output and the real file tree. Do not copy values from references/example-*.yaml.
+
 1. Run legacy inventory and reconcile third-party skills:
    Check `.agents/build-forge.lock.json` and `.agents/references.yaml`. Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py inventory --root <repo_root>`.
    This inventories statements from existing agent instruction files and legacy skills into `.agents/legacy-parity.md`.
@@ -65,7 +67,7 @@ Ask once whether the user wants third party skills. If yes, run the extend-pipel
 ## Finish
 
 1. In existing mode, run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status --root <repo_root>`. It must exit 0. Do not finish while status exits 1.
-2. Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root>`. Fix every error. Show the user any remaining TODO.
+2. Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root> --strict-paths`. Each unmatched path is removed or marked TODO, and the user is told. It is never left silently. Fix every error. Show the user any remaining TODO.
 3. Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root <repo_root>`. It never overwrites existing files. If `AGENTS.md` exists it writes `AGENTS.generated.md`. Help the user merge it, then offer to delete the generated copy.
 4. Report in this shape:
 
@@ -86,7 +88,7 @@ Next step: <one sentence>
 - `references/profile-schema.md`: every field, allowed values, and which pipeline stage reads which field. Read it when you fill or change a profile.
 - `references/interview.md`: question banks for new mode and for gaps in existing mode.
 - `references/external-references.md`: how to install and vet a third party skill repo.
-- `references/example-nemo.project-profile.yaml`: a complete worked profile.
+- `references/example-profile.yaml`: a complete worked profile for an invented app (Pocketlog).
 - `assets/project-profile.template.yaml`: the blank profile to copy.
 
 ## Quoting in the profile
