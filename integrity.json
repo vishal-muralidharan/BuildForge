@@ -28,7 +28,7 @@
   "skills/project-bootstrap/scripts/detect_stack.py": "7d125e114d8d4862973c52d3ff30c0d2a787bf07c53390e91e89a3d47300ba5e",
   "skills/project-bootstrap/scripts/legacy_import.py": "e42efa314670a326047725468b4fa0b03b177d344fbad1399e667073ff12f03f",
   "skills/project-bootstrap/scripts/migrate_profile.py": "7914aa09c3d083e791d2d4ae62d38c84dfa9d0ea6165d4e343a7073d06b54ecf",
-  "skills/project-bootstrap/scripts/render.py": "2afb1e7d5f24cdea22349826b98c5687974ca2c77cba62bf3fb4429fe0d2ffbc",
+  "skills/project-bootstrap/scripts/render.py": "d2fe0ab94544651cb879a42fde467d89bad5dc3276b89452147dd09c64deacf9",
   "skills/project-bootstrap/scripts/validate_profile.py": "a307266e9600a518d9cbc799db859b29e228465a9ab22b20d88cc6e4076d77c2",
   "skills/repo-search/SKILL.md": "3bb91666a623b91e3dc78c07302b633010013936d65f17ff54ef60b5994300cf",
   "skills/rules-to-tests/SKILL.md": "488d20c473f65f68ab7d3008cc818b0e332c5cd0c1e0164476d38d6a43c180a5",
@@ -39,7 +39,7 @@
   "skills/scaffold-app/assets/tokens.base.css": "18b090a5c0c08aeeceb8a2039a58dad962e1d4c9bb01d924fc9e705e1d491d83",
   "skills/scaffold-app/references/stack-recipes.md": "526e4f0cbcfcab7711d825fe5c720d789cc9ea71446de30411657e52e6fdcb8e",
   "skills/scaffold-app/scripts/ensure_check_script.py": "822773ff5fd0a13cb522f8f5dbb50a92c68937331e98c75e243a24304320b5bc",
-  "skills/sync-skills-and-docs/SKILL.md": "1c5471156af48e728210135bcc30bab73219d002f2eb4044270f77f106f5c9cd",
-  "skills/sync-skills-and-docs/scripts/check_sync.py": "ebd195e035940661847f46c6665d6ccdf89d952c474cbfcbc7e242368da7e9de",
+  "skills/sync-skills-and-docs/SKILL.md": "dfb1a8cca7b1898d16b4b7997fa1b66da9a814a0f8bfe5214c5751fbd0197cd8",
+  "skills/sync-skills-and-docs/scripts/check_sync.py": "95f084ab7ae1d58c2c9bcef674fd38219cdb6fa00c9b729327f08050e565869a",
   "skills/targeted-module-testing/SKILL.md": "1580401502c5ac910ada728cf25674b3137f9aee4d438c1ddd1aef36a20e69c8"
 }

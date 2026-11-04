@@ -5,6 +5,15 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Custom block support in `render.py` (`<!-- BEGIN CUSTOM: name -->` ... `<!-- END CUSTOM: name -->`) preserving handwritten notes byte for byte across updates.
+- Stamping mechanism in `render.py` (`<!-- build-forge:generated v1 body=<sha256> -->`) tracking generated body hashes outside custom blocks.
+- `--update` flag in `render.py` regenerating stamped files, restoring custom blocks, and refusing files with hand edits outside custom blocks with a unified diff.
+- `--overwrite-unstamped` guard in `render.py` preventing `--force` from modifying unstamped files without explicit confirmation.
+- Custom block orphan preservation writing displaced blocks to `.agents/custom-orphans.md`.
+- Secret pattern and line limit scanning for custom blocks in `render.py`.
+- Drift detection for unblocked edits, orphan blocks, and oversize blocks in `check_sync.py`.
+- Guide section "Adding your own notes to generated skills" in `README.md`.
+- Integration test suite in `tests/test_render_custom_blocks.py` integrated into `scripts/ci_check.py`.
 - Agent evaluation harness under `tests/evals/` with 4 fixtures (`existing-app`, `empty-folder`, `legacy-rules`, `injected-reference`) and 9 evaluation scenarios.
 - Evaluation grader CLI in `scripts/grade.py` scoring scenario outputs against `expect.yaml` without calling an LLM.
 - Evaluation runbook and recording instructions in `tests/evals/README.md`.
@@ -46,6 +55,7 @@ All notable changes to Build Forge will be documented in this file.
 - `check_integrity_manifest` in `scripts/ci_check.py` verifying the skills tree against `integrity.json`.
 
 ### Changed
+- Updated `sync-skills-and-docs` guidance and documentation to use `render.py --update` instead of `--force`.
 - Expanded `feature-delivery` skill description to trigger on fix, review, and release requests.
 - Updated `project-bootstrap` existing mode to inventory legacy agent files and require parity resolution before completing bootstrap.
 - Scoped `computeSkillsManifest` in `bin/build-forge.js` to core package skills so project custom convention skills in `.agents/skills` are never locked or flagged during verification.

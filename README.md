@@ -358,6 +358,57 @@ When adopting Build Forge in a codebase with existing agent files (`AGENTS.md`, 
 
 Existing legacy files are never edited, moved, or deleted.
 
+## Adding your own notes to generated skills
+
+Generated files (`AGENTS.md`, convention skills in `.agents/skills/`, and the repo map) are derived views of `.agents/project-profile.yaml`. To add project-specific notes that survive re-rendering, use custom blocks.
+
+### Custom blocks
+
+Every generated file ends with an empty custom block named `notes`:
+
+```markdown
+<!-- BEGIN CUSTOM: notes -->
+<!-- END CUSTOM: notes -->
+```
+
+Write notes, exceptions, or tips inside this block. Block names match `[a-z0-9-]{1,40}` and must be unique within their file.
+
+### Safe updates
+
+When the profile changes, update generated files without losing your notes:
+
+```bash
+python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --update
+```
+
+`--update` works as follows:
+
+1. It checks the body hash in the stamp line (`<!-- build-forge:generated v1 body=<sha256> -->`).
+2. If the file has no edits outside custom blocks, it updates the generated text and restores custom blocks byte for byte.
+3. If edits exist outside custom blocks, it refuses the file, prints a unified diff, makes 0 changes, and exits 1.
+
+### Forcing updates
+
+To discard edits outside custom blocks while keeping all custom blocks:
+
+```bash
+python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --force
+```
+
+`--force` prints every line lost outside custom blocks.
+
+Files without a Build Forge stamp are never overwritten by `--force` alone. Overwriting unstamped files requires both flags:
+
+```bash
+python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --force --overwrite-unstamped
+```
+
+### Safety and limits
+
+- **Orphans**: Custom blocks whose file or block name is no longer generated are saved to `.agents/custom-orphans.md`. No block is dropped silently.
+- **Size limits**: Warns above 80 lines per block and 300 custom lines per file. Fails above 160 lines per block or 600 custom lines per file. Facts belong in `.agents/blueprints/` or `.agents/project-profile.yaml`.
+- **Secret scanning**: Blocks are scanned for private keys and long credential strings. Fails on a match.
+
 ## Third party skills
 
 A third party skill is untrusted text that an agent will read. Only add sources you trust.
