@@ -265,7 +265,7 @@ def main():
             clean = CUSTOM_BLOCK_RE.sub("", clean)
             body_h = hashlib.sha256(clean.encode("utf-8")).hexdigest()
             if body_h != stamp_h:
-                errors.append(f"generated file '{rel_label}' has edits outside custom blocks (run render.py --update or --force)")
+                errors.append(f"generated file '{rel_label}' has edits outside custom blocks (run render.py --salvage or --force)")
 
         # Check block limits
         total_custom = 0
@@ -274,6 +274,8 @@ def main():
             bcontent = m.group(2)
             lines = len(bcontent.splitlines())
             total_custom += lines
+            if bname in ("salvaged", "legacy"):
+                warnings.append(f"custom block '{bname}' in '{rel_label}' needs review (merge or remove)")
             if lines > 160:
                 errors.append(f"custom block '{bname}' in '{rel_label}' has {lines} lines (> 160; facts belong in blueprints or profile)")
             elif lines > 80:

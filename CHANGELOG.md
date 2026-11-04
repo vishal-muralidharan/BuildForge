@@ -5,6 +5,12 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Content salvage and migration in `skills/project-bootstrap/scripts/render.py`: `--salvage` moves hand edits outside custom blocks into `salvaged` custom blocks, and `--migrate-custom` wraps unstamped skills into `legacy` blocks.
+- Overflow routing in `render.py` moving blocks over limits (or unstamped files with tables/code blocks > 20 lines) through `blueprint adopt` or to `.agents/notes/<skill>.md`.
+- Safeguards in `render.py`: `--force` behaves like `--salvage` by default; content discarding requires `--discard-edits` and `--yes-discard` together; uncommitted git changes guard with `--allow-dirty`; secret scan refusal.
+- Deterministic render action ledger `.agents/render-log.md` recording paths, actions, and line counts without timestamps.
+- Warning in `check_sync.py` when `salvaged` or `legacy` custom blocks exist.
+- Test suite `tests/test_render_salvage.py` covering all 9 safeguard points, CRLF handling, git dirty tree fixtures, secret detection, idempotency, and non-generated line survival property test.
 - Blueprint lifecycle commands `init`, `adopt`, `link-check`, and `drift` in `skills/project-blueprints/scripts/blueprint.py`.
 - Canonical blueprint templates in `skills/project-blueprints/assets/templates/` for data, tokens, UI, and layout areas.
 - Contract evidence anchor validation and custom block adoption pointers in `blueprint.py`.

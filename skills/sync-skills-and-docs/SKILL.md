@@ -36,8 +36,8 @@ Stage 6 of the pipeline. Rules live once, in the profile. AGENTS.md and the conv
 3. **Validate.** Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .`.
 4. **Re-render.** Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root . --update`.
    - `--update` preserves custom blocks (`<!-- BEGIN CUSTOM: name -->`) byte for byte and regenerates surrounding templates.
-   - If hand edits exist outside custom blocks, `--update` refuses the file, prints a unified diff, and leaves files unchanged. Use `--force` only to overwrite hand edits outside custom blocks while preserving custom blocks.
-   - Unstamped files are never overwritten unless both `--force` and `--overwrite-unstamped` are passed.
+   - If hand edits exist outside custom blocks, `--update` refuses the file, prints a unified diff, and leaves files unchanged. Run with `--salvage` (or `--force`) to regenerate and preserve hand edits into a `salvaged` custom block. Hand edits are never discarded unless `--discard-edits` and `--yes-discard` are passed together.
+   - Unstamped files are never overwritten silently. Run with `--migrate-custom` to wrap unstamped files into a `legacy` custom block, or `--force --overwrite-unstamped` to overwrite.
    - If project-bootstrap is not installed, edit the generated files to match the profile by hand and say so.
 5. **Refresh the repo map.** Run `repo-search` in map mode.
 6. **Update the README** sections named in the map above.

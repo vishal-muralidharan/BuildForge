@@ -445,21 +445,31 @@ python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/pro
 2. If the file has no edits outside custom blocks, it updates the generated text and restores custom blocks byte for byte.
 3. If edits exist outside custom blocks, it refuses the file, prints a unified diff, makes 0 changes, and exits 1.
 
-### Forcing updates
+### Salvaging hand edits and forcing updates
 
-To discard edits outside custom blocks while keeping all custom blocks:
+When a stamped file has hand edits outside custom blocks, `--update` refuses with exit 1.
 
-```bash
-python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --force
-```
-
-`--force` prints every line lost outside custom blocks.
-
-Files without a Build Forge stamp are never overwritten by `--force` alone. Overwriting unstamped files requires both flags:
+To regenerate while salvaging all hand edits into a `salvaged` custom block (and routing overflow to blueprints):
 
 ```bash
-python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --force --overwrite-unstamped
+python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --salvage
 ```
+
+`--force` behaves like `--salvage` by default: no content is discarded, and the salvaged line count is printed.
+
+To intentionally discard edits outside custom blocks, pass `--discard-edits` and `--yes-discard` together:
+
+```bash
+python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --force --discard-edits --yes-discard
+```
+
+To migrate an unstamped file with the same name as a generated skill:
+
+```bash
+python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --migrate-custom
+```
+
+Unstamped files are never overwritten silently. Overwriting unstamped files requires `--force --overwrite-unstamped`.
 
 ### Safety and limits
 

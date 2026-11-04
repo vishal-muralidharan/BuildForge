@@ -137,7 +137,165 @@ def resolve_blueprint_area(source_label: str) -> str:
     return "data"
 
 
-def validate_custom_blocks(blocks: dict, source_label: str) -> list:
+def scan_secrets(text: str, label: str) -> None:
+    """Scan text for potential secrets and exit on match."""
+    for pat in SECRET_PATTERNS:
+        if pat.search(text):
+            sys.exit(
+                f"ERROR: Secret pattern detected in salvaged or migrated content for {label}. "
+                "Refusing to proceed."
+            )
+
+
+def has_large_table_or_fenced_block(text: str, max_lines: int = 20) -> bool:
+    """Check if markdown text contains tables or fenced blocks longer than max_lines."""
+    lines = text.splitlines()
+    in_fence = False
+    fence_count = 0
+    table_count = 0
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            if in_fence:
+                if fence_count > max_lines:
+                    return True
+                in_fence = False
+                fence_count = 0
+            else:
+                in_fence = True
+                fence_count = 0
+        elif in_fence:
+            fence_count += 1
+        elif stripped.startswith("|"):
+            table_count += 1
+            if table_count > max_lines:
+                return True
+        else:
+            table_count = 0
+    return False
+
+
+def log_render_action(root: Path, rel_path: str, action: str, line_count: int) -> None:
+    """Deterministically append salvage or migration entry to .agents/render-log.md."""
+    log_file = root / ".agents" / "render-log.md"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    header = "# Render Log\n\nLog of salvaged edits and migrated custom blocks.\n\n"
+    entry = f"- path: {rel_path} | action: {action} | lines: {line_count}\n"
+    if log_file.is_file():
+        existing = log_file.read_text(encoding="utf-8")
+        if not existing.startswith("# Render Log"):
+            existing = header + existing
+        log_file.write_text(existing.rstrip() + "\n" + entry, encoding="utf-8")
+    else:
+        log_file.write_text(header + entry, encoding="utf-8")
+
+
+def check_git_dirty(root: Path, targets: list, allow_dirty: bool) -> None:
+    """Refuse if git reports uncommitted changes in target files unless allow_dirty is set."""
+    if allow_dirty:
+        return
+    if not targets:
+        return
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ["git", "status", "--porcelain", "--"] + [str(t) for t in targets],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            print("NOTE  Git not available or not a git repository. Skipping dirty tree check.")
+            return
+        output = proc.stdout.strip()
+        if not output:
+            return
+        dirty = []
+        for line in output.splitlines():
+            parts = line.strip().split(maxsplit=1)
+            if len(parts) == 2:
+                dirty.append(parts[1].strip('"'))
+            elif len(parts) == 1:
+                dirty.append(parts[0])
+        if dirty:
+            dirty_str = ", ".join(dirty)
+            sys.exit(
+                f"ERROR: Target file(s) have uncommitted changes: {dirty_str}. "
+                "Commit or stash changes before rendering, or pass --allow-dirty to overwrite."
+            )
+    except FileNotFoundError:
+        print("NOTE  Git binary not found. Skipping dirty tree check.")
+        return
+
+
+def compute_salvaged_lines(clean_tmpl: str, clean_disk: str) -> list:
+    """Find old body lines present in clean_disk that are absent from clean_tmpl."""
+    diff = list(difflib.ndiff(clean_tmpl.splitlines(), clean_disk.splitlines()))
+    return [l[2:] for l in diff if l.startswith("+ ")]
+
+
+def route_overflow(root: Path, dest: Path, block_name: str, block_content: str, rel_label: str) -> None:
+    """Route over-limit custom block through blueprint adopt or to .agents/notes/<skill>.md."""
+    import subprocess
+    skill_name = dest.parent.name if "skills" in dest.parts else dest.stem
+    lines_count = len(block_content.splitlines())
+
+    if skill_name in AREA_MAP:
+        area = AREA_MAP[skill_name]
+        bp_script = root / ".agents" / "skills" / "project-blueprints" / "scripts" / "blueprint.py"
+        if not bp_script.is_file():
+            bp_script = root / "skills" / "project-blueprints" / "scripts" / "blueprint.py"
+        if not bp_script.is_file():
+            bp_script = Path(__file__).resolve().parents[2] / "project-blueprints" / "scripts" / "blueprint.py"
+
+        if bp_script.is_file():
+            cmd = [
+                sys.executable, "-B", str(bp_script),
+                "adopt",
+                "--from", str(dest),
+                "--block", block_name,
+                "--area", area,
+                "--root", str(root),
+            ]
+            res = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True)
+            if res.returncode != 0:
+                sys.exit(f"ERROR: blueprint adopt failed for {rel_label} block '{block_name}':\n{res.stderr or res.stdout}")
+            log_render_action(root, rel_label, f"adopt ({block_name} -> {area})", lines_count)
+            print(f"ROUTED  Custom block '{block_name}' from {rel_label} into blueprint '{area}.md'")
+            return
+
+    # Route to notes if not in AREA_MAP or blueprint script unavailable
+    notes_dir = root / ".agents" / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
+    notes_file = notes_dir / f"{skill_name}.md"
+
+    header = f"# Notes for {skill_name}\n\n"
+    block_entry = f"<!-- BEGIN CUSTOM: {block_name} -->\n{block_content.rstrip()}\n<!-- END CUSTOM: {block_name} -->\n"
+
+    if notes_file.is_file():
+        existing = notes_file.read_text(encoding="utf-8")
+        if not existing.startswith(f"# Notes for {skill_name}"):
+            existing = header + existing
+        notes_file.write_text(existing.rstrip() + "\n\n" + block_entry, encoding="utf-8")
+    else:
+        notes_file.write_text(header + block_entry, encoding="utf-8")
+
+    # In dest, replace the block content with pointer
+    if dest.is_file():
+        txt = dest.read_text(encoding="utf-8")
+        pat = re.compile(
+            rf"<!--\s*BEGIN CUSTOM:\s*{re.escape(block_name)}\s*-->\n?(.*?)<!--\s*END CUSTOM:\s*{re.escape(block_name)}\s*-->\n?",
+            re.DOTALL
+        )
+        replacement = f"<!-- BEGIN CUSTOM: {block_name} -->\nMoved to .agents/notes/{skill_name}.md\n<!-- END CUSTOM: {block_name} -->\n"
+        dest.write_text(pat.sub(replacement, txt, count=1), encoding="utf-8")
+
+    log_render_action(root, rel_label, f"notes ({block_name} -> .agents/notes/{skill_name}.md)", lines_count)
+    print(f"ROUTED  Custom block '{block_name}' from {rel_label} to .agents/notes/{skill_name}.md")
+
+
+def validate_custom_blocks(blocks: dict, source_label: str, allow_overflow: bool = False) -> list:
     """Validate block line counts and secret patterns. Return list of warning strings."""
     warnings = []
     total_lines = 0
@@ -158,11 +316,17 @@ def validate_custom_blocks(blocks: dict, source_label: str) -> list:
 
         if count > 160:
             adopt_cmd = f"python3 .agents/skills/project-blueprints/scripts/blueprint.py adopt --from {source_label} --block {name} --area {area}"
-            sys.exit(
-                f"ERROR: Custom block '{name}' in {source_label} has {count} lines (> 160). "
-                f"Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml). "
-                f"Adopt into blueprints: {adopt_cmd}"
-            )
+            if not allow_overflow:
+                sys.exit(
+                    f"ERROR: Custom block '{name}' in {source_label} has {count} lines (> 160). "
+                    f"Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml). "
+                    f"Adopt into blueprints: {adopt_cmd}"
+                )
+            else:
+                warnings.append(
+                    f"WARN  Custom block '{name}' in {source_label} has {count} lines (> 160; will be routed). "
+                    f"Adopt into blueprints: {adopt_cmd}"
+                )
         elif count > 80:
             adopt_cmd = f"python3 .agents/skills/project-blueprints/scripts/blueprint.py adopt --from {source_label} --block {name} --area {area}"
             warnings.append(
@@ -172,10 +336,15 @@ def validate_custom_blocks(blocks: dict, source_label: str) -> list:
             )
 
     if total_lines > 600:
-        sys.exit(
-            f"ERROR: {source_label} has {total_lines} total custom lines (> 600). "
-            "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
-        )
+        if not allow_overflow:
+            sys.exit(
+                f"ERROR: {source_label} has {total_lines} total custom lines (> 600). "
+                "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
+            )
+        else:
+            warnings.append(
+                f"WARN  {source_label} has {total_lines} total custom lines (> 600; will be routed)."
+            )
     elif total_lines > 300:
         warnings.append(
             f"WARN  {source_label} has {total_lines} total custom lines (> 300). "
@@ -500,10 +669,18 @@ def main():
     ap.add_argument("--profile", required=True)
     ap.add_argument("--root", default=".")
     ap.add_argument("--update", action="store_true", help="Regenerate stamped files while preserving custom blocks; refuse files with hand edits outside blocks")
-    ap.add_argument("--force", action="store_true", help="Overwrite files outside custom blocks; keep blocks and report lost lines")
+    ap.add_argument("--salvage", action="store_true", help="Regenerate stamped files and salvage hand edits outside custom blocks into 'salvaged' block")
+    ap.add_argument("--force", action="store_true", help="Force updates (behaves like --salvage unless --discard-edits and --yes-discard are passed)")
     ap.add_argument("--overwrite-unstamped", action="store_true", help="Allow --force to overwrite unstamped files")
+    ap.add_argument("--migrate-custom", action="store_true", help="Wrap unstamped file body into 'legacy' custom block and render generated skill around it")
+    ap.add_argument("--discard-edits", action="store_true", help="Discard hand edits outside custom blocks (requires --yes-discard)")
+    ap.add_argument("--yes-discard", action="store_true", help="Confirm discarding hand edits outside custom blocks")
+    ap.add_argument("--allow-dirty", action="store_true", help="Allow overwrite/salvage/migration despite uncommitted git changes")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+
+    if a.discard_edits and not a.yes_discard:
+        sys.exit("ERROR: --discard-edits requires --yes-discard.")
 
     root = Path(a.root).resolve()
     prof_path = Path(a.profile).resolve()
@@ -544,8 +721,13 @@ def main():
     all_orphans = []
     all_warnings = []
 
+    # Dirty tree guard: check existing target files
+    existing_targets = [dest for dest, _, _ in targets if dest.is_file()]
+    if (a.update or a.salvage or a.force or a.migrate_custom) and existing_targets:
+        check_git_dirty(root, existing_targets, a.allow_dirty)
+
     # Pre-flight check for --update: transactional validation
-    if a.update and not a.force:
+    if a.update and not a.salvage and not a.force:
         refusal_diffs = {}
         for dest, raw_tmpl, kind in targets:
             if not dest.is_file():
@@ -614,14 +796,55 @@ def main():
 
         if not stamp_m:
             # Unstamped file
-            if a.force and a.overwrite_unstamped:
+            if a.migrate_custom:
+                existing_body = disk_text
+                scan_secrets(existing_body, rel_label)
+                lines = existing_body.splitlines()
+                lines_count = len(lines)
+                needs_adopt = lines_count > 80 or has_large_table_or_fenced_block(existing_body)
+
+                # Wrap existing body in legacy custom block
+                legacy_header = "<!-- Legacy body before Build Forge migration -->\n"
+                full_legacy = legacy_header + existing_body
+                disk_blocks = {"legacy": full_legacy}
+
+                # Ensure legacy marker in raw_tmpl
+                marker = "<!-- BEGIN CUSTOM: legacy -->\n<!-- END CUSTOM: legacy -->\n"
+                if "<!-- BEGIN CUSTOM: notes -->" in raw_tmpl:
+                    raw_tmpl = raw_tmpl.replace("<!-- BEGIN CUSTOM: notes -->", marker + "<!-- BEGIN CUSTOM: notes -->", 1)
+                else:
+                    raw_tmpl = raw_tmpl.rstrip() + "\n\n" + marker
+
+                merged, n_pres, _ = inject_custom_blocks(raw_tmpl, disk_blocks)
+                new_body_hash = compute_body_hash(raw_tmpl)
+                final_content = stamp_text(merged, new_body_hash)
+                if not a.dry_run:
+                    dest.write_text(final_content, encoding="utf-8")
+
+                if needs_adopt and not a.dry_run:
+                    route_overflow(root, dest, "legacy", existing_body, rel_label)
+
+                log_render_action(root, rel_label, "migrate-custom", lines_count)
+                updated.append((dest, 1, 0))
+                print(f"MIGRATED {rel_label} (wrapped in legacy custom block, {lines_count} lines)")
+                continue
+
+            elif a.force and a.overwrite_unstamped:
+                if a.discard_edits and a.yes_discard:
+                    discarded = disk_text.splitlines()
+                    if discarded:
+                        print(f"DISCARDED {len(discarded)} line(s) from {rel_label}:")
+                        for d in discarded:
+                            print(f"  - {d}")
                 body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(raw_tmpl, body_hash)
                 if not a.dry_run:
                     dest.write_text(final_content, encoding="utf-8")
-                updated.append((dest, 0))
+                updated.append((dest, 0, 0))
                 print(f"OVERWROTE {rel_label} (unstamped; forced with --overwrite-unstamped)")
-            elif not a.force and not a.update and kind == "agents":
+                continue
+
+            elif not a.force and not a.update and not a.salvage and kind == "agents":
                 gen_dest = dest.with_name(dest.stem + ".generated" + dest.suffix)
                 body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(raw_tmpl, body_hash)
@@ -629,20 +852,24 @@ def main():
                     gen_dest.write_text(final_content, encoding="utf-8")
                 created.append(gen_dest)
                 print(f"NOTE  {dest.name} exists. Router written to {gen_dest.name}. Merge it by hand.")
+                continue
+
             else:
-                skipped.append((dest, "unstamped file exists; use --force --overwrite-unstamped to overwrite"))
-                print(f"SKIPPED {rel_label} (unstamped; use --force --overwrite-unstamped to overwrite)")
-            continue
+                skipped.append((dest, "unstamped file exists; use --migrate-custom to wrap in legacy block"))
+                print(f"SKIPPED {rel_label} (unstamped; use --migrate-custom to wrap in legacy block)")
+                continue
 
         # Stamped file
         stamp_hash = stamp_m.group(1)
         disk_body_hash = compute_body_hash(disk_text)
         disk_blocks = extract_custom_blocks(disk_text, rel_label)
-        warns = validate_custom_blocks(disk_blocks, rel_label)
+
+        is_salvage_run = a.salvage or a.force
+        warns = validate_custom_blocks(disk_blocks, rel_label, allow_overflow=is_salvage_run)
         all_warnings.extend(warns)
         has_hand_edits = (disk_body_hash != stamp_hash)
 
-        if not a.update and not a.force:
+        if not a.update and not a.force and not a.salvage:
             # Plain render.py: default behavior is skip existing files
             if kind == "agents":
                 gen_dest = dest.with_name(dest.stem + ".generated" + dest.suffix)
@@ -653,25 +880,45 @@ def main():
                 created.append(gen_dest)
                 print(f"NOTE  {dest.name} exists. Router written to {gen_dest.name}. Merge it by hand.")
             else:
-                skipped.append((dest, "exists; use --update or --force"))
-                print(f"SKIPPED {rel_label} (exists; use --update or --force to overwrite)")
+                skipped.append((dest, "exists; use --update or --salvage"))
+                print(f"SKIPPED {rel_label} (exists; use --update or --salvage to overwrite)")
             continue
 
-        if a.force and has_hand_edits:
-            # Overwrite outside custom blocks, keep blocks, report lost lines
-            clean_disk = strip_custom_blocks(strip_stamp(disk_text))
-            clean_tmpl = strip_custom_blocks(raw_tmpl)
-            diff_lines = list(difflib.unified_diff(
-                clean_disk.splitlines(keepends=True),
-                clean_tmpl.splitlines(keepends=True),
-                fromfile=f"{rel_label} (current disk)",
-                tofile=f"{rel_label} (regenerated)",
-            ))
-            lost_lines = [l[1:].rstrip("\r\n") for l in diff_lines if l.startswith("-") and not l.startswith("---")]  # strip-chars-ok: strip trailing CR and LF
-            if lost_lines:
-                print(f"NOTE  Overwriting hand edits outside custom blocks in {rel_label}. Lost lines:")
-                for lost in lost_lines:
-                    print(f"  - {lost}")
+        salvaged_count = 0
+        if has_hand_edits:
+            if a.discard_edits and a.yes_discard:
+                clean_disk = strip_custom_blocks(strip_stamp(disk_text))
+                clean_tmpl = strip_custom_blocks(raw_tmpl)
+                discarded = compute_salvaged_lines(clean_tmpl, clean_disk)
+                if discarded:
+                    print(f"DISCARDED {len(discarded)} line(s) from {rel_label}:")
+                    for d in discarded:
+                        print(f"  - {d}")
+            elif is_salvage_run:
+                clean_disk = strip_custom_blocks(strip_stamp(disk_text))
+                clean_tmpl = strip_custom_blocks(raw_tmpl)
+                salvaged_lines = compute_salvaged_lines(clean_tmpl, clean_disk)
+                if salvaged_lines:
+                    salvaged_body = "\n".join(salvaged_lines) + "\n"
+                    scan_secrets(salvaged_body, rel_label)
+                    header = "<!-- Salvaged hand edits outside custom blocks -->\n"
+                    full_content = header + salvaged_body
+                    if "salvaged" in disk_blocks:
+                        disk_blocks["salvaged"] = disk_blocks["salvaged"].rstrip() + "\n\n" + salvaged_body
+                    else:
+                        disk_blocks["salvaged"] = full_content
+                    salvaged_count = len(salvaged_lines)
+                    log_render_action(root, rel_label, "salvage", salvaged_count)
+                    print(f"SALVAGED {salvaged_count} line(s) from {rel_label}")
+
+        # Ensure special custom blocks (salvaged, legacy) are present in template before injection
+        for special_block in ("legacy", "salvaged"):
+            if special_block in disk_blocks and f"<!-- BEGIN CUSTOM: {special_block} -->" not in raw_tmpl:
+                marker = f"<!-- BEGIN CUSTOM: {special_block} -->\n<!-- END CUSTOM: {special_block} -->\n"
+                if "<!-- BEGIN CUSTOM: notes -->" in raw_tmpl:
+                    raw_tmpl = raw_tmpl.replace("<!-- BEGIN CUSTOM: notes -->", marker + "<!-- BEGIN CUSTOM: notes -->", 1)
+                else:
+                    raw_tmpl = raw_tmpl.rstrip() + "\n\n" + marker
 
         # Inject custom blocks and write updated stamped file
         merged, n_pres, orphans = inject_custom_blocks(raw_tmpl, disk_blocks)
@@ -682,9 +929,20 @@ def main():
         final_content = stamp_text(merged, new_body_hash)
         if not a.dry_run:
             dest.write_text(final_content, encoding="utf-8")
-        updated.append((dest, n_pres))
+
+        # Route overflow blocks if in salvage run
+        if is_salvage_run and not a.dry_run:
+            for bname, bcontent in list(disk_blocks.items()):
+                blines = bcontent.splitlines()
+                if len(blines) > 160:
+                    route_overflow(root, dest, bname, bcontent, rel_label)
+
+        updated.append((dest, n_pres, salvaged_count))
         prefix = "DRY RUN " if a.dry_run else ""
-        print(f"{prefix}UPDATED {rel_label} (preserved {n_pres} block(s))")
+        if salvaged_count > 0:
+            print(f"{prefix}UPDATED {rel_label} (preserved {n_pres} block(s), salvaged {salvaged_count} line(s))")
+        else:
+            print(f"{prefix}UPDATED {rel_label} (preserved {n_pres} block(s))")
 
     # Check for inactive convention skills that have custom blocks
     for skill_name in CONVENTION_SKILLS:
@@ -717,8 +975,14 @@ def main():
 
     if updated:
         print("  updated:")
-        for u, n_blk in updated:
-            print(f"    - {rel_posix(u, root)} (preserved {n_blk} block(s))")
+        for entry in updated:
+            u = entry[0]
+            n_blk = entry[1]
+            n_salv = entry[2] if len(entry) > 2 else 0
+            if n_salv > 0:
+                print(f"    - {rel_posix(u, root)} (preserved {n_blk} block(s), salvaged {n_salv} line(s))")
+            else:
+                print(f"    - {rel_posix(u, root)} (preserved {n_blk} block(s))")
     else:
         print("  updated:   none")
 

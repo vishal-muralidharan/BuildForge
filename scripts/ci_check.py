@@ -762,6 +762,14 @@ def run_render_custom_block_tests(repo_root, errors):
         if res.returncode != 0:
             errors.append(f"Render custom block tests failed:\n{res.stderr or res.stdout}")
 
+    salvage_script = os.path.join(repo_root, "tests", "test_render_salvage.py")
+    if os.path.isfile(salvage_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, salvage_script], env=env, capture_output=True, text=True)
+        if res.returncode != 0:
+            errors.append(f"Render salvage tests failed:\n{res.stderr or res.stdout}")
+
 
 def run_validate_profile_tests(repo_root, errors):
     test_script = os.path.join(repo_root, "tests", "test_validate_profile.py")

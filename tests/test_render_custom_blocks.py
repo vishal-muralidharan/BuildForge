@@ -154,7 +154,7 @@ class TestRenderCustomBlocks(unittest.TestCase):
         self.assertEqual(agents.read_text(encoding="utf-8"), agents_orig)
 
     def test_04_force_keeps_blocks_and_reports_lost_lines(self):
-        """--force on a stamped file with hand edits overwrites outside blocks, keeps blocks, and prints lost lines."""
+        """--force on a stamped file behaves like --salvage unless --discard-edits and --yes-discard are passed."""
         self.run_render(check=True)
 
         bui = self.root / ".agents" / "skills" / "build-ui" / "SKILL.md"
@@ -168,16 +168,29 @@ class TestRenderCustomBlocks(unittest.TestCase):
         content = content.replace("## Finish", "## Custom Hand Modified Finish Header")
         bui.write_text(content, encoding="utf-8")
 
+        # --force alone behaves like --salvage (no content discarded)
         res = self.run_render("--force")
         self.assertEqual(res.returncode, 0, res.stderr)
-        self.assertIn("NOTE  Overwriting hand edits outside custom blocks in .agents/skills/build-ui/SKILL.md. Lost lines:", res.stdout)
-        self.assertIn("Custom Hand Modified Finish Header", res.stdout)
+        self.assertIn("SALVAGED 1 line(s) from .agents/skills/build-ui/SKILL.md", res.stdout)
+        self.assertIn("salvaged 1 line(s)", res.stdout)
 
-        # Check file content
+        # Check file content: custom note preserved and hand-edit salvaged
         new_bui = bui.read_text(encoding="utf-8")
         self.assertIn(f"<!-- BEGIN CUSTOM: notes -->\n{custom_note}<!-- END CUSTOM: notes -->", new_bui)
-        self.assertIn("## Finish", new_bui)
-        self.assertNotIn("Custom Hand Modified Finish Header", new_bui)
+        self.assertIn("Custom Hand Modified Finish Header", new_bui)
+        self.assertIn("<!-- BEGIN CUSTOM: salvaged -->", new_bui)
+
+        # Re-introduce hand edit outside blocks and test --discard-edits --yes-discard
+        content2 = new_bui.replace("## Finish", "## Discardable Header")
+        bui.write_text(content2, encoding="utf-8")
+
+        res_discard = self.run_render("--force", "--discard-edits", "--yes-discard")
+        self.assertEqual(res_discard.returncode, 0, res_discard.stderr)
+        self.assertIn("DISCARDED 1 line(s) from .agents/skills/build-ui/SKILL.md:", res_discard.stdout)
+        self.assertIn("Discardable Header", res_discard.stdout)
+
+        final_bui = bui.read_text(encoding="utf-8")
+        self.assertNotIn("Discardable Header", final_bui)
 
     def test_05_unstamped_file_survives_force_unless_overwrite_unstamped(self):
         """Unstamped file survives --force alone and requires --overwrite-unstamped to overwrite."""
@@ -189,7 +202,7 @@ class TestRenderCustomBlocks(unittest.TestCase):
 
         res1 = self.run_render("--force")
         self.assertEqual(res1.returncode, 0)
-        self.assertIn("SKIPPED .agents/skills/build-ui/SKILL.md (unstamped; use --force --overwrite-unstamped to overwrite)", res1.stdout)
+        self.assertIn("SKIPPED .agents/skills/build-ui/SKILL.md (unstamped; use --migrate-custom to wrap in legacy block)", res1.stdout)
         self.assertEqual(bui.read_text(encoding="utf-8"), unstamped_text)
 
         # With --overwrite-unstamped
