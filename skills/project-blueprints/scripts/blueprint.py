@@ -330,6 +330,278 @@ def cmd_candidates(root: Path) -> int:
     return 0
 
 
+def cmd_init(root: Path, selected_areas: list = None) -> int:
+    """Scaffold missing canonical blueprint files from templates without overwriting."""
+    bp_dir = root / ".agents" / "blueprints"
+    bp_dir.mkdir(parents=True, exist_ok=True)
+    templates_dir = SCRIPT_DIR.parent / "assets" / "templates"
+
+    profile = load_profile(root)
+    canonical_areas = ["data", "tokens", "ui", "layout"]
+    if selected_areas:
+        areas_to_init = selected_areas
+    else:
+        areas_to_init = list(canonical_areas)
+        # Add areas detected by analyzers
+        for aname, amod in AREAS.items():
+            if aname not in areas_to_init and amod.detect(root, profile):
+                areas_to_init.append(aname)
+
+    created_files = []
+    for area in sorted(areas_to_init):
+        target = bp_dir / f"{area}.md"
+        if target.is_file():
+            print(f"Skipped existing .agents/blueprints/{area}.md (never overwritten).")
+            created_files.append(f"{area}.md")
+            continue
+
+        template_src = templates_dir / f"{area}.md"
+        if template_src.is_file():
+            content = template_src.read_text(encoding="utf-8")
+        else:
+            content = (
+                f"# {area.title()} Blueprint\n\n"
+                f"Canonical {area} facts and contracts.\n\n"
+                "<!-- BEGIN CUSTOM: contracts -->\n"
+                "<!-- END CUSTOM: contracts -->\n"
+            )
+        target.write_text(content, encoding="utf-8")
+        print(f"Initialized .agents/blueprints/{area}.md from template.")
+        created_files.append(f"{area}.md")
+
+    # Ensure index.md exists
+    idx_file = bp_dir / "index.md"
+    if not idx_file.is_file():
+        idx_lines = [
+            "# Project Blueprints Index\n",
+            "Deterministic, verified facts extracted directly from codebase evidence.\n",
+            "## Areas\n"
+        ]
+        for cf in sorted(created_files):
+            idx_lines.append(f"- [{cf}]({cf})")
+        idx_file.write_text("\n".join(idx_lines[:58]) + "\n", encoding="utf-8")
+
+    return 0
+
+
+def cmd_adopt(root: Path, from_file: str, block_name: str, area: str) -> int:
+    """Move a custom block out of a convention skill into blueprint contracts atomically."""
+    from_path = Path(from_file)
+    if not from_path.is_absolute():
+        from_path = root / from_path
+    from_path = from_path.resolve()
+
+    if not from_path.is_file():
+        print(f"Error: Source file '{from_file}' not found.", file=sys.stderr)
+        return 1
+
+    src_content = from_path.read_text(encoding="utf-8", errors="replace")
+    pat = re.compile(
+        rf"<!--\s*BEGIN CUSTOM:\s*{re.escape(block_name)}\s*-->\n?(.*?)<!--\s*END CUSTOM:\s*{re.escape(block_name)}\s*-->\n?",
+        re.DOTALL
+    )
+    match = pat.search(src_content)
+    if not match:
+        print(f"Error: Custom block '{block_name}' not found in '{from_file}'.", file=sys.stderr)
+        return 1
+
+    block_body = match.group(1).strip()
+
+    # Secret scan: refuse if potential secrets detected
+    secret_matches = common.scan_for_secrets(block_body)
+    if secret_matches:
+        print(f"Error: Refused to adopt block '{block_name}' holding potential secret pattern: {secret_matches[0]}", file=sys.stderr)
+        return 1
+
+    bp_dir = root / ".agents" / "blueprints"
+    bp_dir.mkdir(parents=True, exist_ok=True)
+    target_bp = bp_dir / f"{area}.md"
+
+    # If target blueprint does not exist, initialize it
+    if not target_bp.is_file():
+        cmd_init(root, [area])
+
+    bp_content = target_bp.read_text(encoding="utf-8", errors="replace") if target_bp.is_file() else ""
+
+    # Insert into contracts block
+    contracts_match = re.search(
+        r"<!--\s*BEGIN CUSTOM:\s*contracts\s*-->\n?(.*?)<!--\s*END CUSTOM:\s*contracts\s*-->\n?",
+        bp_content,
+        re.DOTALL
+    )
+
+    if contracts_match:
+        existing_contracts = contracts_match.group(1).strip()
+        merged_contracts = f"{existing_contracts}\n\n{block_body}" if existing_contracts else block_body
+        new_contracts_block = f"<!-- BEGIN CUSTOM: contracts -->\n{merged_contracts}\n<!-- END CUSTOM: contracts -->\n"
+        new_bp_content = bp_content[:contracts_match.start()] + new_contracts_block + bp_content[contracts_match.end():]
+    else:
+        new_bp_content = bp_content.rstrip() + f"\n\n<!-- BEGIN CUSTOM: contracts -->\n{block_body}\n<!-- END CUSTOM: contracts -->\n"
+
+    # Replace block in source file with single-line show pointer
+    try:
+        rel_from = from_path.relative_to(root).as_posix()
+    except Exception:
+        rel_from = from_file
+
+    pointer_block = (
+        f"<!-- BEGIN CUSTOM: {block_name} -->\n"
+        f"python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area {area} --paths {rel_from}\n"
+        f"<!-- END CUSTOM: {block_name} -->\n"
+    )
+    new_src_content = src_content[:match.start()] + pointer_block + src_content[match.end():]
+
+    # Handle split into parts if target_bp exceeds 250 lines
+    bp_lines = new_bp_content.strip().split("\n")
+    parts = split_into_parts(bp_lines, area, max_lines=250)
+
+    # Atomic write: backup both contents and restore if any write fails
+    backup_src = src_content
+    backup_bp = bp_content
+    written_files = []
+
+    try:
+        for p_idx, (fname, p_lines) in enumerate(parts):
+            p_file = bp_dir / fname
+            p_file.write_text("\n".join(p_lines) + "\n", encoding="utf-8")
+            written_files.append((p_file, p_file.read_text(encoding="utf-8") if p_file.is_file() else ""))
+
+        from_path.write_text(new_src_content, encoding="utf-8")
+    except Exception as e:
+        # Rollback all writes
+        try:
+            from_path.write_text(backup_src, encoding="utf-8")
+            target_bp.write_text(backup_bp, encoding="utf-8")
+        except Exception:
+            pass
+        print(f"Error during atomic adopt: {e}. Rolled back all changes.", file=sys.stderr)
+        return 1
+
+    # Update index.md if new part files were created
+    if len(parts) > 1:
+        idx_file = bp_dir / "index.md"
+        if idx_file.is_file():
+            idx_txt = idx_file.read_text(encoding="utf-8")
+            idx_lines = idx_txt.splitlines()
+            for p_idx, (fname, _) in enumerate(parts):
+                link_entry = f"- [{fname}]({fname})"
+                if link_entry not in idx_lines:
+                    idx_lines.append(link_entry)
+            idx_file.write_text("\n".join(idx_lines[:58]) + "\n", encoding="utf-8")
+
+    print(f"Adopted custom block '{block_name}' from '{from_file}' into '{area}.md' contracts.")
+    return 0
+
+
+def cmd_link_check(root: Path) -> int:
+    """Verify convention skills link to blueprints, index lists all files, and custom blocks are under 80 lines."""
+    errors = []
+    bp_dir = root / ".agents" / "blueprints"
+
+    # Check 1: Convention skills with ## Blueprint point to existing blueprints
+    skills_dirs = [root / ".agents" / "skills", root / "skills"]
+    for sdir in skills_dirs:
+        if not sdir.is_dir():
+            continue
+        for smd in sdir.glob("*/SKILL.md"):
+            txt = smd.read_text(encoding="utf-8", errors="replace")
+            if "## Blueprint" in txt:
+                m_area = re.search(r"--area\s+([a-zA-Z0-9_-]+)", txt)
+                if m_area:
+                    area_name = m_area.group(1)
+                    area_file = bp_dir / f"{area_name}.md"
+                    if not area_file.is_file():
+                        errors.append(f"Skill '{smd.relative_to(root).as_posix()}' links to missing blueprint area '{area_name}' (.agents/blueprints/{area_name}.md not found)")
+
+            # Check custom block lengths in skill (< 80 lines)
+            for m_cb in CUSTOM_BLOCK_RE.finditer(txt):
+                bname = m_cb.group(2)
+                bbody = m_cb.group(1)
+                inner_lines = [l for l in bbody.splitlines() if not l.startswith("<!--")]
+                if len(inner_lines) > 80:
+                    errors.append(f"Custom block '{bname}' in '{smd.relative_to(root).as_posix()}' has {len(inner_lines)} lines (> 80 lines; facts belong in blueprints)")
+
+    # Check 2: Every blueprint in .agents/blueprints/*.md is referenced in index.md
+    if bp_dir.is_dir():
+        idx_file = bp_dir / "index.md"
+        if not idx_file.is_file():
+            errors.append(".agents/blueprints/index.md not found")
+        else:
+            idx_text = idx_file.read_text(encoding="utf-8", errors="replace")
+            for bpath in sorted(bp_dir.glob("*.md")):
+                if bpath.name not in ("index.md", "candidates.md"):
+                    if bpath.name not in idx_text:
+                        errors.append(f"Blueprint '{bpath.name}' is not referenced in .agents/blueprints/index.md")
+
+    if errors:
+        print(f"Link check failed ({len(errors)} errors):", file=sys.stderr)
+        for e in errors:
+            print(f"  - {e}", file=sys.stderr)
+        return 1
+
+    print("Link check passed: all blueprints linked, index complete, custom blocks within limits.")
+    return 0
+
+
+def cmd_drift(root: Path) -> int:
+    """Run verify, stale, link-check, and contract evidence anchor validation."""
+    anchor_errors = []
+    bp_dir = root / ".agents" / "blueprints"
+
+    # Contract evidence anchor check
+    if bp_dir.is_dir():
+        for bpath in sorted(bp_dir.glob("*.md")):
+            txt = bpath.read_text(encoding="utf-8", errors="replace")
+            for m_cb in CUSTOM_BLOCK_RE.finditer(txt):
+                if m_cb.group(2) == "contracts":
+                    c_body = m_cb.group(1)
+                    # Scan for evidence: path:line [contains: text]
+                    for line in c_body.splitlines():
+                        m_ev = re.search(r"(?:evidence|Evidence):\s*`?([^\s:`]+):(\d+)`?", line)
+                        if m_ev:
+                            rel_src = m_ev.group(1).strip()
+                            try:
+                                line_no = int(m_ev.group(2))
+                            except ValueError:
+                                line_no = 1
+                            target_f = root / rel_src
+                            if not target_f.is_file():
+                                anchor_errors.append(f"Contract anchor file '{rel_src}' not found (referenced in {bpath.name})")
+                                continue
+
+                            # Check optional contains
+                            m_ct = re.search(r"(?:contains|Contains):\s*`?([^`]+)`?", line)
+                            if m_ct:
+                                target_text = m_ct.group(1).strip()
+                                s_lines = target_f.read_text(encoding="utf-8", errors="replace").splitlines()
+                                w_start = max(0, line_no - 6)
+                                w_end = min(len(s_lines), line_no + 5)
+                                window = "\n".join(s_lines[w_start:w_end])
+                                if target_text not in window:
+                                    anchor_errors.append(f"Contract anchor text '{target_text}' not found within 5 lines of {rel_src}:{line_no} (referenced in {bpath.name})")
+
+    # Run verify
+    res_verify = cmd_verify(root)
+
+    # Run stale with fail_on_stale=True
+    res_stale = cmd_stale(root, fail_on_stale=True)
+
+    # Run link_check
+    res_link = cmd_link_check(root)
+
+    if anchor_errors:
+        print(f"Contract anchor drift errors ({len(anchor_errors)}):", file=sys.stderr)
+        for ae in anchor_errors:
+            print(f"  - {ae}", file=sys.stderr)
+
+    if anchor_errors or res_verify != 0 or res_stale != 0 or res_link != 0:
+        print("Blueprint drift check failed.", file=sys.stderr)
+        return 1
+
+    print("Blueprint drift check passed: all checks and anchors up to date.")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build Forge codebase blueprints tool.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -359,6 +631,26 @@ def main():
     p_candidates = subparsers.add_parser("candidates", help="Print rule candidates.")
     p_candidates.add_argument("--root", default=".", help="Project root directory.")
 
+    # init
+    p_init = subparsers.add_parser("init", help="Scaffold missing canonical blueprint files.")
+    p_init.add_argument("--areas", default="", help="Comma-separated areas to scaffold.")
+    p_init.add_argument("--root", default=".", help="Project root directory.")
+
+    # adopt
+    p_adopt = subparsers.add_parser("adopt", help="Adopt custom block into blueprint contracts.")
+    p_adopt.add_argument("--from", dest="from_file", required=True, help="Source file holding custom block.")
+    p_adopt.add_argument("--block", required=True, help="Custom block name to adopt.")
+    p_adopt.add_argument("--area", required=True, help="Target blueprint area.")
+    p_adopt.add_argument("--root", default=".", help="Project root directory.")
+
+    # link-check
+    p_link = subparsers.add_parser("link-check", help="Verify links, index completeness, and block limits.")
+    p_link.add_argument("--root", default=".", help="Project root directory.")
+
+    # drift
+    p_drift = subparsers.add_parser("drift", help="Run full drift check (verify, stale, link-check, anchors).")
+    p_drift.add_argument("--root", default=".", help="Project root directory.")
+
     args = parser.parse_args()
     root = Path(args.root).resolve()
 
@@ -374,6 +666,15 @@ def main():
         sys.exit(cmd_show(root, args.area, paths, args.budget))
     elif args.command == "candidates":
         sys.exit(cmd_candidates(root))
+    elif args.command == "init":
+        areas = [a.strip() for a in args.areas.split(",") if a.strip()] if args.areas else None
+        sys.exit(cmd_init(root, areas))
+    elif args.command == "adopt":
+        sys.exit(cmd_adopt(root, args.from_file, args.block, args.area))
+    elif args.command == "link-check":
+        sys.exit(cmd_link_check(root))
+    elif args.command == "drift":
+        sys.exit(cmd_drift(root))
 
 
 if __name__ == "__main__":
