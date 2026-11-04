@@ -5,6 +5,12 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Reference collision detection and deduplication tool `refs.py dedupe` in `skills/extend-pipeline/scripts/refs.py` resolving dual-homed references between `.agents/vendor` and `.agents/skills`.
+- Machine check `no_dual_homed_skills` in `run_rule_checks.py` with `RUNNER_VERSION = 1` and validation schema support.
+- Dual-home, orphan vendor folder, and rule runner version diagnostic checks in `bin/build-forge.js doctor`.
+- Third-party skill awareness and classification in `skills/project-bootstrap/scripts/legacy_import.py` classifying sources into `build-forge`, `generated`, `reference`, `vendor-dup`, `modified-fork`, `likely-third-party`, and `local`.
+- Ledger additions in `.agents/legacy-parity.md` including Skipped Sources and Needs a Decision tables, `--include-skipped` audit flag, and statement counts by source class.
+- Evaluation Scenario 10 (`10-dual-home-onboarding`) in `tests/evals` and end-to-end regression test suite in `tests/test_dual_home_onboarding.py`.
 - Suggest scope script in `skills/atomic-commits/scripts/suggest_scope.py` ranking commit scopes by file path globs.
 - Scope guide table rendering in `AGENTS.md` Git section from `git.scopes`.
 - Scope object support in project profile schema permitting `{name, purpose, paths}` mappings.
