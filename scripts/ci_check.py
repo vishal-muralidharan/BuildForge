@@ -46,6 +46,7 @@ ALLOWED_SKILLS = {
     "feature-delivery",
     "legal-and-settings-pages",
     "product-spec",
+    "project-blueprints",
     "project-bootstrap",
     "repo-search",
     "rules-to-tests",

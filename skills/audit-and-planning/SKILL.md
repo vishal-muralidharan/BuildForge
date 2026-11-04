@@ -18,6 +18,7 @@ Stages 1 and 2 of the pipeline. Editing from assumptions duplicates logic, break
 
 Use `repo-search`. Do not write code until you know what already exists.
 
+- Run `python3 .agents/skills/project-blueprints/scripts/blueprint.py stale`. If it lists an area for the paths you will touch, run `python3 .agents/skills/project-blueprints/scripts/blueprint.py extract --areas <area>`. Then run `python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area <area> --paths <files>` for those paths and use the output.
 - Search the exact names, spelling variants, and usage sites for the feature or symptom.
 - Find who owns state, which helpers exist, and which shared pieces apply. Reuse before you create.
 - If the change touches data, read `data.schema_source` first.

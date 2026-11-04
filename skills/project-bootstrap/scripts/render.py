@@ -252,6 +252,9 @@ def skill_build_ui(p, pn):
         lines.append(f"{n}. Look in {', '.join(f'`{d}`' for d in dirs)} for an existing primitive. Use it. Extend it if a variant is missing. Do not create one off copies.")
         n += 1
     lines.append(f"{n}. Read the tokens in `{tokens}`. Use only those.")
+    lines += ["", "## Blueprint", "",
+              "Query codebase UI facts on demand:",
+              "`python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area ui --paths <files>`"]
     lines += ["", "## Rules", ""] + (rules(p, "design", "motion") or ["- No UI rules recorded. Add them to the profile."])
     lines += ["", "## Finish", "", f"Run `{g(p, 'commands.check', 'the project check command')}`."]
     if g(p, "design.enforced_by"):
@@ -266,7 +269,11 @@ def skill_build_ui(p, pn):
 def skill_design_system(p, pn):
     name = g(p, "project.name")
     tokens = g(p, "design.tokens_file")
-    lines = [f"# {name} design system", "", f"All tokens live in `{tokens}`.", "", "## Token rules", ""]
+    lines = [f"# {name} design system", "", f"All tokens live in `{tokens}`.", "",
+             "## Blueprint", "",
+             "Query codebase design tokens on demand:",
+             "`python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area tokens --paths <files>`", "",
+             "## Token rules", ""]
     lines += rules(p, "tokens") or ["- No token rules recorded. Add them to the profile."]
     lines += ["", "## Changing a token", "",
               f"1. Edit `{tokens}` for every theme or mode.",
@@ -284,7 +291,10 @@ def skill_responsive(p, pn):
     name = g(p, "project.name")
     lo, hi = g(p, "responsive.min_width", 320), g(p, "responsive.max_width", 2560)
     bps = g(p, "responsive.breakpoints", [])
-    lines = [f"# Responsive review for {name}", "", f"Support {lo}px to {hi}px. Touch targets are at least {g(p, 'responsive.touch_target_px', 44)}px on coarse pointers.", ""]
+    lines = [f"# Responsive review for {name}", "", f"Support {lo}px to {hi}px. Touch targets are at least {g(p, 'responsive.touch_target_px', 44)}px on coarse pointers.", "",
+             "## Blueprint", "",
+             "Query codebase layout and breakpoint facts on demand:",
+             "`python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area layout --paths <files>`", ""]
     if bps:
         lines += ["## Breakpoints", ""] + table(["From (px)", "Layout"], [(b.get("from"), b.get("layout")) for b in bps]) + [""]
     lines += ["## Rules", ""] + (rules(p, "responsive") or ["- No responsive rules recorded. Add them to the profile."])
@@ -327,7 +337,10 @@ def skill_naming(p, pn):
 
 def skill_data(p, pn):
     name = g(p, "project.name")
-    lines = [f"# Data rules for {name}", ""]
+    lines = [f"# Data rules for {name}", "",
+             "## Blueprint", "",
+             "Query codebase data models and storage facts on demand:",
+             "`python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area data --paths <files>`", ""]
     if g(p, "data.storage"):
         lines.append(f"Storage: {g(p, 'data.storage')}.")
     if g(p, "data.schema_source"):

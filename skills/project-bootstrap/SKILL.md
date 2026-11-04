@@ -40,10 +40,12 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
    Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area <area>` for each area with pending items. Propose defaults and ask the user whether to accept or drop each item:
    `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py apply --accept <ids> --drop <ids> --reason "<reason>"`
    Do not finish bootstrap while `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status` exits 1.
-5. Move every remaining uninventoried rule from guideline files into the `rules` list. One sentence each, imperative, with an id and an area. Set `enforced_by` to `test` or `lint` only after you find the test or lint rule that enforces it. Otherwise use `manual`. Add 1 default yes proposal for the rule `refs-no-dual-home`, shown with the other rule proposals and applied only after the user says yes. Say that a reference lives in `.agents/vendor` or `.agents/skills`, never both.
-6. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
-7. Run the external references step below.
-8. Validate, render and report (see "Finish").
+5. Extract blueprints and review candidates:
+   After the profile exists, run `python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`. Show `candidates.md` in batches by area and ask which become rules. Add accepted candidates to the profile with evidence.
+6. Move every remaining uninventoried rule from guideline files into the `rules` list. One sentence each, imperative, with an id and an area. Set `enforced_by` to `test` or `lint` only after you find the test or lint rule that enforces it. Otherwise use `manual`. Add 1 default yes proposal for the rule `refs-no-dual-home`, shown with the other rule proposals and applied only after the user says yes. Say that a reference lives in `.agents/vendor` or `.agents/skills`, never both.
+7. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
+8. Run the external references step below.
+9. Validate, render and report (see "Finish").
 
 ## New mode
 
@@ -54,6 +56,7 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
 5. Run the external references step below.
 6. Validate and render.
 7. Scaffolding: if the `scaffold-app` skill is available, hand off to it. Otherwise create only the empty folders from `structure.layers` and tell the user that code scaffolding is the next step. Do not generate application code here.
+8. Blueprint extraction: wait until `scaffold-app` finishes, then run `python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`.
 
 Order for a new app: `product-spec`, then `project-bootstrap`, then `scaffold-app`, then `feature-delivery` once per milestone.
 

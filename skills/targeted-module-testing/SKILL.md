@@ -24,6 +24,8 @@ Stages 5, 7 and the optional deploy stage of the pipeline. A change is not done 
 
 If `commands.check` is empty, run lint, test and build in that order. Empty commands are skipped. Say which ones you skipped.
 
+When blueprints exist (`.agents/blueprints/`), run `python3 .agents/skills/project-blueprints/scripts/blueprint.py verify` after the checks.
+
 Fix every failure at its cause. Do not edit a test or loosen a rule just to get a pass.
 
 ## 2. Tests

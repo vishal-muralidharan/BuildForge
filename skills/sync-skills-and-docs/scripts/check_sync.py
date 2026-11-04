@@ -303,6 +303,22 @@ def main():
         if pv < kv:
             warnings.append(f".agents/checks/run_rule_checks.py has runner version {pv}, older than {kv} in rules-to-tests (refresh recommended)")
 
+    # 11. Blueprint stale check
+    bp_manifest = root / ".agents" / "blueprints" / "manifest.json"
+    if bp_manifest.is_file():
+        bp_script = root / ".agents" / "skills" / "project-blueprints" / "scripts" / "blueprint.py"
+        if not bp_script.is_file():
+            alt_bp = Path(__file__).resolve().parents[3] / "skills" / "project-blueprints" / "scripts" / "blueprint.py"
+            if alt_bp.is_file():
+                bp_script = alt_bp
+        if bp_script.is_file():
+            res = subprocess.run([sys.executable, "-B", str(bp_script), "stale", "--root", str(root)], capture_output=True, text=True)
+            if "Stale blueprint areas:" in res.stdout:
+                stale_line = [l for l in res.stdout.splitlines() if "Stale blueprint areas:" in l][0]
+                warnings.append(f"{stale_line.strip()} (run blueprint.py extract)")
+        else:
+            print("NOTE  project-blueprints skill not installed; skipping blueprint stale check")
+
     for w in sorted(set(warnings)):
         print(f"WARN  {w}")
     for e in errors:

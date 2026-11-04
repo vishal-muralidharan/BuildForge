@@ -26,6 +26,7 @@ Stage 6 of the pipeline. Rules live once, in the profile. AGENTS.md and the conv
 | New rule for agents | `rules` | |
 | Capability or external reference | `capabilities`, `external_references` | |
 | Reference added, removed or updated | `references.yaml`, `references.lock.json` through `refs.py` | Re-render AGENTS.md |
+| Blueprint facts, models or tokens | `blueprints` | Run blueprint extract, check_sync |
 | Post-build audit format | `verification` | |
 
 ## Steps
