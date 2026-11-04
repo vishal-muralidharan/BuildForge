@@ -24,12 +24,12 @@ REF_STAGES = {"audit", "build", "verify", "deploy", "report"}
 REF_MODES = {"advisory", "gate"}
 REF_ACTIVATIONS = {"pipeline-only", "native"}
 REF_CATEGORIES = {"backend", "database", "security", "deploy", "hosting", "browser", "performance", "accessibility", "other"}
-ENFORCED = {"manual", "test", "lint"}
+ENFORCED = {"manual", "test", "lint", "check"}
 STATUS = {"declared", "installed", "rejected"}
 PUSH = {"never", "ask", "allowed"}
 MODES = {"existing", "new"}
 RULE_KEYS = {"id", "area", "text", "enforced_by", "check"}
-CHECK_TYPES = {"forbid", "require_file", "forbid_file", "root_only"}
+CHECK_TYPES = {"forbid", "require_file", "forbid_file", "root_only", "no_dual_homed_skills"}
 CHECK_KEYS = {"type", "pattern", "include", "exclude", "path"}
 NAMING_KEYS = {"item", "style", "example"}
 LAYER_KEYS = {"path", "purpose"}
@@ -299,7 +299,10 @@ def main():
             errors.append(f"rules[{i}] ({rid}) has unexpected keys {stray(r, RULE_KEYS)}. Quote text that contains commas.")
         chk = r.get("check")
         if chk is not None:
-            if not isinstance(chk, dict) or chk.get("type") not in CHECK_TYPES:
+            if isinstance(chk, str):
+                if chk not in CHECK_TYPES:
+                    errors.append(f"rules[{i}] ({rid}) check must be one of {sorted(CHECK_TYPES)}")
+            elif not isinstance(chk, dict) or chk.get("type") not in CHECK_TYPES:
                 errors.append(f"rules[{i}] ({rid}) check.type must be one of {sorted(CHECK_TYPES)}")
             else:
                 bad_keys = sorted(set(chk) - CHECK_KEYS)

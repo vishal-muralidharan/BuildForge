@@ -16,14 +16,14 @@ A rule that only lives in prose gets broken the first time an agent is in a hurr
 ## Steps
 
 1. **Sort the rules.** Go through every rule with `enforced_by: manual`. Mark each one:
-   - **Mechanical:** a pattern, a file or a folder rule can decide it. Example: "No emojis anywhere."
+   - **Mechanical:** a pattern, a file, a folder rule, or a structure constraint (like `no_dual_homed_skills`) can decide it. Example: "No emojis anywhere." or "A reference lives in .agents/vendor or .agents/skills, never both."
    - **Judgment:** it needs a person. Example: "Keep copy to 1 or 2 words." Leave these manual. Do not fake a check for them.
 2. **Write each check.** Add a `check` block to the mechanical rules. Use the 4 types in the profile schema. Start from `references/check-patterns.md`. Keep patterns narrow, so they do not flag valid code.
 3. **Prove each check on both sides.**
    - Run the runner. The check must pass on the current code. If it fails on real violations, tell the user and either fix the code (through `feature-delivery`) or narrow the pattern.
    - Add 1 deliberate violation in a temporary file. Confirm the check fails. Remove the file. A check that has never failed has not been proven.
 4. **Set enforcement.** For each rule with a working check, set `enforced_by: test`. Set `design.enforced_by` to the runner path when design rules use checks.
-5. **Install the runner.** Copy `scripts/run_rule_checks.py` to `.agents/checks/run_rule_checks.py` in the project. The project then does not depend on this skill being installed.
+5. **Install or refresh the runner.** Copy `scripts/run_rule_checks.py` to `.agents/checks/run_rule_checks.py` in the project. If `.agents/checks/run_rule_checks.py` already exists with an older `RUNNER_VERSION`, show the diff and copy the newer runner only after the user says yes. The project then does not depend on this skill being installed.
 6. **Hook it into `check` and CI.** Add the runner to the single check command, for example `python3 .agents/checks/run_rule_checks.py`, ahead of the build. If python3 is not found, use python or py -3. For JavaScript projects add a `rules` script and chain it in the `check` script. For other stacks, add it to the equivalent chain. Update `commands.check` in the profile if the command text changes. To enforce rule checks in GitHub Actions, copy `assets/rules-ci.yml` to `.github/workflows/agent-rules.yml`.
 7. **Validate and render.** Run `validate_profile.py`, then re-render with `project-bootstrap` so the generated skills show `(enforced by test)`.
 8. **Commit** with `atomic-commits`: 1 commit for the profile checks, 1 for the runner and the hook.

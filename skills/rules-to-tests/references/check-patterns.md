@@ -98,6 +98,15 @@ check:
 
 Needs `structure.root_allowed` in the profile.
 
+### No dual-homed skills
+
+```yaml
+check:
+  type: no_dual_homed_skills
+```
+
+Fails when any skill exists in both `.agents/vendor` and `.agents/skills`. Takes no parameters.
+
 ### A required file exists
 
 ```yaml

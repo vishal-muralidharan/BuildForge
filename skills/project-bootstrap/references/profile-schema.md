@@ -69,6 +69,7 @@ A rule can carry a `check` block. `rules-to-tests` runs it. A rule with a check 
 | `require_file` | `path` | the file is missing |
 | `forbid_file` | `include`, `exclude` | any file matches the globs |
 | `root_only` | none (uses `structure.root_allowed`) | the repo root holds an entry that is not allowed |
+| `no_dual_homed_skills` | none | a skill exists in both .agents/vendor and .agents/skills |
 
 ```yaml
 - id: ui-no-raw-hex

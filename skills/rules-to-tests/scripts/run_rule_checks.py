@@ -28,6 +28,7 @@ IGNORE_DIRS = {"node_modules", "dist", "build", ".git", ".next", ".nuxt", "cover
                "venv", "__pycache__", ".turbo", ".vercel", ".netlify", "target", "out"}
 ROOT_IGNORE = {".git", "node_modules", "dist", "build", ".DS_Store", "coverage"}
 MAX_BYTES = 1_000_000
+RUNNER_VERSION = 1
 
 
 def expand_braces(pattern):
@@ -98,7 +99,7 @@ def gitignored_names(root):
 
 def run_check(rule, prof, root, files):
     chk = rule["check"]
-    t = chk["type"]
+    t = chk.get("type") if isinstance(chk, dict) else chk
     problems = []
     if t == "forbid":
         rx = re.compile(chk["pattern"])
@@ -127,6 +128,28 @@ def run_check(rule, prof, root, files):
             if entry in ROOT_IGNORE or entry in allowed or entry in ignored:
                 continue
             problems.append(f"not allowed in the repo root: {entry}")
+    elif t == "no_dual_homed_skills":
+        vendor_dir = root / ".agents" / "vendor"
+        skills_dir = root / ".agents" / "skills"
+        if vendor_dir.is_dir() and skills_dir.is_dir():
+            vendor_folders = {d.name for d in vendor_dir.iterdir() if d.is_dir() and not d.name.startswith(".")}
+            skills_folders = {d.name for d in skills_dir.iterdir() if d.is_dir() and not d.name.startswith(".")}
+            overlap = vendor_folders & skills_folders
+            for o in sorted(overlap):
+                problems.append(f"dual-homed skill collision: '{o}' exists in both .agents/vendor and .agents/skills")
+            for sname in sorted(skills_folders - overlap):
+                sm = skills_dir / sname / "SKILL.md"
+                if sm.is_file():
+                    try:
+                        content = sm.read_text(encoding="utf-8", errors="ignore")
+                        match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+                        if match:
+                            y = yaml.safe_load(match.group(1)) or {}
+                            fn_name = str(y.get("name", "")).strip() if isinstance(y, dict) else ""
+                            if fn_name and fn_name in vendor_folders:
+                                problems.append(f"dual-homed skill collision: skill '{sname}' frontmatter name '{fn_name}' matches .agents/vendor/{fn_name}")
+                    except Exception:
+                        pass
     return problems
 
 
@@ -139,14 +162,19 @@ def main():
     a = ap.parse_args()
 
     root = Path(a.root).resolve()
-    prof = yaml.safe_load(Path(a.profile).read_text()) or {}
+    prof_path = Path(a.profile)
+    if not prof_path.is_absolute() and not prof_path.is_file() and (root / a.profile).is_file():
+        prof_path = root / a.profile
+    prof = yaml.safe_load(prof_path.read_text()) or {}
     rules = prof.get("rules") or []
-    checked = [r for r in rules if isinstance(r.get("check"), dict)]
-    unchecked = [r for r in rules if not isinstance(r.get("check"), dict)]
+    checked = [r for r in rules if isinstance(r.get("check"), (dict, str))]
+    unchecked = [r for r in rules if not isinstance(r.get("check"), (dict, str))]
 
     if a.list:
         for r in checked:
-            print(f"{r['id']}: {r['check']['type']}")
+            chk = r["check"]
+            ctype = chk.get("type") if isinstance(chk, dict) else chk
+            print(f"{r['id']}: {ctype}")
         print(f"\n{len(checked)} checked, {len(unchecked)} without a check")
         return
     if a.only:

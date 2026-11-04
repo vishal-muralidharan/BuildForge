@@ -13,6 +13,7 @@ Checks:
   7. Generated files have no edits outside custom blocks.
   8. Custom blocks do not exceed line limits.
   9. Orphan custom blocks in .agents/custom-orphans.md.
+  10. Project rule runner version against package runner.
 
 Exit 1 on errors. Warnings are advice. Needs PyYAML (pip install pyyaml).
 """
@@ -221,6 +222,18 @@ def main():
         otxt = orphans_f.read_text(encoding="utf-8")
         if "<!-- BEGIN CUSTOM:" in otxt:
             warnings.append("orphan custom blocks exist in .agents/custom-orphans.md (review and merge or remove)")
+
+    # 10. Check runner version
+    proj_runner = root / ".agents" / "checks" / "run_rule_checks.py"
+    pkg_runner = root / ".agents" / "skills" / "rules-to-tests" / "scripts" / "run_rule_checks.py"
+    if proj_runner.is_file() and pkg_runner.is_file():
+        def extract_runner_version(fpath):
+            m = re.search(r"^RUNNER_VERSION\s*=\s*(\d+)", fpath.read_text(encoding="utf-8", errors="ignore"), re.MULTILINE)
+            return int(m.group(1)) if m else 0
+        pv = extract_runner_version(proj_runner)
+        kv = extract_runner_version(pkg_runner)
+        if pv < kv:
+            warnings.append(f".agents/checks/run_rule_checks.py has runner version {pv}, older than {kv} in rules-to-tests (refresh recommended)")
 
     for w in sorted(set(warnings)):
         print(f"WARN  {w}")
