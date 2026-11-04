@@ -1,0 +1,3 @@
+# Allowed unmentioned scripts in skills/*/scripts
+skills/sync-skills-and-docs/scripts/mdscan.py: internal markdown scanner module imported by check_sync.py
+skills/project-bootstrap/scripts/migrate_profile.py: profile migration script invoked during build-forge update lifecycle
