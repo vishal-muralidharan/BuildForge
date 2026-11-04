@@ -885,6 +885,101 @@ function doctorCommand(cwd, isJson) {
     }
   }
 
+  // 12. Dual-home skills
+  const vendorDir = path.join(cwd, '.agents', 'vendor');
+  const collisions = [];
+  if (fs.existsSync(vendorDir) && fs.existsSync(targetSkillsDir)) {
+    try {
+      const vendorFolders = fs.readdirSync(vendorDir).filter(f => {
+        try { return fs.statSync(path.join(vendorDir, f)).isDirectory() && !f.startsWith('.'); } catch (e) { return false; }
+      });
+      for (const vf of vendorFolders) {
+        if (fs.existsSync(path.join(targetSkillsDir, vf))) {
+          collisions.push(vf);
+        }
+      }
+    } catch (e) {}
+  }
+  if (fs.existsSync(refsYaml) && fs.existsSync(targetSkillsDir)) {
+    try {
+      const refsContent = fs.readFileSync(refsYaml, 'utf8');
+      const lines = refsContent.split('\n');
+      let inRefs = false;
+      let curName = null;
+      let curAct = 'pipeline-only';
+      for (const line of lines) {
+        if (line.trim().startsWith('references:')) { inRefs = true; continue; }
+        if (!inRefs) continue;
+        const nameMatch = line.match(/^\s*-\s*name:\s*([a-zA-Z0-9_-]+)/) || line.match(/^\s*name:\s*([a-zA-Z0-9_-]+)/);
+        if (nameMatch) {
+          curName = nameMatch[1];
+          curAct = 'pipeline-only';
+        }
+        const actMatch = line.match(/^\s*activation:\s*([a-zA-Z0-9_-]+)/);
+        if (actMatch) {
+          curAct = actMatch[1];
+        }
+        if (curName && curAct === 'pipeline-only') {
+          if (fs.existsSync(path.join(targetSkillsDir, curName)) && !collisions.includes(curName)) {
+            collisions.push(curName);
+          }
+        }
+      }
+    } catch (e) {}
+  }
+  if (collisions.length > 0) {
+    addCheck('Dual-home skills', 'WARN', `${collisions.length} dual-homed skill(s) detected: ${collisions.join(', ')}`, 'Run: python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe');
+  } else {
+    addCheck('Dual-home skills', 'OK', 'No dual-homed skills found');
+  }
+
+  // 13. Orphan vendor folders
+  const orphans = [];
+  if (fs.existsSync(vendorDir)) {
+    try {
+      const refNames = new Set();
+      if (fs.existsSync(refsYaml)) {
+        const refsContent = fs.readFileSync(refsYaml, 'utf8');
+        const matches = refsContent.matchAll(/name:\s*([a-zA-Z0-9_-]+)/g);
+        for (const m of matches) {
+          refNames.add(m[1]);
+        }
+      }
+      const vendorFolders = fs.readdirSync(vendorDir).filter(f => {
+        try { return fs.statSync(path.join(vendorDir, f)).isDirectory() && !f.startsWith('.'); } catch (e) { return false; }
+      });
+      for (const vf of vendorFolders) {
+        if (!refNames.has(vf)) {
+          orphans.push(vf);
+        }
+      }
+    } catch (e) {}
+  }
+  if (orphans.length > 0) {
+    addCheck('Orphan vendor folders', 'WARN', `${orphans.length} orphan folder(s) in .agents/vendor: ${orphans.join(', ')}`, 'Remove unused vendor folder or register it in .agents/references.yaml');
+  } else {
+    addCheck('Orphan vendor folders', 'OK', 'No orphan vendor folders found');
+  }
+
+  // 14. Rule runner version
+  const runnerPath = path.join(cwd, '.agents', 'checks', 'run_rule_checks.py');
+  if (fs.existsSync(runnerPath)) {
+    try {
+      const runnerContent = fs.readFileSync(runnerPath, 'utf8');
+      const m = runnerContent.match(/RUNNER_VERSION\s*=\s*(\d+)/);
+      const runnerVer = m ? parseInt(m[1], 10) : 0;
+      if (runnerVer < 1) {
+        addCheck('Rule runner', 'WARN', `Project run_rule_checks.py runner v${runnerVer} is older than v1`, 'Refresh .agents/checks/run_rule_checks.py from skills/rules-to-tests/scripts/run_rule_checks.py');
+      } else {
+        addCheck('Rule runner', 'OK', `run_rule_checks.py runner is up to date (v${runnerVer})`);
+      }
+    } catch (e) {
+      addCheck('Rule runner', 'WARN', 'Could not read runner version from .agents/checks/run_rule_checks.py');
+    }
+  } else {
+    addCheck('Rule runner', 'OK', 'No project rule runner configured');
+  }
+
   const okCount = checks.filter(c => c.status === 'OK').length;
   const warnCount = checks.filter(c => c.status === 'WARN').length;
   const failCount = checks.filter(c => c.status === 'FAIL').length;
@@ -1062,6 +1157,21 @@ function updateCommand(cwd) {
   fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
 
   console.log(`Build Forge: Updated ${updatedSkills.length} pipeline skill(s) in .agents/skills.`);
+
+  // Check for dual-homed collisions
+  const vendorDir = path.join(cwd, '.agents', 'vendor');
+  if (fs.existsSync(vendorDir) && fs.existsSync(targetSkillsDir)) {
+    try {
+      const vendorFolders = fs.readdirSync(vendorDir).filter(f => {
+        try { return fs.statSync(path.join(vendorDir, f)).isDirectory() && !f.startsWith('.'); } catch (e) { return false; }
+      });
+      const collisions = vendorFolders.filter(vf => fs.existsSync(path.join(targetSkillsDir, vf)));
+      if (collisions.length > 0) {
+        console.log(`\nNote: ${collisions.length} dual-homed skill collision(s) detected: ${collisions.join(', ')}.`);
+        console.log('Run python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe to inspect and reconcile.');
+      }
+    } catch (e) {}
+  }
 
   // 3. Print migrate plan and command to apply it
   const profilePath = path.join(cwd, '.agents', 'project-profile.yaml');
