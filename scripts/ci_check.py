@@ -9,16 +9,17 @@ Verifies:
 4. No placeholder paths (<this-skill>, <project-bootstrap>) and no command uses 'python ' without the 3.
 5. Every SKILL.md has <= 500 lines.
 6. Every .py file compiles without syntax errors (using py_compile).
-7. No __pycache__ directories or .pyc files exist in the repository tree.
-8. No file under skills/ contains an em dash or en dash.
-9. Smoke tests:
+7. AST lint checks: multi-character strip calls and leading './' in glob patterns.
+8. No __pycache__ directories or .pyc files exist in the repository tree.
+9. No file under skills/ contains an em dash or en dash.
+10. Smoke tests:
    - validate_profile.py exits 0 on example-nemo profile.
    - render.py exits 0 on example-nemo profile.
    - check_commit_message.py exits 0 on "feat(entry): add keypad" and exits 1 on "Added keypad".
    - bin/build-forge.js installs one skill per folder in skills/ in a temporary folder.
-10. Multi-agent link and unlink tests in temporary folders.
-11. Allowlist guard: skills/, integrity.json, and npm pack must not contain folders outside ALLOWED_SKILLS.
-12. Integrity manifest: every file in skills/ must match its recorded hash in integrity.json.
+11. Multi-agent link and unlink tests in temporary folders.
+12. Allowlist guard: skills/, integrity.json, and npm pack must not contain folders outside ALLOWED_SKILLS.
+13. Integrity manifest: every file in skills/ must match its recorded hash in integrity.json.
 """
 import os
 import re
@@ -28,6 +29,9 @@ import tempfile
 import py_compile
 import subprocess
 from pathlib import Path
+
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 try:
     import yaml
@@ -787,6 +791,26 @@ def run_dual_home_onboarding_tests(repo_root, errors):
             errors.append(f"Dual-home onboarding integration tests failed:\n{res.stderr or res.stdout}")
 
 
+def check_py_ast_lint(repo_root, errors):
+    lint_py = os.path.join(repo_root, "scripts", "lint_py.py")
+    if os.path.isfile(lint_py):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", lint_py], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Python AST lint checks failed:\n{res.stdout}\n{res.stderr}".strip())
+
+
+def run_check_sync_tests(repo_root, errors):
+    test_script = os.path.join(repo_root, "tests", "test_check_sync.py")
+    if os.path.isfile(test_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_script], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Check sync and mdscan tests failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -797,6 +821,7 @@ def main():
     check_skills(skills_dir, errors)
     check_skill_placeholders(skills_dir, errors)
     check_python_files(repo_root, errors)
+    check_py_ast_lint(repo_root, errors)
     check_no_cache_or_pyc(repo_root, errors)
     check_dashes(skills_dir, errors)
     check_feature_delivery_workflows(skills_dir, errors)
@@ -830,6 +855,9 @@ def main():
 
     print("Running dual-home onboarding integration tests...")
     run_dual_home_onboarding_tests(repo_root, errors)
+
+    print("Running check_sync tests...")
+    run_check_sync_tests(repo_root, errors)
 
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)

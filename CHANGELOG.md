@@ -5,6 +5,16 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Markdown scanner `skills/sync-skills-and-docs/scripts/mdscan.py` for section and table extraction that ignores fenced code blocks.
+- Python AST linter `scripts/lint_py.py` that fails on multi-character strip operations without `# strip-chars-ok:` comments and `./` prefixes in glob patterns.
+- Integration test suite `tests/test_check_sync.py` verifying glob normalization, code block isolation, and AST linting rules.
+
+### Fixed
+- Fixed `check_sync.py` stripping leading dots from paths like `.agents/**` by introducing `strip_dot_slash`.
+- Restricted skill discovery in `check_sync.py` to the Areas table's Skill column, preventing false warnings from the Scope guide table.
+- Restricted scope discovery in `check_sync.py` to the Scope guide table.
+- Fixed prefix stripping in `legacy_import.py` for references starting with `.`.
+- Added troubleshooting row to `README.md` for false warnings from `check_sync`.
 - Reference collision detection and deduplication tool `refs.py dedupe` in `skills/extend-pipeline/scripts/refs.py` resolving dual-homed references between `.agents/vendor` and `.agents/skills`.
 - Machine check `no_dual_homed_skills` in `run_rule_checks.py` with `RUNNER_VERSION = 1` and validation schema support.
 - Dual-home, orphan vendor folder, and rule runner version diagnostic checks in `bin/build-forge.js doctor`.

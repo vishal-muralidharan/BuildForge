@@ -67,7 +67,7 @@ class TestCheckSync(unittest.TestCase):
 
     def run_check_sync(self, profile_file=None):
         prof = profile_file or self.profile_path
-        cmd = [sys.executable, str(CHECK_SYNC_PY), "--profile", str(prof), "--root", str(self.root)]
+        cmd = [sys.executable, "-B", str(CHECK_SYNC_PY), "--profile", str(prof), "--root", str(self.root)]
         env = dict(os.environ)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         res = subprocess.run(cmd, capture_output=True, text=True, env=env)

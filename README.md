@@ -637,6 +637,7 @@ All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention ski
 | `verify` exits with code 2 | Lock file is missing. | Run `npx @v1006/build-forge install` to write `.agents/build-forge.lock.json`. |
 | `verify` shows `modified` (exit code 1) | Skill files were altered or contain extra files. | Run `npx @v1006/build-forge install --force` to restore clean pipeline skills. |
 | Dual-homed skill collision detected | A reference exists in both `.agents/vendor/<name>` and `.agents/skills/<name>`. | Run `python3 .agents/skills/extend-pipeline/scripts/refs.py dedupe` to inspect collisions, then pass `--approved` to remove identical duplicate copies. |
+| False warning from `check_sync` | Markdown tables outside Areas or dotted paths like `.agents/**` triggered false missing skill or path warnings. | Update Build Forge. Skill names are now read only from the Areas section and scope names from the Scope guide section using `mdscan.py`. Leading path dots are preserved. |
 
 ## License
 
