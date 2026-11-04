@@ -20,3 +20,4 @@ Canonical database models, entities, and storage contracts.
 
 <!-- BEGIN CUSTOM: contracts -->
 <!-- END CUSTOM: contracts -->
+
