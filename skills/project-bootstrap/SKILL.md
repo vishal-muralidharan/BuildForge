@@ -40,8 +40,8 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
    Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py batch --area <area>` for each area with pending items. Propose defaults and ask the user whether to accept or drop each item:
    `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py apply --accept <ids> --drop <ids> --reason "<reason>"`
    Do not finish bootstrap while `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status` exits 1.
-5. Extract blueprints and review candidates:
-   After the profile exists, run `python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`. Show `candidates.md` in batches by area and ask which become rules. Add accepted candidates to the profile with evidence.
+5. Scaffold and extract blueprints on day 0:
+   After the profile exists, run `python3 .agents/skills/project-blueprints/scripts/blueprint.py init` then `python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`. Show `candidates.md` in batches by area and ask which become rules. Add accepted candidates to the profile with evidence.
 6. Move every remaining uninventoried rule from guideline files into the `rules` list. One sentence each, imperative, with an id and an area. Set `enforced_by` to `test` or `lint` only after you find the test or lint rule that enforces it. Otherwise use `manual`. Add 1 default yes proposal for the rule `refs-no-dual-home`, shown with the other rule proposals and applied only after the user says yes. Say that a reference lives in `.agents/vendor` or `.agents/skills`, never both.
 7. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
 8. Run the external references step below.
@@ -52,7 +52,7 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
 1. If `docs.spec` names a file, or `docs/product-spec.md` exists, read it and prefill every answer it covers. If there is no spec and the idea is vague, suggest running `product-spec` first. Then interview in at most 3 short rounds using `references/interview.md`: product, stack, then design and data. Ask only what the spec leaves open. Offer a default for every question. Accept "you decide".
 2. Write the profile with `mode: new`. Turn each decision into a rule. For example, "monochrome design" becomes a design rule with an id.
 3. Fill `structure.layers` with the folders the stack needs. Fill `commands` with the commands the chosen tooling will provide.
-4. Run blueprint init to scaffold missing blueprint contracts when blueprints are enabled.
+4. On day 0, run blueprint init (`python3 .agents/skills/project-blueprints/scripts/blueprint.py init`) then blueprint extract (`python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`) to scaffold missing blueprint contracts and extract initial facts.
 5. Run the external references step below.
 6. Validate and render.
 7. Scaffolding: if the `scaffold-app` skill is available, hand off to it. Otherwise create only the empty folders from `structure.layers` and tell the user that code scaffolding is the next step. Do not generate application code here.

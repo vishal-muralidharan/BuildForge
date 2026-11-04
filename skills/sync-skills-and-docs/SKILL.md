@@ -43,10 +43,11 @@ Stage 6 of the pipeline. Rules live once, in the profile. AGENTS.md and the conv
 6. **Update the README** sections named in the map above.
 7. **Search for old names.** Search the docs, skills and README for names that no longer exist: moved files, removed components, removed tokens, old commands.
 8. **Flag, do not delete.** If a skill no longer applies, add it to the section "Skills flagged for review" in the repo map. Never delete it silently.
-9. **Run the drift checker.**
+9. **Run the drift checker and blueprint drift.**
 
 ```bash
 python3 .agents/skills/sync-skills-and-docs/scripts/check_sync.py --profile .agents/project-profile.yaml --root .
+python3 .agents/skills/project-blueprints/scripts/blueprint.py drift
 ```
 
 If python3 is not found, use python or py -3.

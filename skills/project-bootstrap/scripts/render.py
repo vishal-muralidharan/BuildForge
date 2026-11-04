@@ -121,10 +121,28 @@ def extract_custom_blocks(text: str, source_label: str) -> dict:
     return blocks
 
 
+AREA_MAP = {
+    "build-ui": "ui",
+    "maintain-design-system": "tokens",
+    "review-db-structure": "data",
+    "review-responsive-design": "layout",
+}
+
+
+def resolve_blueprint_area(source_label: str) -> str:
+    """Resolve blueprint area from convention skill source label."""
+    for skill_name, area in AREA_MAP.items():
+        if skill_name in source_label:
+            return area
+    return "data"
+
+
 def validate_custom_blocks(blocks: dict, source_label: str) -> list:
     """Validate block line counts and secret patterns. Return list of warning strings."""
     warnings = []
     total_lines = 0
+
+    area = resolve_blueprint_area(source_label)
 
     for name, content in blocks.items():
         lines = content.splitlines()
@@ -139,14 +157,18 @@ def validate_custom_blocks(blocks: dict, source_label: str) -> list:
                 )
 
         if count > 160:
+            adopt_cmd = f"python3 .agents/skills/project-blueprints/scripts/blueprint.py adopt --from {source_label} --block {name} --area {area}"
             sys.exit(
                 f"ERROR: Custom block '{name}' in {source_label} has {count} lines (> 160). "
-                "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
+                f"Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml). "
+                f"Adopt into blueprints: {adopt_cmd}"
             )
         elif count > 80:
+            adopt_cmd = f"python3 .agents/skills/project-blueprints/scripts/blueprint.py adopt --from {source_label} --block {name} --area {area}"
             warnings.append(
                 f"WARN  Custom block '{name}' in {source_label} has {count} lines (> 80). "
-                "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
+                f"Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml). "
+                f"Adopt into blueprints: {adopt_cmd}"
             )
 
     if total_lines > 600:
