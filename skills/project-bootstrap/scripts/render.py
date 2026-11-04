@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Render AGENTS.md, convention skills and a repo map from the project profile.
 
-Usage: python render.py --profile PATH [--root REPO_ROOT] [--force] [--dry-run]
+Usage: python render.py --profile PATH [--root REPO_ROOT] [--update] [--force] [--overwrite-unstamped] [--dry-run]
 
 Rules live once, in the profile. The files written here are generated views.
-Existing files are never overwritten unless --force is set. If AGENTS.md
-already exists, the router is written to AGENTS.generated.md for merging.
+Existing files are never overwritten unless --update or --force is set.
+Custom blocks (<!-- BEGIN CUSTOM: name --> ... <!-- END CUSTOM: name -->)
+are preserved byte for byte across updates.
 Needs PyYAML (pip install pyyaml).
 """
 import argparse
+import difflib
+import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -25,6 +29,188 @@ OPTIONAL_SKILLS = [("feature-delivery", "Run any task from start to finish"),
                    ("scaffold-app", "Create the first working skeleton of a new app"),
                    ("rules-to-tests", "Turn written rules into automatic checks"),
                    ("legal-and-settings-pages", "Settings, privacy, terms, consent and account deletion")]
+
+CONVENTION_SKILLS = {
+    "build-ui",
+    "maintain-design-system",
+    "review-responsive-design",
+    "review-directory-structure",
+    "file-folder-naming",
+    "review-db-structure",
+}
+
+STAMP_RE = re.compile(r"^<!-- build-forge:generated v1 body=([0-9a-f]{64}) -->\n?", re.MULTILINE)
+CUSTOM_BLOCK_RE = re.compile(
+    r"<!-- BEGIN CUSTOM: ([a-z0-9-]{1,40}) -->\n?(.*?)<!-- END CUSTOM: \1 -->\n?",
+    re.DOTALL
+)
+CUSTOM_NAME_RE = re.compile(r"^[a-z0-9-]{1,40}$")
+
+SECRET_PATTERNS = [
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"),
+    re.compile(r"(?i)\b(?:api[_-]?key|token|secret|password|passwd)\b\s*[:=]\s*['\"]?([A-Za-z0-9+/=_-]{20,})['\"]?"),
+]
+
+
+def normalize_lf(text: str) -> str:
+    """Normalize line endings to LF."""
+    return text.replace("\r\n", "\n")
+
+
+def strip_stamp(text: str) -> str:
+    """Remove stamp line if present."""
+    return STAMP_RE.sub("", text)
+
+
+def strip_custom_blocks(text: str) -> str:
+    """Remove all custom blocks."""
+    return CUSTOM_BLOCK_RE.sub("", text)
+
+
+def compute_body_hash(text: str) -> str:
+    """Compute sha256 hash of body with custom blocks and stamp removed, LF normalized."""
+    norm = normalize_lf(text)
+    clean = strip_stamp(norm)
+    clean = strip_custom_blocks(clean)
+    return hashlib.sha256(clean.encode("utf-8")).hexdigest()
+
+
+def stamp_text(text: str, body_hash: str) -> str:
+    """Add or replace the stamp line after frontmatter (or at file top)."""
+    norm = normalize_lf(text)
+    clean = strip_stamp(norm)
+    stamp_line = f"<!-- build-forge:generated v1 body={body_hash} -->\n"
+    fm_match = re.match(r"^(---\n.*?\n---\n)(.*)$", clean, re.DOTALL)
+    if fm_match:
+        return f"{fm_match.group(1)}{stamp_line}{fm_match.group(2)}"
+    return f"{stamp_line}{clean}"
+
+
+def extract_custom_blocks(text: str, source_label: str) -> dict:
+    """Extract custom blocks from text. Return dict of {name: inner_content}."""
+    norm = normalize_lf(text)
+
+    open_matches = list(re.finditer(r"<!-- BEGIN CUSTOM: ([^\s>]+) -->", norm))
+    close_matches = list(re.finditer(r"<!-- END CUSTOM: ([^\s>]+) -->", norm))
+
+    open_names = [m.group(1) for m in open_matches]
+    close_names = [m.group(1) for m in close_matches]
+
+    for name in open_names:
+        if not CUSTOM_NAME_RE.match(name):
+            sys.exit(f"ERROR: Invalid custom block name '{name}' in {source_label}. Names must match [a-z0-9-]{{1,40}}.")
+
+    seen = set()
+    for name in open_names:
+        if name in seen:
+            sys.exit(f"ERROR: Duplicate custom block name '{name}' in {source_label}.")
+        seen.add(name)
+
+    if len(open_names) != len(close_names):
+        sys.exit(f"ERROR: Mismatched custom block tags in {source_label} ({len(open_names)} BEGIN vs {len(close_names)} END).")
+
+    blocks = {}
+    for m in CUSTOM_BLOCK_RE.finditer(norm):
+        name = m.group(1)
+        inner = m.group(2)
+        blocks[name] = inner
+
+    if set(open_names) != set(blocks.keys()):
+        sys.exit(f"ERROR: Malformed or unclosed custom block in {source_label}.")
+
+    return blocks
+
+
+def validate_custom_blocks(blocks: dict, source_label: str) -> list:
+    """Validate block line counts and secret patterns. Return list of warning strings."""
+    warnings = []
+    total_lines = 0
+
+    for name, content in blocks.items():
+        lines = content.splitlines()
+        count = len(lines)
+        total_lines += count
+
+        for pat in SECRET_PATTERNS:
+            if pat.search(content):
+                sys.exit(
+                    f"ERROR: Secret pattern detected in custom block '{name}' in {source_label}. "
+                    "Remove secrets from custom blocks."
+                )
+
+        if count > 160:
+            sys.exit(
+                f"ERROR: Custom block '{name}' in {source_label} has {count} lines (> 160). "
+                "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
+            )
+        elif count > 80:
+            warnings.append(
+                f"WARN  Custom block '{name}' in {source_label} has {count} lines (> 80). "
+                "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
+            )
+
+    if total_lines > 600:
+        sys.exit(
+            f"ERROR: {source_label} has {total_lines} total custom lines (> 600). "
+            "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
+        )
+    elif total_lines > 300:
+        warnings.append(
+            f"WARN  {source_label} has {total_lines} total custom lines (> 300). "
+            "Facts belong in blueprints (.agents/blueprints/) or the profile (.agents/project-profile.yaml)."
+        )
+
+    return warnings
+
+
+def inject_custom_blocks(template_text: str, blocks: dict):
+    """Inject preserved custom blocks into template_text. Return (merged_text, preserved_count, orphan_dict)."""
+    norm = normalize_lf(template_text)
+    orphan_blocks = {}
+    preserved_count = 0
+
+    for name, content in blocks.items():
+        pattern = re.compile(rf"<!-- BEGIN CUSTOM: {re.escape(name)} -->\n?.*?<!-- END CUSTOM: {re.escape(name)} -->\n?", re.DOTALL)
+        if pattern.search(norm):
+            replacement = f"<!-- BEGIN CUSTOM: {name} -->\n{content}<!-- END CUSTOM: {name} -->\n"
+            norm = pattern.sub(lambda _: replacement, norm, count=1)
+            preserved_count += 1
+        else:
+            orphan_blocks[name] = content
+
+    return norm, preserved_count, orphan_blocks
+
+
+def append_orphans(orphans: list, root: Path) -> None:
+    """Save orphan custom blocks to .agents/custom-orphans.md."""
+    if not orphans:
+        return
+    orphans_file = root / ".agents" / "custom-orphans.md"
+    orphans_file.parent.mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    for rel_path, name, content in orphans:
+        inner = content if (content.endswith("\n") or not content) else content + "\n"
+        entry = (
+            f"## {rel_path} (block: {name})\n\n"
+            f"<!-- BEGIN CUSTOM: {name} -->\n"
+            f"{inner}"
+            f"<!-- END CUSTOM: {name} -->\n"
+        )
+        entries.append(entry)
+        print(f"ORPHAN  Preserved custom block '{name}' from {rel_path} in .agents/custom-orphans.md")
+
+    header = (
+        "# Custom Block Orphans\n\n"
+        "Preserved by render.py. Custom blocks whose file or block name no longer exists.\n\n"
+    )
+    if orphans_file.is_file():
+        existing = orphans_file.read_text(encoding="utf-8")
+        if not existing.startswith("# Custom Block Orphans"):
+            existing = header + existing
+        orphans_file.write_text(existing.rstrip() + "\n\n" + "\n".join(entries), encoding="utf-8")
+    else:
+        orphans_file.write_text(header + "\n".join(entries), encoding="utf-8")
 
 
 def g(d, path, default=None):
@@ -257,56 +443,245 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", required=True)
     ap.add_argument("--root", default=".")
-    ap.add_argument("--force", action="store_true")
+    ap.add_argument("--update", action="store_true", help="Regenerate stamped files while preserving custom blocks; refuse files with hand edits outside blocks")
+    ap.add_argument("--force", action="store_true", help="Overwrite files outside custom blocks; keep blocks and report lost lines")
+    ap.add_argument("--overwrite-unstamped", action="store_true", help="Allow --force to overwrite unstamped files")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
     root = Path(a.root).resolve()
     prof_path = Path(a.profile).resolve()
-    p = yaml.safe_load(prof_path.read_text())
+    if not prof_path.is_file():
+        sys.exit(f"Profile not found: {prof_path}")
+    p = yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
     try:
         pn = prof_path.relative_to(root).as_posix()
     except ValueError:
         pn = prof_path.as_posix()
 
-    written, skipped = [], []
-
-    def write(path, text):
-        if path.exists() and not a.force:
-            skipped.append(path)
-            return False
-        if not a.dry_run:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text)
-        written.append(path)
-        return True
-
-    skills_dir = root / g(p, "docs.skills_dir")
+    skills_dir = root / (g(p, "docs.skills_dir") or ".agents/skills")
     generated = build_skills(p, pn)
     names = {n for n, _, _ in generated}
+
+    # Prepare targets: (dest_path, raw_template, kind)
+    targets = []
+    notes_block = "\n<!-- BEGIN CUSTOM: notes -->\n<!-- END CUSTOM: notes -->\n"
+
     for name, desc, body in generated:
-        text = frontmatter(name, desc) + "\n" + BANNER.format(profile=pn) + "\n\n" + "\n".join(body) + "\n"
-        write(skills_dir / name / "SKILL.md", text)
+        raw_body = frontmatter(name, desc) + "\n" + BANNER.format(profile=pn) + "\n\n" + "\n".join(body) + notes_block
+        dest = skills_dir / name / "SKILL.md"
+        targets.append((dest, raw_body, "skill"))
 
-    agents_text = render_agents(p, pn, names, root)
-    agents = root / g(p, "docs.agents_file")
-    if agents.exists() and not a.force:
-        if write(agents.with_name(agents.stem + ".generated" + agents.suffix), agents_text):
-            print(f"NOTE  {agents.name} exists. Router written to {agents.stem}.generated{agents.suffix}. Merge it by hand.")
-    else:
-        write(agents, agents_text)
+    agents_file = root / (g(p, "docs.agents_file") or "AGENTS.md")
+    agents_raw = render_agents(p, pn, names, root) + notes_block
+    targets.append((agents_file, agents_raw, "agents"))
 
-    write(root / g(p, "docs.repo_map"), render_repo_map(p, pn))
+    repo_map_path = g(p, "docs.repo_map")
+    if repo_map_path:
+        repo_map_dest = root / repo_map_path
+        repo_map_raw = render_repo_map(p, pn) + notes_block
+        targets.append((repo_map_dest, repo_map_raw, "repo_map"))
+
+    active_dest_paths = {dest for dest, _, _ in targets}
+
+    created = []
+    updated = []
+    refused = []
+    skipped = []
+    all_orphans = []
+    all_warnings = []
+
+    # Pre-flight check for --update: transactional validation
+    if a.update and not a.force:
+        refusal_diffs = {}
+        for dest, raw_tmpl, kind in targets:
+            if not dest.is_file():
+                continue
+            disk_text = normalize_lf(dest.read_text(encoding="utf-8"))
+            m = STAMP_RE.search(disk_text)
+            if not m:
+                refused.append((dest, "unstamped file exists"))
+                continue
+
+            stamp_hash = m.group(1)
+            disk_body_hash = compute_body_hash(disk_text)
+            disk_blocks = extract_custom_blocks(disk_text, str(dest.relative_to(root)))
+            warns = validate_custom_blocks(disk_blocks, str(dest.relative_to(root)))
+            all_warnings.extend(warns)
+
+            if disk_body_hash != stamp_hash:
+                # Hand edits detected outside custom blocks
+                # Compute unified diff
+                merged_candidate, _, _ = inject_custom_blocks(raw_tmpl, disk_blocks)
+                new_hash = compute_body_hash(raw_tmpl)
+                candidate_stamped = stamp_text(merged_candidate, new_hash)
+
+                diff_lines = list(difflib.unified_diff(
+                    disk_text.splitlines(keepends=True),
+                    candidate_stamped.splitlines(keepends=True),
+                    fromfile=f"{dest.relative_to(root)} (current)",
+                    tofile=f"{dest.relative_to(root)} (expected clean)",
+                ))
+                refusal_diffs[dest] = "".join(diff_lines)
+                refused.append((dest, "hand edits outside custom blocks"))
+
+        if refused:
+            for w in all_warnings:
+                print(w)
+            for dest, diff in refusal_diffs.items():
+                print(f"\nREFUSED {dest.relative_to(root)} (hand edits outside custom blocks):\n")
+                print(diff)
+            print("\nRender summary:")
+            print("  created:   none")
+            print("  updated:   none")
+            print("  refused:")
+            for r, reason in refused:
+                print(f"    - {r.relative_to(root)} ({reason})")
+            print("  skipped:   none")
+            sys.exit(1)
+
+    # Process all targets
+    for dest, raw_tmpl, kind in targets:
+        rel_label = str(dest.relative_to(root))
+        if not dest.is_file():
+            # Fresh file
+            body_hash = compute_body_hash(raw_tmpl)
+            final_content = stamp_text(raw_tmpl, body_hash)
+            if not a.dry_run:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(final_content, encoding="utf-8")
+            created.append(dest)
+            prefix = "DRY RUN " if a.dry_run else ""
+            print(f"{prefix}WROTE   {rel_label}")
+            continue
+
+        # File exists
+        disk_text = normalize_lf(dest.read_text(encoding="utf-8"))
+        stamp_m = STAMP_RE.search(disk_text)
+
+        if not stamp_m:
+            # Unstamped file
+            if a.force and a.overwrite_unstamped:
+                body_hash = compute_body_hash(raw_tmpl)
+                final_content = stamp_text(raw_tmpl, body_hash)
+                if not a.dry_run:
+                    dest.write_text(final_content, encoding="utf-8")
+                updated.append((dest, 0))
+                print(f"OVERWROTE {rel_label} (unstamped; forced with --overwrite-unstamped)")
+            elif not a.force and not a.update and kind == "agents":
+                gen_dest = dest.with_name(dest.stem + ".generated" + dest.suffix)
+                body_hash = compute_body_hash(raw_tmpl)
+                final_content = stamp_text(raw_tmpl, body_hash)
+                if not a.dry_run:
+                    gen_dest.write_text(final_content, encoding="utf-8")
+                created.append(gen_dest)
+                print(f"NOTE  {dest.name} exists. Router written to {gen_dest.name}. Merge it by hand.")
+            else:
+                skipped.append((dest, "unstamped file exists; use --force --overwrite-unstamped to overwrite"))
+                print(f"SKIPPED {rel_label} (unstamped; use --force --overwrite-unstamped to overwrite)")
+            continue
+
+        # Stamped file
+        stamp_hash = stamp_m.group(1)
+        disk_body_hash = compute_body_hash(disk_text)
+        disk_blocks = extract_custom_blocks(disk_text, rel_label)
+        warns = validate_custom_blocks(disk_blocks, rel_label)
+        all_warnings.extend(warns)
+        has_hand_edits = (disk_body_hash != stamp_hash)
+
+        if not a.update and not a.force:
+            # Plain render.py: default behavior is skip existing files
+            if kind == "agents":
+                gen_dest = dest.with_name(dest.stem + ".generated" + dest.suffix)
+                body_hash = compute_body_hash(raw_tmpl)
+                final_content = stamp_text(raw_tmpl, body_hash)
+                if not a.dry_run:
+                    gen_dest.write_text(final_content, encoding="utf-8")
+                created.append(gen_dest)
+                print(f"NOTE  {dest.name} exists. Router written to {gen_dest.name}. Merge it by hand.")
+            else:
+                skipped.append((dest, "exists; use --update or --force"))
+                print(f"SKIPPED {rel_label} (exists; use --update or --force to overwrite)")
+            continue
+
+        if a.force and has_hand_edits:
+            # Overwrite outside custom blocks, keep blocks, report lost lines
+            clean_disk = strip_custom_blocks(strip_stamp(disk_text))
+            clean_tmpl = strip_custom_blocks(raw_tmpl)
+            diff_lines = list(difflib.unified_diff(
+                clean_disk.splitlines(keepends=True),
+                clean_tmpl.splitlines(keepends=True),
+                fromfile=f"{rel_label} (current disk)",
+                tofile=f"{rel_label} (regenerated)",
+            ))
+            lost_lines = [l[1:].rstrip("\r\n") for l in diff_lines if l.startswith("-") and not l.startswith("---")]
+            if lost_lines:
+                print(f"NOTE  Overwriting hand edits outside custom blocks in {rel_label}. Lost lines:")
+                for lost in lost_lines:
+                    print(f"  - {lost}")
+
+        # Inject custom blocks and write updated stamped file
+        merged, n_pres, orphans = inject_custom_blocks(raw_tmpl, disk_blocks)
+        for oname, ocontent in orphans.items():
+            all_orphans.append((rel_label, oname, ocontent))
+
+        new_body_hash = compute_body_hash(raw_tmpl)
+        final_content = stamp_text(merged, new_body_hash)
+        if not a.dry_run:
+            dest.write_text(final_content, encoding="utf-8")
+        updated.append((dest, n_pres))
+        prefix = "DRY RUN " if a.dry_run else ""
+        print(f"{prefix}UPDATED {rel_label} (preserved {n_pres} block(s))")
+
+    # Check for inactive convention skills that have custom blocks
+    for skill_name in CONVENTION_SKILLS:
+        skill_file = skills_dir / skill_name / "SKILL.md"
+        if skill_file.is_file() and skill_file not in active_dest_paths:
+            content = skill_file.read_text(encoding="utf-8")
+            blocks = extract_custom_blocks(content, str(skill_file.relative_to(root)))
+            for bname, bcontent in blocks.items():
+                if bcontent.strip():
+                    all_orphans.append((str(skill_file.relative_to(root)), bname, bcontent))
+
+    if not a.dry_run:
+        append_orphans(all_orphans, root)
+
+    for w in all_warnings:
+        print(w)
 
     missing = [s for s in PROCESS_SKILLS if not (skills_dir / s / "SKILL.md").exists()]
-    prefix = "DRY RUN " if a.dry_run else ""
-    for w in written:
-        print(f"{prefix}WROTE   {w.relative_to(root)}")
-    for s in skipped:
-        print(f"SKIPPED {s.relative_to(root)} (exists; use --force to overwrite)")
     if missing:
         print("NOTE  Process skills not found in the skills dir: " + ", ".join(missing))
     print("If your agent does not read .agents/skills, run: npx @v1006/build-forge link")
+
+    print("\nRender summary:")
+    if created:
+        print("  created:")
+        for c in created:
+            print(f"    - {c.relative_to(root)}")
+    else:
+        print("  created:   none")
+
+    if updated:
+        print("  updated:")
+        for u, n_blk in updated:
+            print(f"    - {u.relative_to(root)} (preserved {n_blk} block(s))")
+    else:
+        print("  updated:   none")
+
+    if refused:
+        print("  refused:")
+        for r, reason in refused:
+            print(f"    - {r.relative_to(root)} ({reason})")
+    else:
+        print("  refused:   none")
+
+    if skipped:
+        print("  skipped:")
+        for s, reason in skipped:
+            print(f"    - {s.relative_to(root)} ({reason})")
+    else:
+        print("  skipped:   none")
 
 
 if __name__ == "__main__":
