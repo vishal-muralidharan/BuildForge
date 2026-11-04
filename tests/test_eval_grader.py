@@ -344,8 +344,59 @@ def run_grader_test_for_scenario_9(tmp_dir: Path) -> None:
     assert res_fail["summary"]["fail"] > 0
 
 
+def run_grader_test_for_scenario_10(tmp_dir: Path) -> None:
+    scenario_dir = find_scenario_dir(repo_root, "10-dual-home-onboarding")
+
+    # 1. Passing state: ref-alpha deduped, ref-beta preserved, legacy files untouched
+    work_pass = tmp_dir / "10-pass"
+    work_pass.mkdir(parents=True, exist_ok=True)
+    copy_fixture("dual-home-onboarding", work_pass)
+    meta = init_git_repo(work_pass)
+    save_baseline(
+        work_pass,
+        [
+            ".agents/skills/app-layout/SKILL.md",
+            ".agents/skills/data-storage/SKILL.md",
+            ".agents/skills/data-storage/references/table.md",
+            ".agents/vendor/ref-alpha/SKILL.md",
+            ".agents/vendor/ref-beta/SKILL.md",
+        ],
+        meta,
+    )
+
+    # Dedupe ref-alpha
+    dup_skill = work_pass / ".agents" / "skills" / "ref-alpha"
+    if dup_skill.is_dir():
+        shutil.rmtree(dup_skill)
+
+    res_pass = grade_scenario(scenario_dir, work_pass, repo_root)
+    assert res_pass["status"] == "PASS", f"Scenario 10 passing state failed: {res_pass}"
+    assert res_pass["summary"]["fail"] == 0
+
+    # 2. Failing state: un-deduped (ref-alpha still in skills)
+    work_fail = tmp_dir / "10-fail"
+    work_fail.mkdir(parents=True, exist_ok=True)
+    copy_fixture("dual-home-onboarding", work_fail)
+    meta_fail = init_git_repo(work_fail)
+    save_baseline(
+        work_fail,
+        [
+            ".agents/skills/app-layout/SKILL.md",
+            ".agents/skills/data-storage/SKILL.md",
+            ".agents/skills/data-storage/references/table.md",
+            ".agents/vendor/ref-alpha/SKILL.md",
+            ".agents/vendor/ref-beta/SKILL.md",
+        ],
+        meta_fail,
+    )
+
+    res_fail = grade_scenario(scenario_dir, work_fail, repo_root)
+    assert res_fail["status"] == "FAIL", "Scenario 10 failing state unexpectedly passed"
+    assert res_fail["summary"]["fail"] > 0
+
+
 def run_all_eval_grader_tests() -> None:
-    print("Testing evaluation grader on all 9 scenarios...")
+    print("Testing evaluation grader on all 10 scenarios...")
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp = Path(tmp_str)
         run_grader_test_for_scenario_1(tmp)
@@ -366,7 +417,9 @@ def run_all_eval_grader_tests() -> None:
         print("  - Scenario 08 (injected reference): PASS and FAIL verified")
         run_grader_test_for_scenario_9(tmp)
         print("  - Scenario 09 (legacy adoption): PASS and FAIL verified")
-    print("All 9 scenarios scored accurately by grader.")
+        run_grader_test_for_scenario_10(tmp)
+        print("  - Scenario 10 (dual-home onboarding): PASS and FAIL verified")
+    print("All 10 scenarios scored accurately by grader.")
 
 
 if __name__ == "__main__":

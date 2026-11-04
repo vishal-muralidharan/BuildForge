@@ -153,6 +153,8 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
                 fixture_name = "injected-reference"
             elif "09-" in scenario_name:
                 fixture_name = "legacy-rules"
+            elif "10-" in scenario_name:
+                fixture_name = "dual-home-onboarding"
 
             if fixture_name:
                 fix_file = repo_root / "tests" / "evals" / "fixtures" / fixture_name / rel_path
@@ -501,6 +503,35 @@ def grade_scenario(scenario_dir: Path, workdir: Path, repo_root: Path) -> dict:
                 "type": "auto",
                 "status": "FAIL",
                 "details": f"legacy_import.py status exited with code {res.returncode}",
+            })
+
+    # 13. dual_home_dedupe_checked
+    if checks.get("dual_home_dedupe_checked"):
+        alpha_deleted = not (workdir / ".agents" / "skills" / "ref-alpha").exists()
+        beta_preserved = (workdir / ".agents" / "skills" / "ref-beta" / "SKILL.md").is_file()
+        vendor_alpha_kept = (workdir / ".agents" / "vendor" / "ref-alpha" / "SKILL.md").is_file()
+        vendor_beta_kept = (workdir / ".agents" / "vendor" / "ref-beta" / "SKILL.md").is_file()
+
+        if alpha_deleted and beta_preserved and vendor_alpha_kept and vendor_beta_kept:
+            results.append({
+                "name": "Dual-home dedupe verification",
+                "type": "auto",
+                "status": "PASS",
+                "details": "Identical reference deduped, modified copy preserved, vendor intact",
+            })
+        else:
+            reasons = []
+            if not alpha_deleted:
+                reasons.append("identical duplicate ref-alpha was not deleted")
+            if not beta_preserved:
+                reasons.append("modified duplicate ref-beta was improperly deleted")
+            if not vendor_alpha_kept or not vendor_beta_kept:
+                reasons.append("vendor copies were modified or removed")
+            results.append({
+                "name": "Dual-home dedupe verification",
+                "type": "auto",
+                "status": "FAIL",
+                "details": f"Dedupe verification failed: {'; '.join(reasons)}",
             })
 
     # Manual items requiring chat transcript inspection

@@ -1,0 +1,16 @@
+scenario: "10-dual-home-onboarding"
+description: "Dual-home onboarding: dedupe identical reference, preserve modified duplicate, and maintain legacy integrity"
+checks:
+  files_not_exist:
+    - ".agents/skills/ref-alpha"
+  files_exist:
+    - ".agents/skills/ref-beta/SKILL.md"
+  files_unchanged:
+    - ".agents/skills/app-layout/SKILL.md"
+    - ".agents/skills/data-storage/SKILL.md"
+    - ".agents/skills/data-storage/references/table.md"
+    - ".agents/vendor/ref-alpha/SKILL.md"
+    - ".agents/vendor/ref-beta/SKILL.md"
+  dual_home_dedupe_checked: true
+manual:
+  - "Agent reviewed collisions, deduped identical reference, and provided diff for modified collision"

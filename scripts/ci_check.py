@@ -777,6 +777,16 @@ def run_suggest_scope_tests(repo_root, errors):
             errors.append(f"Suggest scope tests failed:\n{res.stderr or res.stdout}")
 
 
+def run_dual_home_onboarding_tests(repo_root, errors):
+    test_script = os.path.join(repo_root, "tests", "test_dual_home_onboarding.py")
+    if os.path.isfile(test_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, test_script], env=env, capture_output=True, text=True)
+        if res.returncode != 0:
+            errors.append(f"Dual-home onboarding integration tests failed:\n{res.stderr or res.stdout}")
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -817,6 +827,9 @@ def main():
 
     print("Running suggest scope tests...")
     run_suggest_scope_tests(repo_root, errors)
+
+    print("Running dual-home onboarding integration tests...")
+    run_dual_home_onboarding_tests(repo_root, errors)
 
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)

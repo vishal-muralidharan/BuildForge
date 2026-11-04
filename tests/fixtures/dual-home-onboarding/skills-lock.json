@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "ref-alpha": {
+      "version": "1.0.0"
+    },
+    "ref-beta": {
+      "version": "1.0.0"
+    }
+  }
+}
