@@ -80,6 +80,9 @@ All notable changes to Build Forge will be documented in this file.
 - Standardized Python execution on `python3` across all skills.
 
 ### Fixed
+- Fixed root `.gitignore` pattern anchoring (`/.agents/`, `/.claude/`, `/.gemini/`) so that test fixtures containing nested `.agents/` folders remain tracked in Git and present in clean CI checkouts.
+- Fixed relative path formatting in `render.py`, `check_sync.py`, and `refs.py` to output POSIX slashes (`Path.as_posix()`) across Linux, macOS, and Windows, avoiding path separator mismatches in terminal summaries and test assertions.
+- Added cross-platform testing guidelines and path normalization conventions into native skills (`targeted-module-testing`, `project-bootstrap`, `rules-to-tests`, `feature-delivery`).
 - Fixed cross-platform wildcard handling on Windows CI runners in `tests/evals/fixtures/existing-app/package.json` by replacing `"node --test tests/*.test.js"` with `"node --test"` to rely on Node's native recursive test discovery without depending on shell wildcard expansion.
 - Resolved cross-platform CI failures on Windows by invoking `npm` with `shell=(sys.platform == "win32")` in `scripts/ci_check.py` and `scripts/grade.py`.
 - Fixed bare git remote HEAD resolution on Linux and macOS CI runners in evaluation scenario 7 by explicitly initializing bare remotes with `-b main` and pointing symbolic-ref to `refs/heads/main`.
