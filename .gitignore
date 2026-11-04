@@ -2,9 +2,9 @@
 node_modules/
 
 # Local agent skills and configuration used in this repository
-.agents/
-.claude/
-.gemini/
+/.agents/
+/.claude/
+/.gemini/
 
 # Build and package artifacts
 dist/

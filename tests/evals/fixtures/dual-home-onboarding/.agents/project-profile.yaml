@@ -1,0 +1,18 @@
+schema_version: 1
+project:
+  name: DualHomeDemo
+  summary: Dual home onboarding demo
+  mode: existing
+stack:
+  language: typescript
+  framework: None
+  package_manager: npm
+commands:
+  check: python3 .agents/checks/run_rule_checks.py
+rules:
+  - id: refs-no-dual-home
+    area: structure
+    text: Third party references must never be dual-homed in skills.
+    enforced_by: check
+    check: no_dual_homed_skills
+
