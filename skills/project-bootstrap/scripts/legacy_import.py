@@ -13,6 +13,9 @@ Commands:
 """
 import argparse
 import difflib
+import fnmatch
+import hashlib
+import json
 import os
 import re
 import sys
@@ -28,19 +31,17 @@ IGNORE_DIRS = {
     ".venv", "venv", "__pycache__", ".turbo", ".vercel", ".netlify", "target", "out"
 }
 
-BUILDFORGE_SKILLS = {
-    "atomic-commits", "audit-and-planning", "extend-pipeline", "feature-delivery",
-    "legal-and-settings-pages", "product-spec", "project-bootstrap", "repo-search",
-    "rules-to-tests", "scaffold-app", "sync-skills-and-docs", "targeted-module-testing",
-    "project-blueprints"
+# Documented thresholds for legacy import source classification
+THIRD_PARTY_SIGNAL_THRESHOLD = 2
+THIRD_PARTY_FRONTMATTER_KEYS = {
+    "license", "metadata", "source", "author", "vendor", "repository", "homepage"
 }
-
-CONVENTION_SKILLS = {
-    "build-ui", "maintain-design-system", "review-responsive-design",
-    "review-directory-structure", "file-folder-naming", "review-db-structure"
+SCRIPT_EXTENSIONS = {
+    ".sh", ".bash", ".py", ".js", ".mjs", ".cjs", ".ts", ".rb", ".pl", ".php", ".bin"
 }
-
+TEST_DIR_NAMES = {"test", "tests", "__tests__", "fixtures"}
 GENERATOR_BANNER_SNIPPET = "by project-bootstrap"
+GENERATOR_STAMP_MARKER = "<!-- build-forge:generated"
 
 # Documented threshold for matching an existing profile rule:
 # Token overlap (Jaccard similarity of lowercase word tokens) >= 0.50 AND
@@ -91,63 +92,377 @@ def is_covered_by_rule(text: str, profile_rules: list) -> tuple:
     return False, ""
 
 
-def find_legacy_files(root: Path) -> list:
-    found = []
+def compute_file_hash(file_path: Path) -> str:
+    try:
+        content = file_path.read_bytes().replace(b"\r\n", b"\n")
+        return hashlib.sha256(content).hexdigest()
+    except Exception:
+        return ""
+
+
+def compute_dir_hashes(dir_path: Path) -> dict:
+    hashes = {}
+    if not dir_path.is_dir():
+        return hashes
+    for root, dirnames, files in os.walk(dir_path):
+        dirnames[:] = [d for d in dirnames if d not in IGNORE_DIRS and d != ".git"]
+        for f in sorted(files):
+            full = Path(root, f)
+            rel = full.relative_to(dir_path).as_posix()
+            hashes[rel] = compute_file_hash(full)
+    return hashes
+
+
+def get_build_forge_skill_names(root: Path) -> set:
+    lock_f = root / ".agents" / "build-forge.lock.json"
+    if lock_f.is_file():
+        try:
+            data = json.loads(lock_f.read_text(encoding="utf-8"))
+            names = set()
+            for k in data.keys():
+                parts = k.split("/")
+                if len(parts) >= 2 and parts[0] == "skills":
+                    names.add(parts[1])
+            if names:
+                return names
+        except Exception:
+            pass
+    # Fallback to package skills
+    pkg_skills_dir = Path(__file__).resolve().parent.parent.parent.parent / "skills"
+    if pkg_skills_dir.is_dir():
+        return {d.name for d in pkg_skills_dir.iterdir() if d.is_dir()}
+    return set()
+
+
+def is_generated_file(p: Path) -> bool:
+    if p.name == "AGENTS.generated.md":
+        return True
+    try:
+        head = p.read_text(encoding="utf-8", errors="ignore")[:400]
+        if GENERATOR_BANNER_SNIPPET in head or GENERATOR_STAMP_MARKER in head:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def get_references_info(root: Path) -> tuple:
+    refs_yaml = root / ".agents" / "references.yaml"
+    ref_names = set()
+    ref_paths = set()
+    if refs_yaml.is_file():
+        try:
+            data = yaml.safe_load(refs_yaml.read_text(encoding="utf-8")) or {}
+            for r in data.get("references", []):
+                if isinstance(r, dict):
+                    if r.get("name"):
+                        ref_names.add(r["name"])
+                    if r.get("path"):
+                        ref_paths.add(Path(r["path"]).as_posix().lstrip("./"))
+        except Exception:
+            pass
+    return ref_names, ref_paths
+
+
+def detect_third_party_signals(skill_dir: Path) -> list:
+    signals = []
+    skill_md = skill_dir / "SKILL.md"
+    if skill_md.is_file():
+        try:
+            content = skill_md.read_text(encoding="utf-8", errors="ignore")
+            m = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+            if m:
+                fm = yaml.safe_load(m.group(1)) or {}
+                if isinstance(fm, dict):
+                    found_keys = [k for k in fm if k.lower() in THIRD_PARTY_FRONTMATTER_KEYS]
+                    if found_keys:
+                        signals.append(f"frontmatter keys: {', '.join(sorted(found_keys))}")
+        except Exception:
+            pass
+
+    non_doc_files = []
+    has_test_folder = False
+    has_license = False
+    has_git = False
+
+    try:
+        for item in skill_dir.iterdir():
+            if item.is_file():
+                nl = item.name.lower()
+                if nl.startswith("license"):
+                    has_license = True
+                elif nl == "package.json" or nl.endswith(".schema.json"):
+                    non_doc_files.append(item.name)
+                elif item.suffix.lower() in SCRIPT_EXTENSIONS:
+                    non_doc_files.append(item.name)
+            elif item.is_dir():
+                nl = item.name.lower()
+                if nl in TEST_DIR_NAMES:
+                    has_test_folder = True
+                elif nl == ".git":
+                    has_git = True
+                if nl in ("scripts", "bin", "src"):
+                    for sub in item.rglob("*"):
+                        if sub.is_file() and sub.suffix.lower() in SCRIPT_EXTENSIONS:
+                            non_doc_files.append(f"{nl}/{sub.name}")
+                            break
+    except Exception:
+        pass
+
+    if non_doc_files:
+        signals.append(f"non document files: {', '.join(non_doc_files[:3])}")
+    if has_license:
+        signals.append("LICENSE file present")
+    if has_git:
+        signals.append(".git folder present")
+    if has_test_folder:
+        signals.append("test folder present")
+
+    return signals
+
+
+def should_ignore_file(file_path: Path, skill_dir: Path) -> bool:
+    try:
+        rel = file_path.relative_to(skill_dir)
+        parts = rel.parts
+        # Never ignore a references/ folder inside a local skill
+        if "references" in parts:
+            return False
+        for p in parts[:-1]:
+            if p.lower() in TEST_DIR_NAMES:
+                return True
+        fname = file_path.name.lower()
+        if fnmatch.fnmatch(fname, "*.test.*") or fnmatch.fnmatch(fname, "*.spec.*"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def classify_skill_folder(d: Path, root: Path, bf_skills: set, ref_names: set, ref_paths: set) -> dict:
+    name = d.name
+    vendor_dir = root / ".agents" / "vendor" / name
+
+    # 1. build-forge
+    if name in bf_skills:
+        return {"class": "build-forge", "reason": "Build Forge pipeline skill", "diff_files": []}
+
+    # 2. generated convention skills
+    skill_md = d / "SKILL.md"
+    if skill_md.is_file() and is_generated_file(skill_md):
+        return {"class": "generated", "reason": "Generated convention skill", "diff_files": []}
+
+    # 3. reference (direct reference match)
+    rel_posix = d.relative_to(root).as_posix()
+    if name in ref_names or rel_posix in ref_paths:
+        if vendor_dir.is_dir():
+            s_hashes = compute_dir_hashes(d)
+            v_hashes = compute_dir_hashes(vendor_dir)
+            if s_hashes == v_hashes:
+                return {
+                    "class": "vendor-dup",
+                    "reason": f"Identical to vendor copy (.agents/vendor/{name}). Propose refs.py dedupe.",
+                    "diff_files": []
+                }
+            else:
+                diff_files = [f for f in sorted(set(s_hashes.keys()) | set(v_hashes.keys())) if s_hashes.get(f) != v_hashes.get(f)]
+                return {
+                    "class": "modified-fork",
+                    "reason": f"{len(diff_files)} file(s) differ from vendor copy (.agents/vendor/{name})",
+                    "diff_files": diff_files
+                }
+        return {"class": "reference", "reason": "Matches entry in .agents/references.yaml", "diff_files": []}
+
+    # 4. vendor-dup without reference entry (name matches vendor folder)
+    if vendor_dir.is_dir():
+        s_hashes = compute_dir_hashes(d)
+        v_hashes = compute_dir_hashes(vendor_dir)
+        if s_hashes == v_hashes:
+            return {
+                "class": "vendor-dup",
+                "reason": f"Identical to vendor copy (.agents/vendor/{name}). Propose refs.py dedupe.",
+                "diff_files": []
+            }
+        else:
+            diff_files = [f for f in sorted(set(s_hashes.keys()) | set(v_hashes.keys())) if s_hashes.get(f) != v_hashes.get(f)]
+            return {
+                "class": "modified-fork",
+                "reason": f"{len(diff_files)} file(s) differ from vendor copy (.agents/vendor/{name})",
+                "diff_files": diff_files
+            }
+
+    # 5. likely-third-party (2 or more signals)
+    signals = detect_third_party_signals(d)
+    if len(signals) >= THIRD_PARTY_SIGNAL_THRESHOLD:
+        return {
+            "class": "likely-third-party",
+            "reason": f"Matched {len(signals)} signals: {'; '.join(signals)}",
+            "signals": signals,
+            "diff_files": []
+        }
+
+    # 6. local
+    return {"class": "local", "reason": "Local skill", "diff_files": []}
+
+
+def find_and_classify_sources(root: Path, include_skipped: bool = False):
+    bf_skills = get_build_forge_skill_names(root)
+    ref_names, ref_paths = get_references_info(root)
+
+    active_files = []
+    skipped_sources = []
+    decision_sources = []
+    source_counts = {
+        "local": 0, "modified-fork": 0, "vendor-dup": 0,
+        "likely-third-party": 0, "build-forge": 0, "generated": 0, "reference": 0
+    }
+
+    def count_stmts(p: Path) -> int:
+        return len(split_statements(p, root))
 
     # 1. Root agent files
     for name in ("AGENTS.md", "CLAUDE.md", ".cursorrules", "INSTRUCTIONS.md", ".windsurfrules", ".clinerules"):
         p = root / name
         if p.is_file():
-            # Skip if generated by project-bootstrap
-            try:
-                head = p.read_text(encoding="utf-8", errors="ignore")[:300]
-                if GENERATOR_BANNER_SNIPPET in head or name == "AGENTS.generated.md":
-                    continue
-            except Exception:
-                pass
-            found.append(p)
+            if is_generated_file(p):
+                cnt = count_stmts(p)
+                source_counts["generated"] += cnt
+                skipped_sources.append({
+                    "path": name, "class": "generated",
+                    "reason": "Generated router file", "count": cnt
+                })
+                if include_skipped:
+                    active_files.append((p, "generated", "Generated router file"))
+            else:
+                active_files.append((p, "local", "Local root instruction file"))
+                source_counts["local"] += count_stmts(p)
 
     gh_copilot = root / ".github" / "copilot-instructions.md"
     if gh_copilot.is_file():
-        found.append(gh_copilot)
+        active_files.append((gh_copilot, "local", "GitHub Copilot instructions"))
+        source_counts["local"] += count_stmts(gh_copilot)
 
     # 2. .cursor/rules
     cursor_rules = root / ".cursor" / "rules"
     if cursor_rules.is_dir():
         for p in sorted(cursor_rules.rglob("*")):
             if p.is_file() and p.suffix.lower() in (".md", ".mdc", ".txt"):
-                found.append(p)
+                if not should_ignore_file(p, cursor_rules):
+                    active_files.append((p, "local", "Cursor rule"))
+                    source_counts["local"] += count_stmts(p)
 
     # 3. .claude/skills
     claude_skills = root / ".claude" / "skills"
     if claude_skills.is_dir():
-        for p in sorted(claude_skills.rglob("*")):
-            if p.is_file() and p.suffix.lower() in (".md", ".txt"):
-                found.append(p)
+        for item in sorted(claude_skills.iterdir()):
+            if item.is_symlink():
+                continue
+            if item.is_dir():
+                for p in sorted(item.rglob("*")):
+                    if p.is_file() and p.suffix.lower() in (".md", ".txt"):
+                        if not should_ignore_file(p, item):
+                            active_files.append((p, "local", "Claude skill"))
+                            source_counts["local"] += count_stmts(p)
 
-    # 4. .agents/skills (exclude Build Forge skills and generated convention skills)
-    agent_skills = root / ".agents" / "skills"
-    if agent_skills.is_dir():
-        for item in sorted(agent_skills.iterdir()):
-            if not item.is_dir():
+    # 4. .agents/vendor (always reference, never legacy source)
+    vendor_dir = root / ".agents" / "vendor"
+    if vendor_dir.is_dir():
+        for vd in sorted(vendor_dir.iterdir()):
+            if not vd.is_dir() or vd.name.startswith("."):
                 continue
-            name = item.name
-            if name in BUILDFORGE_SKILLS or name in CONVENTION_SKILLS:
+            v_cnt = 0
+            v_files = []
+            for p in sorted(vd.rglob("*")):
+                if p.is_file() and p.suffix.lower() in (".md", ".txt"):
+                    if not should_ignore_file(p, vd):
+                        v_cnt += count_stmts(p)
+                        v_files.append(p)
+            source_counts["reference"] += v_cnt
+            skipped_sources.append({
+                "path": f".agents/vendor/{vd.name}",
+                "class": "reference",
+                "reason": "Installed vendor reference",
+                "count": v_cnt
+            })
+            if include_skipped:
+                for vf in v_files:
+                    active_files.append((vf, "reference", "Vendor reference"))
+
+    # 5. .agents/skills
+    skills_dir = root / ".agents" / "skills"
+    if skills_dir.is_dir():
+        for item in sorted(skills_dir.iterdir()):
+            if not item.is_dir() or item.name.startswith("."):
                 continue
+            c_info = classify_skill_folder(item, root, bf_skills, ref_names, ref_paths)
+            s_class = c_info["class"]
+            reason = c_info["reason"]
+            diff_files = set(c_info.get("diff_files", []))
+
+            skill_files = []
             for p in sorted(item.rglob("*")):
                 if p.is_file() and p.suffix.lower() in (".md", ".txt"):
-                    try:
-                        head = p.read_text(encoding="utf-8", errors="ignore")[:300]
-                        if GENERATOR_BANNER_SNIPPET in head:
-                            continue
-                    except Exception:
-                        pass
-                    found.append(p)
+                    if not should_ignore_file(p, item):
+                        skill_files.append(p)
 
-    # Deduplicate while preserving order
+            if s_class == "local":
+                for sf in skill_files:
+                    active_files.append((sf, "local", "Local skill"))
+                    source_counts["local"] += count_stmts(sf)
+            elif s_class == "modified-fork":
+                mod_count = 0
+                skip_count = 0
+                for sf in skill_files:
+                    rel_in_skill = sf.relative_to(item).as_posix()
+                    if rel_in_skill in diff_files:
+                        active_files.append((sf, "modified-fork", f"Modified fork ({rel_in_skill})"))
+                        mod_count += count_stmts(sf)
+                    else:
+                        skip_count += count_stmts(sf)
+                source_counts["modified-fork"] += mod_count
+                source_counts["vendor-dup"] += skip_count
+                decision_sources.append({
+                    "path": f".agents/skills/{item.name}",
+                    "class": "modified-fork",
+                    "signals": f"{len(diff_files)} file(s) differ from vendor copy",
+                    "proposed_action": "Review diff and reconcile with vendor reference"
+                })
+                if skip_count > 0:
+                    skipped_sources.append({
+                        "path": f".agents/skills/{item.name} (unmodified files)",
+                        "class": "vendor-dup",
+                        "reason": "Unmodified files identical to vendor copy",
+                        "count": skip_count
+                    })
+            else:
+                s_cnt = sum(count_stmts(sf) for sf in skill_files)
+                source_counts[s_class] += s_cnt
+                skipped_sources.append({
+                    "path": f".agents/skills/{item.name}",
+                    "class": s_class,
+                    "reason": reason,
+                    "count": s_cnt
+                })
+                if s_class == "likely-third-party":
+                    decision_sources.append({
+                        "path": f".agents/skills/{item.name}",
+                        "class": "likely-third-party",
+                        "signals": "; ".join(c_info.get("signals", [])),
+                        "proposed_action": "Register as reference or keep as local skill"
+                    })
+                if include_skipped:
+                    for sf in skill_files:
+                        active_files.append((sf, s_class, reason))
+
+    return active_files, skipped_sources, decision_sources, source_counts
+
+
+def find_legacy_files(root: Path) -> list:
+    """Compatibility wrapper returning unique active local/modified file paths."""
+    active_files, _, _, _ = find_and_classify_sources(root, include_skipped=False)
     seen = set()
     unique = []
-    for f in found:
+    for f, _, _ in active_files:
         resolved = f.resolve()
         if resolved not in seen:
             seen.add(resolved)
@@ -498,7 +813,18 @@ def unescape_table_cell(text: str) -> str:
     return text.replace("\\|", "|").strip()
 
 
-def write_ledger(ledger_path: Path, statements: list):
+def extract_section(content: str, header: str) -> str:
+    idx = content.find(header)
+    if idx == -1:
+        return ""
+    start = idx + len(header)
+    next_idx = content.find("\n## ", start)
+    if next_idx == -1:
+        return content[start:].strip()
+    return content[start:next_idx].strip()
+
+
+def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = None, decision_sources: list = None, source_counts: dict = None):
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     cov_pct, cov_count, rel_count = calculate_coverage(statements)
 
@@ -515,6 +841,13 @@ def write_ledger(ledger_path: Path, statements: list):
         cl = s.get("class", "note")
         counts_class[cl] = counts_class.get(cl, 0) + 1
 
+    existing_content = ""
+    if ledger_path.is_file():
+        try:
+            existing_content = ledger_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            pass
+
     lines = [
         "# Legacy Parity Ledger",
         "",
@@ -529,6 +862,23 @@ def write_ledger(ledger_path: Path, statements: list):
         f"  - accepted: {counts_status['accepted']}",
         f"  - dropped: {counts_status['dropped']}",
         "",
+        "## Statement Counts by Source Class"
+    ]
+
+    if source_counts is not None:
+        for sc in ("local", "modified-fork", "vendor-dup", "likely-third-party", "build-forge", "generated", "reference"):
+            lines.append(f"- {sc}: {source_counts.get(sc, 0)}")
+    elif "## Statement Counts by Source Class" in existing_content:
+        sec = extract_section(existing_content, "## Statement Counts by Source Class")
+        if sec:
+            lines.append(sec)
+        else:
+            lines.append("- local: 0")
+    else:
+        lines.append("- local: 0")
+
+    lines.extend([
+        "",
         "## Counts by Class",
         f"- covered: {counts_class['covered']}",
         f"- derivable-data: {counts_class['derivable-data']}",
@@ -539,14 +889,63 @@ def write_ledger(ledger_path: Path, statements: list):
         f"- note: {counts_class['note']}",
         f"- duplicate: {counts_class['duplicate']}",
         "",
+        "## Skipped Sources"
+    ])
+
+    if skipped_sources is not None:
+        if skipped_sources:
+            lines.extend([
+                "| Source | Class | Reason |",
+                "|---|---|---|"
+            ])
+            for item in skipped_sources:
+                lines.append(f"| {item['path']} | {item['class']} | {escape_table_cell(item['reason'])} |")
+        else:
+            lines.append("_No skipped sources._")
+    elif "## Skipped Sources" in existing_content:
+        sec = extract_section(existing_content, "## Skipped Sources")
+        if sec:
+            lines.append(sec)
+        else:
+            lines.append("_No skipped sources._")
+    else:
+        lines.append("_No skipped sources._")
+
+    lines.extend([
+        "",
+        "## Needs a Decision"
+    ])
+
+    if decision_sources is not None:
+        if decision_sources:
+            lines.extend([
+                "| Source | Class | Signals or Diff | Proposed Action |",
+                "|---|---|---|---|"
+            ])
+            for item in decision_sources:
+                lines.append(f"| {item['path']} | {item['class']} | {escape_table_cell(item['signals'])} | {escape_table_cell(item['proposed_action'])} |")
+        else:
+            lines.append("_No sources needing decision._")
+    elif "## Needs a Decision" in existing_content:
+        sec = extract_section(existing_content, "## Needs a Decision")
+        if sec:
+            lines.append(sec)
+        else:
+            lines.append("_No sources needing decision._")
+    else:
+        lines.append("_No sources needing decision._")
+
+    lines.extend([
+        "",
         "## Ledger",
-        "| ID | Source | Class | Proposed Destination | Status | Details |",
-        "|---|---|---|---|---|---|"
-    ]
+        "| ID | Source | Class | Proposed Destination | Status | Details | Source Class |",
+        "|---|---|---|---|---|---|---|"
+    ])
 
     for s in statements:
         details = s.get("reason") or s.get("text", "")
-        row = f"| {s['id']} | {s['file']}:{s['line']} | {s['class']} | {s['proposed_destination']} | {s['status']} | {escape_table_cell(details)} |"
+        source_class = s.get("source_class", "local")
+        row = f"| {s['id']} | {s['file']}:{s['line']} | {s['class']} | {s['proposed_destination']} | {s['status']} | {escape_table_cell(details)} | {source_class} |"
         lines.append(row)
 
     ledger_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -577,6 +976,7 @@ def read_ledger(ledger_path: Path) -> list:
                 dest = parts[3]
                 status = parts[4]
                 details = unescape_table_cell(parts[5])
+                source_class = parts[6] if len(parts) >= 7 else "local"
 
                 file_part = src
                 line_part = 1
@@ -593,6 +993,7 @@ def read_ledger(ledger_path: Path) -> list:
                     "file": file_part,
                     "line": line_part,
                     "class": sclass,
+                    "source_class": source_class,
                     "proposed_destination": dest,
                     "status": status,
                     "text": details,
@@ -602,14 +1003,17 @@ def read_ledger(ledger_path: Path) -> list:
     return statements
 
 
-def cmd_inventory(root: Path):
-    legacy_files = find_legacy_files(root)
+def cmd_inventory(root: Path, include_skipped: bool = False):
+    active_files, skipped_sources, decision_sources, source_counts = find_and_classify_sources(root, include_skipped=include_skipped)
     profile_data, profile_rules = load_profile_rules(root)
     blueprints = load_blueprints(root)
 
     raw_statements = []
-    for f in legacy_files:
-        raw_statements.extend(split_statements(f, root))
+    for f, s_class, s_reason in active_files:
+        stmts = split_statements(f, root)
+        for st in stmts:
+            st["source_class"] = s_class
+        raw_statements.extend(stmts)
 
     classified_statements = []
     counter = 1
@@ -623,6 +1027,7 @@ def cmd_inventory(root: Path):
             "text": raw["text"],
             "raw": raw["raw"],
             "class": res["class"],
+            "source_class": raw.get("source_class", "local"),
             "proposed_destination": res["proposed_destination"],
             "status": res["status"],
             "reason": res.get("reason", "")
@@ -630,7 +1035,13 @@ def cmd_inventory(root: Path):
         counter += 1
 
     ledger_path = root / ".agents" / "legacy-parity.md"
-    write_ledger(ledger_path, classified_statements)
+    write_ledger(
+        ledger_path,
+        classified_statements,
+        skipped_sources=skipped_sources,
+        decision_sources=decision_sources,
+        source_counts=source_counts
+    )
 
     cov_pct, cov_count, rel_count = calculate_coverage(classified_statements)
     counts_class = {}
@@ -638,11 +1049,19 @@ def cmd_inventory(root: Path):
         c = s["class"]
         counts_class[c] = counts_class.get(c, 0) + 1
 
-    print(f"Legacy parity inventory: {len(classified_statements)} statements across {len(legacy_files)} file(s).")
+    print(f"Legacy parity inventory: {len(classified_statements)} statements across {len(active_files)} file(s).")
     for cl in ("covered", "derivable-data", "derivable-tokens", "derivable-ui", "derivable-layout", "rule-candidate", "note", "duplicate"):
         print(f"  {cl}: {counts_class.get(cl, 0)}")
     print(f"\nCoverage: {cov_pct}% ({cov_count}/{rel_count} rule-candidate and derivable statements covered or accepted).")
-    print(f"Ledger written to {ledger_path.relative_to(root).as_posix()}.")
+    print("\nStatement counts by source class:")
+    for sc in ("local", "modified-fork", "vendor-dup", "likely-third-party", "build-forge", "generated", "reference"):
+        print(f"  {sc}: {source_counts.get(sc, 0)}")
+    if decision_sources:
+        print(f"\nWarning: {len(decision_sources)} source(s) need a decision:")
+        for ds in decision_sources:
+            print(f"  - {ds['path']} ({ds['class']}): {ds['signals']}")
+            print(f"    Proposed action: {ds['proposed_action']}")
+    print(f"\nLedger written to {ledger_path.relative_to(root).as_posix()}.")
 
 
 def cmd_batch(root: Path, area: str, limit: int):
@@ -868,6 +1287,7 @@ def main():
     sub = ap.add_subparsers(dest="command", required=True)
 
     p_inv = sub.add_parser("inventory", help="Inventory legacy statements into ledger.")
+    p_inv.add_argument("--include-skipped", action="store_true", help="Include skipped sources in inventory statements.")
     p_inv.add_argument("--root", default=".", help="Project root directory.")
 
     p_batch = sub.add_parser("batch", help="Print pending statements for an area.")
@@ -888,7 +1308,7 @@ def main():
     root = Path(args.root).resolve()
 
     if args.command == "inventory":
-        cmd_inventory(root)
+        cmd_inventory(root, include_skipped=args.include_skipped)
     elif args.command == "batch":
         cmd_batch(root, args.area, args.limit)
     elif args.command == "apply":

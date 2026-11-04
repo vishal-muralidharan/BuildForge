@@ -24,9 +24,10 @@ Scripts live in this skill's `scripts/` folder. Run them with the full path to t
 
 ## Existing mode
 
-1. Run legacy inventory:
-   Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py inventory --root <repo_root>`.
-   This inventories statements from existing agent instruction files and legacy skills into `.agents/legacy-parity.md`. Never delete or move the legacy files.
+1. Run legacy inventory and reconcile third-party skills:
+   Check `.agents/build-forge.lock.json` and `.agents/references.yaml`. Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py inventory --root <repo_root>`.
+   This inventories statements from existing agent instruction files and legacy skills into `.agents/legacy-parity.md`.
+   If there are `likely-third-party` or `modified-fork` skills, show them from the "Needs a decision" table and prompt the user before rule extraction: register as reference (`refs.py add`) or keep as project rule. If `vendor-dup` collisions exist, propose `refs.py dedupe`. Never delete or move legacy files.
 2. Read the discovery JSON and the legacy parity ledger. Also read `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, and any agent instruction files when they exist. They hold rules the code cannot show.
 3. Copy `assets/project-profile.template.yaml` to `.agents/project-profile.yaml`. Fill only what the evidence supports.
    - Commands: use `commands_suggested`. If there is no single `check` command, propose one that chains lint, test and build, and ask before adding it to `package.json`.
