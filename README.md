@@ -216,7 +216,7 @@ The pipeline is goal-oriented rather than task-oriented: it does not stop merely
 | # | Stage | Skill to use | Gate: do not continue until |
 |---|---|---|---|
 | 0 | Pre-flight | git | Branch is checked against protected branches and working tree is clean. |
-| 1 | Audit & Goal | `audit-and-planning` (phases 1 and 2), `repo-search` | Root cause diagnosed. Protected data identified. Goal invariants defined in `.agents/work/CURRENT_GOAL.md`. |
+| 1 | Audit & Goal | `audit-and-planning` (phases 1 and 2), `repo-search` | Root cause diagnosed. Protected data identified. Current goal invariants defined in `.agents/work/CURRENT_GOAL.md` (updated for each task in a series). |
 | 2 | Plan | `audit-and-planning` (phases 3 and 4) | Every step has a target, a verify command and a commit message. Plan approved if over 5 steps or touching protected items. |
 | 3 | Build step | The convention skill for the area (`build-ui`, `review-db-structure`, and so on) | The step does 1 thing and follows the rules of its area. |
 | 3a | Verify step | `targeted-module-testing`, step 1 | The step's checks pass with 0 errors and 0 warnings. Atomic rollback triggers after 2 consecutive check failures. |
@@ -225,7 +225,7 @@ The pipeline is goal-oriented rather than task-oriented: it does not stop merely
 | 5 | Full verify | `targeted-module-testing`, steps 1 to 3 | `commands.check` passes. Tests and browser checks pass. |
 | 5a | Goal loop gate | `targeted-module-testing`, step 2b | All acceptance invariants from `CURRENT_GOAL.md` are evaluated. If all pass, proceed to stage 6. If any fail, re-enter loop at stage 3. |
 | 6 | Deploy (optional) | `targeted-module-testing`, step 4 | Runs only if `capabilities.deploy.enabled` is true. |
-| 7 | Report | `targeted-module-testing`, step 5 | The Post-Build Audit is written. `CURRENT_GOAL.md` marked completed. |
+| 7 | Report | `targeted-module-testing`, step 5 | The Post-Build Audit is written. `CURRENT_GOAL.md` marked completed; advances to next task if in a series. |
 
 ## What it creates in your project
 

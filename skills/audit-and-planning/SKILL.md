@@ -27,7 +27,7 @@ Use `repo-search`. Do not write code until you know what already exists.
 
 - **Bug:** trace the exact failure mechanism. Reproduce it when you can. Name the cause, not the symptom.
 - **Feature:** map it onto the layers in `structure.layers`. For each new file, name the layer it belongs in.
-- **Goal Definition:** State the ultimate objective in 1 or 2 sentences. Declare 2 to 4 measurable acceptance invariants (observable behavior, data state, API contracts). These are written to `.agents/work/CURRENT_GOAL.md` and evaluated during the Goal Loop in `feature-delivery`.
+- **Goal Definition:** State the ultimate objective in 1 or 2 sentences. Declare 2 to 4 measurable acceptance invariants (observable behavior, data state, API contracts). These are written to `.agents/work/CURRENT_GOAL.md` and evaluated during the Goal Loop in `feature-delivery`. When working on a series of goals or tasks, always overwrite or update `CURRENT_GOAL.md` with the specific objective and invariants of the current active task. Never retain a prior task's goal or invariants.
 - Run every check below that the profile turns on:
   - `data.invariants`: the plan must keep each one.
   - `data.protected`: if the plan touches any item, stop and ask the user before you plan further.
@@ -67,7 +67,7 @@ Steps:
 ## Phase 4: Checklist before the first edit
 
 - [ ] I searched and found nothing to duplicate, or I listed what I will reuse.
-- [ ] Goal objective and measurable acceptance invariants are defined in `.agents/work/CURRENT_GOAL.md`.
+- [ ] Goal objective and measurable acceptance invariants for the current task are written to `.agents/work/CURRENT_GOAL.md` (updated for each task in a series).
 - [ ] Every step is atomic and has a verify command and a commit message.
 - [ ] No protected item changes without user approval.
 - [ ] Every data invariant still holds.

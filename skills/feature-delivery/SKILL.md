@@ -45,7 +45,7 @@ Pick the workflow matching the request type:
 | # | Stage | Skill to use | Gate: do not continue until |
 |---|---|---|---|
 | 0 | Pre-flight | git | Branch is verified and working tree is clean. |
-| 1 | Audit & Goal Definition | `audit-and-planning` (phases 1 and 2), `repo-search` | Root cause diagnosed. Protected data identified. Goal invariants and measurable acceptance criteria written to `.agents/work/CURRENT_GOAL.md`. |
+| 1 | Audit & Goal Definition | `audit-and-planning` (phases 1 and 2), `repo-search` | Root cause diagnosed. Protected data identified. Current goal invariants and measurable acceptance criteria written to `.agents/work/CURRENT_GOAL.md` (updated for each task in a series). |
 | 2 | Plan | `audit-and-planning` (phases 3 and 4) | Every step has a target, a verify command, and a commit message. Plan approved if over 5 steps or touching protected items. |
 | 3 | Build step | Area convention skill (`build-ui`, etc.) | The step does 1 thing and follows the rules of its area. |
 | 3a | Verify step | `targeted-module-testing`, step 1 | The step's checks pass with 0 errors and 0 warnings. |
@@ -54,7 +54,7 @@ Pick the workflow matching the request type:
 | 5 | Full verify | `targeted-module-testing`, steps 1 to 3 | `commands.check` passes. Tests and browser checks pass. |
 | 5a | Goal loop gate | `targeted-module-testing`, step 3b | All acceptance invariants from `CURRENT_GOAL.md` are evaluated. If all pass, proceed to stage 6. If any fail, re-enter loop. |
 | 6 | Deploy (optional) | `targeted-module-testing`, step 4 | Runs only if `capabilities.deploy.enabled` is true. |
-| 7 | Report | `targeted-module-testing`, step 5 | Post-Build Audit written. `CURRENT_GOAL.md` marked completed. |
+| 7 | Report | `targeted-module-testing`, step 5 | Post-Build Audit written. `CURRENT_GOAL.md` marked completed; advances to next task if in a series. |
 
 Stages 1, 5 and 6 consult references through `due`. A gate reference with a blocking finding stops the stage until the user decides.
 
@@ -81,24 +81,52 @@ When working on Stage 3 and 3a:
 
 ## Keeping track with CURRENT_GOAL.md
 
-Always record task progress in `.agents/work/CURRENT_GOAL.md`:
+Always record active task progress in `.agents/work/CURRENT_GOAL.md`. This file is the execution ledger for the currently active goal. It must always reflect the task currently underway, never a prior or finished task.
 
 ```markdown
-# Goal: <objective description>
+# Current Goal: <active task objective>
 Iteration: 1
 Status: in_progress
 
+## Series Queue (only when a series of goals or tasks was given)
+- [x] Task 1: <first objective> (completed)
+- [ ] Task 2: <current objective> (active)
+- [ ] Task 3: <upcoming objective> (pending)
+
 ## Acceptance Invariants
-- [ ] Invariant 1: <measurable outcome>
-- [ ] Invariant 2: <expected behavior or contract>
+- [ ] Invariant 1: <measurable outcome for current goal>
+- [ ] Invariant 2: <expected behavior or contract for current goal>
 
 ## Plan Steps
 - [x] Step 1: <target> (commit: <hash>)
 - [ ] Step 2: <target> (current)
 - [ ] Step 3: <target>
+
+## Completed Goals History
+- Task 1: <first objective> (completed at commit <hash>)
 ```
 
 Update the checkboxes after each commit. If a session is interrupted or context is compacted, read `CURRENT_GOAL.md` and `git log` to resume immediately at the first uncompleted step.
+
+## Handling a Series of Goals or Tasks
+
+When the user provides a series, backlog, or list of goals/tasks:
+
+1. **Initialize the Queue**: In Stage 1 of the first task, record all requested tasks under `## Series Queue` in `CURRENT_GOAL.md`. Set `# Current Goal:` to the first task.
+2. **Active Goal Scope**: `# Current Goal:`, `Acceptance Invariants`, and `Plan Steps` must strictly cover the active task being executed, never mixed across multiple tasks.
+3. **Execute One Goal at a Time**: Run the active goal through Stages 1 to 7 with the Goal Loop. Never mix acceptance invariants or plan steps from multiple tasks into the active section.
+4. **Transition to the Next Goal**:
+   - In Stage 7, mark the finished task as `[x]` in `## Series Queue` and record it under `## Completed Goals History`.
+   - If pending tasks remain in the series:
+     - Immediately update `CURRENT_GOAL.md` before starting the next task:
+       - Update `# Current Goal:` to the next task's objective description.
+       - Reset `Iteration: 1`.
+       - Set `Status: in_progress`.
+       - Replace `Acceptance Invariants` with the 2 to 4 measurable invariants for this new goal.
+       - Replace `Plan Steps` with the atomic plan steps for this new goal.
+       - In `## Series Queue`, mark the new task as `(active)`.
+     - Re-enter Stage 1 (`audit-and-planning`) for the new task.
+   - Do not leave `CURRENT_GOAL.md` showing an old or completed goal once work on the next task begins.
 
 ## When to stop and ask
 

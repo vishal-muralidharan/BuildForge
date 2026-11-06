@@ -42,6 +42,7 @@ REQUIRED_TEXT = {
     ],
     "feature-delivery": [
         "stale",
+        "Series Queue",
     ],
 }
 

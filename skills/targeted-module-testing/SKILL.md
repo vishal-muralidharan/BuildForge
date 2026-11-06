@@ -41,7 +41,7 @@ Fix every failure at its cause. Do not edit a test or loosen a rule just to get 
 
 Automated tests exiting with code 0 does not prove that the user's objective was met.
 
-1. Read `.agents/work/CURRENT_GOAL.md`.
+1. Read `.agents/work/CURRENT_GOAL.md`. Confirm that `# Current Goal:` and the acceptance invariants reflect the active task being verified.
 2. Evaluate each acceptance invariant listed under `Acceptance Invariants`:
    - Inspect data flow, API contract, or rendered component behavior against the expected invariant.
    - Confirm edge cases (zero states, invalid inputs, error handling) behave as intended.
@@ -74,6 +74,8 @@ Never change secrets, environment variables, hosting settings or billing during 
 ## 5. Post-Build Audit
 
 End every task with this section when `verification.post_build_report` is true. Fill it from what you actually observed. Do not pad it.
+
+When all invariants pass, update `.agents/work/CURRENT_GOAL.md`: set `Status: completed`. If part of a series of tasks, mark the current task completed in `Series Queue` and prepare `CURRENT_GOAL.md` to transition to the next task in `feature-delivery`.
 
 ```markdown
 ### Post-Build Audit: Open Questions & Known Issues
