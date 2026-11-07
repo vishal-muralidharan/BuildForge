@@ -38,6 +38,7 @@ Pick the workflow matching the request type:
 | Bug fix or regression | `references/workflows/fix-bug.md` |
 | Code review or diff audit | `references/workflows/review-changes.md` |
 | Release preparation or version bump | `references/workflows/release-prep.md` |
+| Incident, unwritten convention, or rule gap | `references/workflows/incident-to-rule.md` |
 | Feature or general delivery | Stages 0 to 7 below |
 
 ## Stages and gates
@@ -154,6 +155,7 @@ Iterations: <count of goal loop cycles>
 Commits: <short hash and message for each>
 Checks: <what ran and the result>
 Docs synced: <profile, generated files, README, repo map: yes or what remains>
+Rule gaps: <none, or missing rules discovered and whether codified>
 Post-Build Audit: <known issues and open questions, from verify skill>
 Next: <1 sentence>
 ```
