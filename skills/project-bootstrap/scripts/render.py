@@ -453,6 +453,17 @@ def skill_build_ui(p, pn):
     lines += ["", "## Blueprint", "",
               "Query codebase UI facts on demand:",
               "`python3 .agents/skills/project-blueprints/scripts/blueprint.py show --area ui --paths <files>`"]
+    if g(p, "design.enabled"):
+        first_dir = dirs[0] if dirs else "the first component folder"
+        lines += [
+            "",
+            "## Form controls",
+            "",
+            "1. Use the themed primitive.",
+            f"2. If none exists, build it first in `{first_dir}`, reusing existing low level widgets, as its own commit with loading, empty and error states where they apply, then use it.",
+            "3. Never use a native browser control that a themed primitive covers.",
+            "4. Read the Form controls table with the blueprint show command for the ui area before choosing a control."
+        ]
     lines += ["", "## Rules", ""] + (rules(p, "design", "motion") or ["- No UI rules recorded. Add them to the profile."])
     lines += ["", "## Finish", "", f"Run `{g(p, 'commands.check', 'the project check command')}`."]
     if g(p, "design.enforced_by"):

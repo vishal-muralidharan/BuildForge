@@ -8,12 +8,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BP_SCRIPT_DIR = REPO_ROOT / "skills" / "project-blueprints" / "scripts"
 if str(BP_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(BP_SCRIPT_DIR))
 
 BP_SCRIPT = BP_SCRIPT_DIR / "blueprint.py"
+BOOTSTRAP_SCRIPT_DIR = REPO_ROOT / "skills" / "project-bootstrap" / "scripts"
+if str(BOOTSTRAP_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(BOOTSTRAP_SCRIPT_DIR))
 FIXTURES_DIR = REPO_ROOT / "tests" / "fixtures" / "blueprints"
 
 
@@ -172,6 +177,103 @@ class TestProjectBlueprints(unittest.TestCase):
         self.assertEqual(parts[0][0], "data.md")
         self.assertEqual(parts[1][0], "data-part-2.md")
         self.assertEqual(parts[2][0], "data-part-3.md")
+
+    def test_form_controls_gap_violation_and_candidates(self):
+        """A fixture with Calendar and native date inputs and no DatePicker shows gap and violation and creates both candidates."""
+        app_dir = self.root / "app_gap_violation"
+        (app_dir / "src" / "components" / "ui").mkdir(parents=True, exist_ok=True)
+        (app_dir / "src" / "views").mkdir(parents=True, exist_ok=True)
+
+        # Low level widget Calendar, no DatePicker
+        (app_dir / "src" / "components" / "ui" / "Calendar.tsx").write_text(
+            "export function Calendar() { return <div>Calendar Grid</div>; }\n",
+            encoding="utf-8"
+        )
+        # Native date input outside primitive folder
+        (app_dir / "src" / "views" / "BookingForm.tsx").write_text(
+            "export function BookingForm() { return <form><input type=\"date\" name=\"booking\" /></form>; }\n",
+            encoding="utf-8"
+        )
+        (app_dir / "package.json").write_text('{"name": "test-app"}\n', encoding="utf-8")
+
+        res_extract = self.run_bp("extract", "--areas", "ui", cwd=app_dir)
+        self.assertEqual(res_extract.returncode, 0, res_extract.stderr)
+
+        ui_md = (app_dir / ".agents" / "blueprints" / "ui.md").read_text(encoding="utf-8")
+        self.assertIn("## Form controls", ui_md)
+        self.assertIn("gap, violation", ui_md)
+
+        candidates_md = (app_dir / ".agents" / "blueprints" / "candidates.md").read_text(encoding="utf-8")
+        self.assertIn("ui-no-native-pickers", candidates_md)
+        self.assertIn("Create the primitive first, in its own commit, before using the control.", candidates_md)
+
+        # Output is deterministic and verify passes
+        res_verify = self.run_bp("verify", cwd=app_dir)
+        self.assertEqual(res_verify.returncode, 0, f"Verify failed:\n{res_verify.stderr}\n{res_verify.stdout}")
+
+    def test_form_controls_datepicker_shows_ok(self):
+        """A fixture with a DatePicker shows ok."""
+        app_dir = self.root / "app_ok"
+        (app_dir / "src" / "components" / "ui").mkdir(parents=True, exist_ok=True)
+        (app_dir / "src" / "views").mkdir(parents=True, exist_ok=True)
+
+        # Themed primitive DatePicker exists
+        (app_dir / "src" / "components" / "ui" / "DatePicker.tsx").write_text(
+            "export function DatePicker() { return <div>Themed Date Picker</div>; }\n",
+            encoding="utf-8"
+        )
+        # Usage uses the primitive, no native date input
+        (app_dir / "src" / "views" / "BookingForm.tsx").write_text(
+            "import { DatePicker } from '../components/ui/DatePicker';\n"
+            "export function BookingForm() { return <form><DatePicker /></form>; }\n",
+            encoding="utf-8"
+        )
+        (app_dir / "package.json").write_text('{"name": "test-app"}\n', encoding="utf-8")
+
+        res_extract = self.run_bp("extract", "--areas", "ui", cwd=app_dir)
+        self.assertEqual(res_extract.returncode, 0, res_extract.stderr)
+
+        ui_md = (app_dir / ".agents" / "blueprints" / "ui.md").read_text(encoding="utf-8")
+        self.assertIn("## Form controls", ui_md)
+        # Date row has DatePicker and ok status
+        self.assertIn("DatePicker.tsx", ui_md)
+        self.assertIn("| date | src/components/ui/DatePicker.tsx | 0 | ok |", ui_md)
+
+    def test_form_controls_dynamic_type_shows_review(self):
+        """A dynamic type (type={x}) shows review."""
+        app_dir = self.root / "app_dyn"
+        (app_dir / "src" / "views").mkdir(parents=True, exist_ok=True)
+        (app_dir / "src" / "views" / "DynamicForm.tsx").write_text(
+            "export function DynamicForm({ kind }) { return <input type={kind} />; }\n",
+            encoding="utf-8"
+        )
+        (app_dir / "package.json").write_text('{"name": "test-app"}\n', encoding="utf-8")
+
+        res_extract = self.run_bp("extract", "--areas", "ui", cwd=app_dir)
+        self.assertEqual(res_extract.returncode, 0, res_extract.stderr)
+
+        ui_md = (app_dir / ".agents" / "blueprints" / "ui.md").read_text(encoding="utf-8")
+        self.assertIn("review", ui_md)
+
+    def test_build_ui_contains_form_controls_section(self):
+        """The rendered build-ui text contains the Form controls section."""
+        from render import skill_build_ui
+
+        profile = {
+            "project": {"name": "TestApp"},
+            "design": {
+                "enabled": True,
+                "tokens_file": "src/tokens.css",
+                "component_dirs": ["src/components/ui"]
+            }
+        }
+        sname, desc, lines = skill_build_ui(profile, "TestApp")
+        text = "\n".join(lines)
+        self.assertIn("## Form controls", text)
+        self.assertIn("1. Use the themed primitive.", text)
+        self.assertIn("2. If none exists, build it first in `src/components/ui`", text)
+        self.assertIn("3. Never use a native browser control that a themed primitive covers.", text)
+        self.assertIn("4. Read the Form controls table with the blueprint show command", text)
 
 
 if __name__ == "__main__":

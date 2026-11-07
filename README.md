@@ -336,7 +336,7 @@ Blueprints capture verifiable facts about a codebase so agents do not rescan fil
 Blueprints live in `.agents/blueprints/` and cover 6 areas:
 - `data.md`: Database tables (SQL, Prisma), storage keys, and schema names.
 - `tokens.md`: CSS variables, role mappings, and light and dark theme palettes.
-- `ui.md`: Exported UI components, props types, variants, and state primitives.
+- `ui.md`: Exported UI components, props types, variants, state primitives, and form controls status table.
 - `layout.md`: Breakpoints, navigation shells, and mobile viewport constraints.
 - `auth.md`: Authentication providers, route guards, and logout cleanup paths.
 - `config.md`: Environment variable names and route mappings.
