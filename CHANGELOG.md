@@ -5,6 +5,12 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Maintainer developer toolkit `scripts/dev.py` supporting `new-skill`, `check`, `impact`, `recipe`, `fixture`, and `release-plan`.
+- Maintainer documentation and 4 playbooks under `maintainers/skills/`: `author-skill`, `author-extension`, `triage-field-report`, and `cut-release`.
+- 8 maintainer change recipes in `maintainers/recipes/*.yaml` for repeatable touchpoint management.
+- Test suite `tests/test_maintainer_tooling.py` verifying package exclusions, fixture validation, recipe integrity, and release planning.
+- Trigger phrase test file `tests/triggers.yaml` and skill classification file `tiers.json`.
+- Check flag `--check` in `scripts/make_integrity.py` for automated integrity manifest verification.
 - Field adoption integration test suite `tests/test_field_adoption.py` verifying the full 10-step sequence across validation, salvage, adoption, synchronization, drift, doctor, and non-generated line survival property test.
 - Field adoption test fixture `tests/fixtures/field-adoption` with invented stamped and unstamped convention skills, 60-line interface table, 200-line token table, oversized custom block, listed and unlisted vendor folders, and Scope guide table.
 - Evaluation scenario 11 (`11-field-adoption`) in `tests/evals/scenarios/11-field-adoption/` with task specification, expectation matrix, setup script, and grader integration in `scripts/grade.py` and `tests/test_eval_grader.py`.
