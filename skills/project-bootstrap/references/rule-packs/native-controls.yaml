@@ -20,18 +20,17 @@ rules:
       hint: "Use the project's themed picker primitive instead of native date/time/color inputs."
       examples:
         bad:
-          - '<input type="date" />'
-          - "<input type='date' />"
-          - '<Input type="color" />'
-          - '<input type={"date"} />'
-          - "<input type={'time'} />"
-          - "<input type=`datetime-local` />"
+          - '<input type="date">'
+          - "<input type={'time'}>"
+          - '<input type="color">'
+          - '<Input type="date" />'
+          - "<input type={`datetime-local`} />"
         good:
-          - '<DatePicker />'
-          - '<input type="text" />'
-          - '<input type="checkbox" />'
-          - '<Input type="email" />'
-          - '<input type={inputType} />'
+          - '<DatePicker>'
+          - '<input type="text">'
+          - '<input type="checkbox">'
+          - '<Input type="email">'
+          - '<input type={inputType}>'
 
   - id: ui-no-native-selects
     area: design
@@ -45,9 +44,11 @@ rules:
       hint: "Use the themed Select primitive instead of a native select element."
       examples:
         bad:
+          - '<select>'
           - '<select name="country">'
           - '<select className="styled-select">'
         good:
+          - '<Select>'
           - '<Select name="country">'
           - '<CustomSelect options={options} />'
 
@@ -63,10 +64,12 @@ rules:
       hint: "Use a themed modal dialog or toast notification instead of window alert, confirm, or prompt."
       examples:
         bad:
-          - 'alert("Action completed");'
+          - 'alert("x")'
+          - "confirm('y')"
+          - "prompt(`z`)"
           - 'window.confirm("Are you sure?");'
-          - 'const name = prompt("Enter name:");'
         good:
+          - '<ConfirmDialog />'
           - 'dialog.alert("Action completed");'
           - 'confirmModal.open({ title: "Confirm" });'
           - 'toast.success("Saved");'

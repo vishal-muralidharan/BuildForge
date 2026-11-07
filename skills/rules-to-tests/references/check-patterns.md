@@ -127,7 +127,85 @@ check:
 
 ## 2. Rule packs
 
-Ready packs combining multiple rules for common stacks.
+Ready packs combining multiple rules for common stacks. Installed via `packs.py apply <id>`.
+
+### Native controls pack (`native-controls`)
+
+Prevent native browser form controls outside component folders.
+Requires the project to use themed primitives for pickers, selects, and dialogs.
+
+#### 1. No native pickers (`ui-no-native-pickers`)
+
+```yaml
+- id: ui-no-native-pickers
+  area: design
+  text: Never use native browser date, time, month, week, datetime-local, or color inputs instead of the project's themed picker primitives.
+  enforced_by: test
+  check:
+    type: forbid
+    pattern: '(?<![\w-])type\s*=\s*(?:\{\s*)?["\x27\x60](?:date|time|color|datetime-local|month|week)["\x27\x60]'
+    include: ["src/**/*.{js,jsx,ts,tsx,vue,svelte,html}"]
+    exclude: ["{{component_dirs}}/**"]
+    hint: Use the project's themed picker primitive instead of native date/time/color inputs.
+    examples:
+      bad:
+        - '<input type="date">'
+        - "<input type={'time'}>"
+      good:
+        - '<DatePicker>'
+        - '<input type="text">'
+```
+
+#### 2. No native selects (`ui-no-native-selects`)
+
+```yaml
+- id: ui-no-native-selects
+  area: design
+  text: Never use native browser select elements instead of the project's themed Select primitive.
+  enforced_by: test
+  check:
+    type: forbid
+    pattern: '<select\b'
+    include: ["src/**/*.{js,jsx,ts,tsx,vue,svelte,html}"]
+    exclude: ["{{component_dirs}}/**"]
+    hint: Use the themed Select primitive instead of a native select element.
+    examples:
+      bad:
+        - '<select>'
+      good:
+        - '<Select>'
+```
+
+Note: A native `<select>` inside `PrimitiveSelect.tsx` is allowed because `exclude` covers `{{component_dirs}}/**`.
+
+#### 3. No browser dialogs (`ui-no-browser-dialogs`)
+
+```yaml
+- id: ui-no-browser-dialogs
+  area: design
+  text: Never use window alert, confirm, or prompt instead of the project's dialog and toast primitives.
+  enforced_by: test
+  check:
+    type: forbid
+    pattern: '(?<![\w.$])(?:window\.)?(?:alert|confirm|prompt)\s*\('
+    include: ["src/**/*.{js,jsx,ts,tsx,vue,svelte,html}"]
+    exclude: ["**/*.test.*", "**/*.spec.*", "src/test/**"]
+    hint: Use a themed modal dialog or toast notification instead of window alert, confirm, or prompt.
+    examples:
+      bad:
+        - 'alert("x")'
+        - "confirm('y')"
+        - 'prompt(`z`)'
+      good:
+        - '<ConfirmDialog />'
+        - 'customDialog.confirm("Save changes?")'
+```
+
+#### Test corpus summary
+
+The 6 bad examples and 5 good examples for native controls verification:
+- Bad (6): `<input type="date">`, `<input type={'time'}>`, `<select>`, `alert("x")`, `confirm('y')`, `prompt(`z`)`.
+- Good (5): `<DatePicker>`, `<Select>`, native `<select>` inside `PrimitiveSelect.tsx` (wrapped in component directory), custom dialog primitive, and non-picker input like `type="text"`.
 
 ### Web hazards pack (`web-hazards`)
 
