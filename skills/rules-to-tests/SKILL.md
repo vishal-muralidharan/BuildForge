@@ -15,9 +15,12 @@ A rule that only lives in prose gets broken the first time an agent is in a hurr
 
 ## Steps
 
-1. **Sort the rules.** Go through every rule with `enforced_by: manual`. Mark each one:
-   - **Mechanical:** a pattern, a file, a folder rule, or a structure constraint (like `no_dual_homed_skills`) can decide it. Example: "No emojis anywhere." or "A reference lives in .agents/vendor or .agents/skills, never both."
-   - **Judgment:** it needs a person. Example: "Keep copy to 1 or 2 words." Leave these manual. Do not fake a check for them.
+1. **Sort the rules.** Go through every rule in `.agents/project-profile.yaml`. Distinguish:
+   - **Pack rules with checks:** rules with `pack: <id>@<version>` that have a `check` block (from `native-controls`, `web-hazards`, `mobile-web`, `a11y-basics`, `motion-basics`, or `testing-practices`). These run mechanically via `run_rule_checks.py`.
+   - **Pack rules without checks:** rules with `pack: <id>@<version>` and `enforced_by: manual` (and verify checks from packs like `ui-states`, `shortcuts`, or `browser-checks`). These are manual verify checks, recorded under the test plan or browser checks. Never fake a check for them.
+   - **Project rules:** for rules without a pack, inspect each rule with `enforced_by: manual`:
+     - **Mechanical:** a pattern, a file, a folder rule, or a structure constraint (like `no_dual_homed_skills`) can decide it. Example: "No emojis anywhere." or "A reference lives in .agents/vendor or .agents/skills, never both."
+     - **Judgment:** it needs a person. Example: "Keep copy to 1 or 2 words." Leave these manual. Do not fake a check for them.
 2. **Write each check.** Add a `check` block to the mechanical rules. Use the check types in the profile schema: `forbid`, `require_file`, `forbid_file`, `root_only`, and `no_dual_homed_skills`. Start from `references/check-patterns.md`. The `no_dual_homed_skills` pattern checks that no reference skill is installed in both `.agents/vendor` and `.agents/skills`. It runs whenever rule checks execute in CI or pre-commit verification. Keep patterns narrow, so they do not flag valid code.
 3. **Prove each check on both sides.**
    - Run the runner. The check must pass on the current code. If it fails on real violations, tell the user and either fix the code (through `feature-delivery`) or narrow the pattern.
