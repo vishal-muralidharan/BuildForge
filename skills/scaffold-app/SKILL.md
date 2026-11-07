@@ -34,6 +34,7 @@ Turns a validated profile into a skeleton that builds, lints and tests green. It
 ## Rules
 
 - No product features, no sample screens, no placeholder data. A skeleton only.
+- It creates no components, by design. Components are created when a feature first needs one, through the Form controls workflow in build-ui.
 - Add only dependencies the profile's stack needs. Each extra dependency needs a reason and the user's yes.
 - Never write secrets or keys into files. Use environment files that are ignored by git, and tell the user which variables will be needed.
 - If a generator or install step fails twice, stop and report the exact error.

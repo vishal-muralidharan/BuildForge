@@ -5,6 +5,8 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Form controls analysis in UI blueprint analyzer `skills/project-blueprints/scripts/analyzers/ui.py` detecting native controls, low-level widgets, themed primitives, gap/violation status, and candidate proposals.
+- Form controls guidance section in generated `build-ui` skill, `audit-and-planning` Phase 2 form control checklist, and `scaffold-app` component creation rule.
 - Maintainer developer toolkit `scripts/dev.py` supporting `new-skill`, `check`, `impact`, `recipe`, `fixture`, and `release-plan`.
 - Maintainer documentation and 4 playbooks under `maintainers/skills/`: `author-skill`, `author-extension`, `triage-field-report`, and `cut-release`.
 - 8 maintainer change recipes in `maintainers/recipes/*.yaml` for repeatable touchpoint management.
