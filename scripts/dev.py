@@ -563,6 +563,12 @@ def cmd_release_plan(args, repo_root: Path) -> None:
     else:
         next_ver = f"{vparts[0]}.{vparts[1]}.{vparts[2] + 1}"
 
+    target_ver = getattr(args, "target_version", None)
+    if target_ver:
+        clean_target = target_ver.lstrip("v")
+        if re.match(r"^\d+\.\d+\.\d+$", clean_target):
+            next_ver = clean_target
+
     print(f"Last tag:                   {last_tag}")
     print(f"Commits since tag:          {len(commits)}")
     print(f"Commit types:               {dict(sorted(type_counts.items()))}")
@@ -609,7 +615,8 @@ def main():
     p_fix.add_argument("--root", default=None, help="Root folder to check (for check)")
 
     # release-plan
-    subparsers.add_parser("release-plan", help="Generate read only release plan")
+    p_rel = subparsers.add_parser("release-plan", help="Generate read only release plan")
+    p_rel.add_argument("target_version", nargs="?", default=None, help="Target release version (optional)")
 
     args = parser.parse_args()
 
