@@ -340,7 +340,50 @@ During bootstrap, `hazard_sweep.py` audits the codebase for common hazards (web 
 
 When an unwritten convention is broken during delivery, the `incident-to-rule` workflow codifies the pattern into a tested rule with examples, selftest validation, and a separate atomic commit.
 
-See [check-patterns.md](skills/rules-to-tests/references/check-patterns.md) for patterns and ready packs such as `web-hazards`.
+See [check-patterns.md](skills/rules-to-tests/references/check-patterns.md) for patterns and ready packs such as `native-controls` and `web-hazards`.
+
+## Rule packs
+
+Rule packs are curated collections of opt-in rules for common stacks and concerns. Packs are never applied automatically. You can accept, edit, or drop any rule.
+
+The 9 available packs live under `skills/project-bootstrap/references/rule-packs/`:
+1. `native-controls`: Prevent native browser form controls outside component folders (`ui-no-native-pickers`, `ui-no-native-selects`, `ui-no-browser-dialogs`).
+2. `web-hazards`: Prevent common web security and hygiene hazards (`web-no-console`, `web-target-blank-rel`, `web-no-raw-eval`, `web-no-inner-html`, `web-no-committed-env`).
+3. `ui-states`: Require loading skeletons for operations over 300ms, empty states with clear actions, and user-facing error alerts.
+4. `mobile-web`: Require 16px minimum font size for inputs, 44px tap targets, viewport fit cover with safe area insets, and unrestricted pinch zoom.
+5. `shortcuts`: Consistent keyboard shortcut modifiers across platforms, code labels, and focus guards.
+6. `a11y-basics`: Semantic HTML tags, visible keyboard focus indicators, AA contrast ratios, and descriptive labels.
+7. `motion-basics`: Honor reduced motion preferences, animate only transform and opacity, and keep transitions under 300ms.
+8. `testing-practices`: Query elements by accessible role, wait for asynchronous UI instead of arbitrary sleeps, and avoid brittle style assertions.
+9. `browser-checks`: Quality verification checks for zero console errors, contrast compliance, event listener cleanup, and viewport fit.
+
+### Managing packs with packs.py
+
+Manage rule packs using the `packs.py` CLI:
+
+```bash
+# List all available rule packs
+python3 .agents/skills/project-bootstrap/scripts/packs.py list
+
+# Show details, rules, and verify checks for a pack
+python3 .agents/skills/project-bootstrap/scripts/packs.py show native-controls
+
+# Plan changes and probe the codebase for existing violations
+python3 .agents/skills/project-bootstrap/scripts/packs.py plan native-controls
+
+# Apply pack rules to .agents/project-profile.yaml
+python3 .agents/skills/project-bootstrap/scripts/packs.py apply native-controls --yes
+
+# Diff installed pack rules against newer packaged versions
+python3 .agents/skills/project-bootstrap/scripts/packs.py diff native-controls
+
+# Lint rule pack definitions for schema conformance
+python3 .agents/skills/project-bootstrap/scripts/packs.py lint
+```
+
+### How checks fail the build
+
+Mechanical rules carry a `check` block executed by `run_rule_checks.py`. This runner is hooked into your single `check` command (such as `npm test` or `npm run check`). When an agent or developer violates a check pattern, the build fails immediately. The output shows the rule ID, offending file:line, and a hint explaining how to fix the violation. User-edited rule text is never overwritten on pack updates, and dropped rules remain permanently ignored.
 
 ## Project blueprints
 

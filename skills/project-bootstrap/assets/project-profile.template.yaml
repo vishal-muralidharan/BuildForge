@@ -103,14 +103,23 @@ capabilities:               # optional helpers. A disabled slot is skipped by th
 #    path: ""               # set when installed, relative to the repo root
 
 rules:                      # write each rule ONCE, here
-  # Rule packs available: web-hazards, native-controls
+  # Rule packs available: native-controls, web-hazards, ui-states, mobile-web, shortcuts, a11y-basics, motion-basics, testing-practices, browser-checks
   - id: "example-rule"
     area: design            # design, tokens, motion, responsive, structure, naming, data, security, verify, git, docs, process
     text: "One sentence. Imperative."
     enforced_by: manual     # manual | test | lint
+    # pack: "native-controls@1" # optional: records which pack and version supplied this rule
     # optional machine check, run by rules-to-tests. Types: forbid, require_file, forbid_file, root_only
     # check: {type: forbid, pattern: '#[0-9a-fA-F]{3,8}\b', include: ["src/**/*.css"], exclude: ["src/index.css"], hint: "Use tokens", examples: {bad: ["#fff"], good: ["var(--bg)"]}}
     # exceptions: [{path: "src/legacy/button.css", reason: "Migration in progress"}]
+
+# Installed rule packs:
+# rule_packs:
+#   - id: native-controls
+#     version: 1
+
+# Pack rule IDs permanently dropped by the user:
+# dropped_pack_rules: []
 
 docs:
   readme: README.md

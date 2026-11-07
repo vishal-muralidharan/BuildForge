@@ -5,6 +5,11 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Rule pack system in `skills/project-bootstrap/scripts/packs.py` supporting `list`, `show`, `plan`, `apply`, `diff`, and `lint` commands.
+- 9 curated, opt-in rule packs in `skills/project-bootstrap/references/rule-packs/`: `native-controls`, `web-hazards`, `ui-states`, `mobile-web`, `shortcuts`, `a11y-basics`, `motion-basics`, `testing-practices`, and `browser-checks`.
+- Rule pack schema validation in `validate_profile.py` supporting `rule_packs` (`[{id, version}]`), `rule.pack` (`<id>@<version>`), `dropped_pack_rules`, `enforced_by_ref: {file, contains}`, and `claim-unverified` warnings with `--strict-claims`.
+- Dynamic variable expansion for `{{component_dirs}}` in rule checks with graceful skip when `design.component_dirs` is not configured.
+- Comprehensive test suite `tests/test_rule_packs.py` covering lint, broken packs rejection, selftest, fixture probes, apply, conflict preservation on user edits, dropped rules persistence, diff after version bumps, and recipe verification.
 - Rule pack `web-hazards` with checks, hints, and examples covering console logging, target=_blank rel attributes, raw eval, innerHTML/dangerouslySetInnerHTML, and committed .env files.
 - Rule schema enhancements in `validate_profile.py` supporting `exceptions: [{path, reason}]`, check `hint`, and check `examples`.
 - Check runner enhancements in `run_rule_checks.py` (version 2) supporting `--selftest`, `--explain <id>`, exception merging into excludes, and hint reporting on check failure.

@@ -565,7 +565,7 @@ def lint_pack_file(f: Path, all_seen_ids: dict, errors: list):
             sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
             if len(sentences) > 1:
                 errors.append(f"{f.name}: rule '{rid}' text must be exactly 1 sentence (found {len(sentences)})")
-            if "—" in text or "–" in text:
+            if "\u2014" in text or "\u2013" in text:
                 errors.append(f"{f.name}: rule '{rid}' text contains em or en dashes")
 
         enf = r.get("enforced_by")
@@ -624,7 +624,7 @@ def lint_pack_file(f: Path, all_seen_ids: dict, errors: list):
             for vidx, vline in enumerate(vc):
                 if not isinstance(vline, str) or not vline.strip():
                     errors.append(f"{f.name}: verify_checks[{vidx}] must be a non-empty string")
-                elif "—" in vline or "–" in vline:
+                elif "\u2014" in vline or "\u2013" in vline:
                     errors.append(f"{f.name}: verify_checks[{vidx}] contains em or en dashes")
 
 

@@ -14,4 +14,7 @@ touchpoints:
   - file: skills/rules-to-tests/references/check-patterns.md
     contains: "{pack_name}"
     why: Check patterns and documentation for the pack rules
+  - file: skills/project-bootstrap/references/rule-packs/{pack_name}.yaml
+    contains: "id: {pack_name}"
+    why: Rule pack definition file with rules, examples, and verify checks
 
