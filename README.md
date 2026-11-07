@@ -312,7 +312,7 @@ stack:
 
 `rules-to-tests` reads rules in `.agents/project-profile.yaml` and turns them into automatic checks. It copies a test runner (`run_rule_checks.py`) into `.agents/checks/` and connects it to the project check command.
 
-A rule can define a `check` block with types such as `forbid`, `require_file`, `forbid_file`, or `root_only`:
+A rule can define a `check` block with types such as `forbid`, `require_file`, `forbid_file`, or `root_only`. Checks support `hint` messages and `examples` (`bad` and `good`) verified with `run_rule_checks.py --selftest`:
 
 ```yaml
 rules:
@@ -325,9 +325,22 @@ rules:
       pattern: '(?<![\w&/])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b'
       include: ["src/**/*.{js,jsx,ts,tsx,css,html}"]
       exclude: ["src/index.css"]
+      hint: "Use design token variables instead of raw hex values."
+      examples:
+        bad: ["color: #ffffff;"]
+        good: ["color: var(--color-background);"]
+    exceptions:
+      - path: "src/legacy/badge.css"
+        reason: "Legacy badge styles pending migration"
 ```
 
-See [check-patterns.md](skills/rules-to-tests/references/check-patterns.md) for patterns.
+### Hazard sweep and rule packs
+
+During bootstrap, `hazard_sweep.py` audits the codebase for common hazards (web hazards, native controls, raw colors, hex in styles, any in TypeScript, and storage leaks) with default-yes adoption.
+
+When an unwritten convention is broken during delivery, the `incident-to-rule` workflow codifies the pattern into a tested rule with examples, selftest validation, and a separate atomic commit.
+
+See [check-patterns.md](skills/rules-to-tests/references/check-patterns.md) for patterns and ready packs such as `web-hazards`.
 
 ## Project blueprints
 

@@ -83,6 +83,7 @@ When all invariants pass, update `.agents/work/CURRENT_GOAL.md`: set `Status: co
 - **Checks:** <what ran and the result. Not run: <what was skipped and why>>
 - **Known Issues:** <edge cases, quirks and limits you found>
 - **Open Questions:** <decisions that need the user>
+- **Rule Gaps:** Did this change work around a missing rule? <none, or missing convention to codify with incident-to-rule>
 ```
 
 Look for known issues in these places, depending on the profile:
@@ -92,6 +93,7 @@ Look for known issues in these places, depending on the profile:
 - `design.enabled`: legibility in every theme, focus visibility and icon clarity.
 - `data.storage` is set: storage quota, offline retries, migrations and idempotent writes.
 - Keyboard shortcuts were added: modifiers across operating systems, and capture while typing in inputs.
+- Rule gaps: check whether this task worked around an unwritten convention. If yes, name the convention and suggest running `incident-to-rule`.
 
 Open questions are choices the user should make: trade-offs, label or placement choices, and future schema changes.
 

@@ -84,7 +84,31 @@ A rule can carry a `check` block. `rules-to-tests` runs it. A rule with a check 
     pattern: '#[0-9a-fA-F]{3,8}\b'
     include: ["src/**/*.{js,jsx,css}"]
     exclude: ["src/index.css"]
+    hint: "Use design token variables instead of raw hex values."
+    examples:
+      bad: ["color: #ffffff;"]
+      good: ["color: var(--color-background);"]
+  exceptions:
+    - path: "src/legacy/badge.css"
+      reason: "Legacy badge styles pending design token migration"
 ```
+
+### Rule exceptions
+
+A rule may carry an `exceptions` list with `{path, reason}` items. The `reason` is required and non-empty. The check runner merges exception paths into the check exclude list. The profile validator errors when an exception lacks a reason, and warns when an exception path matches no existing file.
+
+### Check hints and examples
+
+A check block can include:
+- `hint`: short sentence naming the fix. The runner prints this on failure.
+- `examples`: mapping with `bad` and `good` lists. Tested by `run_rule_checks.py --selftest`.
+
+### Rule packs
+
+Predefined rule collections can be adopted during bootstrap hazard sweep:
+- `web-hazards`: web security and hygiene (`web-no-console`, `web-target-blank-rel`, `web-no-raw-eval`, `web-no-inner-html`, `web-no-committed-env`).
+- `native-controls`: prevent unthemed browser form controls.
+
 - `enforced_by: test` or `lint` is a claim. Check that the test or rule exists before you set it.
 - Where each area renders: `design` and `motion` go to `build-ui`. `tokens` goes to `maintain-design-system`. `responsive`, `structure`, `naming` and `data` go to the skill of the same topic. `process`, `security`, `verify`, `git` and `docs` go to the "Project rules" section of AGENTS.md.
 
