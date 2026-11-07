@@ -64,3 +64,4 @@ Use this workflow when a task fixes a violation of an unwritten convention, the 
 
 - Pattern cannot be written without false positives across valid code: stop and ask user whether to narrow the pattern or keep the rule manual.
 - Existing violations are extensive and cannot be fixed or exempted safely: stop and report findings before modifying the profile.
+
