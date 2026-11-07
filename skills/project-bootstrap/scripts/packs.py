@@ -37,7 +37,9 @@ IGNORE_DIRS = {
 MAX_BYTES = 1_000_000
 
 
-def get_packs_dir() -> Path:
+def get_packs_dir(custom_dir = None) -> Path:
+    if custom_dir:
+        return Path(custom_dir).resolve()
     script_dir = Path(__file__).resolve().parent
     return script_dir.parent / "references" / "rule-packs"
 
@@ -292,11 +294,15 @@ def plan_pack_changes(pack: dict, prof: dict) -> dict:
 
 
 def cmd_plan(args):
-    packs_dir = get_packs_dir()
+    packs_dir = get_packs_dir(getattr(args, "packs_dir", None))
     p = load_pack(args.pack_id, packs_dir)
-    prof_path = Path(args.profile).resolve()
+    root = Path(getattr(args, "root", ".")).resolve()
+    if Path(args.profile).is_absolute():
+        prof_path = Path(args.profile).resolve()
+    else:
+        prof_path = (root / args.profile).resolve()
     if not prof_path.is_file():
-        sys.exit(f"Profile not found: {args.profile}")
+        sys.exit(f"Profile not found: {prof_path}")
     prof = yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
 
     plan = plan_pack_changes(p, prof)
@@ -319,16 +325,34 @@ def cmd_plan(args):
     if plan["already_installed"]:
         print(f"\n  Already installed:  {len(plan['already_installed'])}")
 
+    files = list_repo_files(root)
+    violations_found = 0
+    for r in plan["to_add"]:
+        violations = probe_rule_violations(r, root, files)
+        if violations:
+            violations_found += len(violations)
+            print(f"\n  Probe violation for rule '{r['id']}':")
+            for v in violations[:5]:
+                print(f"    {v['file']}:{v['line']}: {v['match']}")
+            if len(violations) > 5:
+                print(f"    ... and {len(violations) - 5} more")
+
+    if violations_found > 0:
+        print(f"\n  Total probe violations detected: {violations_found}")
+
 
 def cmd_apply(args):
-    packs_dir = get_packs_dir()
+    packs_dir = get_packs_dir(getattr(args, "packs_dir", None))
     p = load_pack(args.pack_id, packs_dir)
-    prof_path = Path(args.profile).resolve()
+    root = Path(getattr(args, "root", ".")).resolve()
+    if Path(args.profile).is_absolute():
+        prof_path = Path(args.profile).resolve()
+    else:
+        prof_path = (root / args.profile).resolve()
     if not prof_path.is_file():
-        sys.exit(f"Profile not found: {args.profile}")
+        sys.exit(f"Profile not found: {prof_path}")
     prof = yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
 
-    root = Path(args.root).resolve()
     files = list_repo_files(root)
 
     except_ids = set()
@@ -349,6 +373,16 @@ def cmd_apply(args):
 
     plan = plan_pack_changes(p, prof)
     rules_to_apply = []
+
+    if plan["conflicts"]:
+        print(f"Conflicts ({len(plan['conflicts'])}):")
+        for c in plan["conflicts"]:
+            print(f"  ! {c['id']}: text differs from profile rule. Preserving existing rule and not overwriting.")
+
+    if plan["skipped"]:
+        print(f"Skipped ({len(plan['skipped'])}):")
+        for s_id, s_reason in plan["skipped"]:
+            print(f"  - {s_id}: {s_reason}")
 
     for r in plan["to_add"]:
         rid = r["id"]
@@ -400,6 +434,14 @@ def cmd_apply(args):
         prof["rules"] = []
     prof["rules"].extend(rules_to_apply)
 
+    vc = p.get("verify_checks") or []
+    if vc:
+        if "quality_gates" not in prof or not isinstance(prof["quality_gates"], list):
+            prof["quality_gates"] = []
+        for check_item in vc:
+            if check_item not in prof["quality_gates"]:
+                prof["quality_gates"].append(check_item)
+
     if "rule_packs" not in prof or not isinstance(prof["rule_packs"], list):
         prof["rule_packs"] = []
 
@@ -414,11 +456,15 @@ def cmd_apply(args):
 
 
 def cmd_diff(args):
-    packs_dir = get_packs_dir()
+    packs_dir = get_packs_dir(getattr(args, "packs_dir", None))
     p = load_pack(args.pack_id, packs_dir)
-    prof_path = Path(args.profile).resolve()
+    root = Path(getattr(args, "root", ".")).resolve()
+    if Path(args.profile).is_absolute():
+        prof_path = Path(args.profile).resolve()
+    else:
+        prof_path = (root / args.profile).resolve()
     if not prof_path.is_file():
-        sys.exit(f"Profile not found: {args.profile}")
+        sys.exit(f"Profile not found: {prof_path}")
     prof = yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
 
     rule_packs = prof.get("rule_packs", []) or []
@@ -546,27 +592,27 @@ def lint_pack_file(f: Path, all_seen_ids: dict, errors: list):
                     if not isinstance(exs["good"], list) or len(exs["good"]) == 0:
                         errors.append(f"{f.name}: rule '{rid}' check.examples.good must have at least 1 example")
 
-                if ctype == "forbid":
-                    pat = chk.get("pattern", "")
-                    try:
-                        rx = re.compile(pat)
+                    if ctype == "forbid":
+                        pat = chk.get("pattern", "")
+                        try:
+                            rx = re.compile(pat)
+                            for b in (exs.get("bad") or []):
+                                if not rx.search(b):
+                                    errors.append(f"{f.name}: rule '{rid}' selftest bad example did not match: {b}")
+                            for g in (exs.get("good") or []):
+                                if rx.search(g):
+                                    errors.append(f"{f.name}: rule '{rid}' selftest good example unexpectedly matched: {g}")
+                        except re.error as e:
+                            errors.append(f"{f.name}: rule '{rid}' regex pattern '{pat}' failed to compile: {e}")
+                    elif ctype == "forbid_file":
+                        inc = chk.get("include") or []
+                        exc = chk.get("exclude") or []
                         for b in (exs.get("bad") or []):
-                            if not rx.search(b):
-                                errors.append(f"{f.name}: rule '{rid}' selftest bad example did not match: {b}")
+                            if not matching_files([b], inc, exc):
+                                errors.append(f"{f.name}: rule '{rid}' selftest bad file example was not flagged: {b}")
                         for g in (exs.get("good") or []):
-                            if rx.search(g):
-                                errors.append(f"{f.name}: rule '{rid}' selftest good example unexpectedly matched: {g}")
-                    except re.error as e:
-                        errors.append(f"{f.name}: rule '{rid}' regex pattern '{pat}' failed to compile: {e}")
-                elif ctype == "forbid_file":
-                    inc = chk.get("include") or []
-                    exc = chk.get("exclude") or []
-                    for b in (exs.get("bad") or []):
-                        if not matching_files([b], inc, exc):
-                            errors.append(f"{f.name}: rule '{rid}' selftest bad file example was not flagged: {b}")
-                    for g in (exs.get("good") or []):
-                        if matching_files([g], inc, exc):
-                            errors.append(f"{f.name}: rule '{rid}' selftest good file example was flagged: {g}")
+                            if matching_files([g], inc, exc):
+                                errors.append(f"{f.name}: rule '{rid}' selftest good file example was flagged: {g}")
         elif enf == "test":
             errors.append(f"{f.name}: rule '{rid}' claims enforced_by test but has no check block")
 
@@ -582,19 +628,27 @@ def lint_pack_file(f: Path, all_seen_ids: dict, errors: list):
                     errors.append(f"{f.name}: verify_checks[{vidx}] contains em or en dashes")
 
 
-def cmd_lint(args):
-    packs_dir = get_packs_dir() if not getattr(args, "dir", None) else Path(args.dir)
+def lint_packs(packs_dir: Path = None) -> list:
+    if packs_dir is None:
+        packs_dir = get_packs_dir()
+    packs_dir = Path(packs_dir).resolve()
     if not packs_dir.is_dir():
-        sys.exit(f"Rule packs directory not found: {packs_dir}")
+        return [f"Rule packs directory not found: {packs_dir}"]
 
     files = sorted(packs_dir.glob("*.yaml"))
     if not files:
-        sys.exit(f"No rule pack files found in {packs_dir}")
+        return [f"No rule pack files found in {packs_dir}"]
 
     errors = []
     seen_ids = {}
     for f in files:
         lint_pack_file(f, seen_ids, errors)
+    return errors
+
+
+def cmd_lint(args):
+    packs_dir = get_packs_dir(getattr(args, "dir", None) or getattr(args, "packs_dir", None))
+    errors = lint_packs(packs_dir)
 
     if errors:
         print(f"Rule pack lint failed with {len(errors)} error(s):")
@@ -602,7 +656,7 @@ def cmd_lint(args):
             print(f"  - {err}")
         sys.exit(1)
 
-    print(f"OK: All {len(files)} rule packs passed lint checks with 0 errors.")
+    print(f"OK: All {len(list(packs_dir.glob('*.yaml')))} rule packs passed lint checks with 0 errors.")
 
 
 def main():
@@ -613,15 +667,19 @@ def main():
 
     p_show = sp.add_subparsers().add_parser("show", help="Show rule pack details") if False else sp.add_parser("show", help="Show rule pack details")
     p_show.add_argument("pack_id", help="Rule pack id")
+    p_show.add_argument("--packs-dir", default=None, help="Custom rule packs directory")
 
     p_plan = sp.add_parser("plan", help="Plan changes against project profile")
     p_plan.add_argument("pack_id", help="Rule pack id")
     p_plan.add_argument("--profile", default=".agents/project-profile.yaml", help="Profile path")
+    p_plan.add_argument("--root", default=".", help="Repository root path")
+    p_plan.add_argument("--packs-dir", default=None, help="Custom rule packs directory")
 
     p_apply = sp.add_parser("apply", help="Apply pack rules to project profile")
     p_apply.add_argument("pack_id", help="Rule pack id")
     p_apply.add_argument("--profile", default=".agents/project-profile.yaml", help="Profile path")
     p_apply.add_argument("--root", default=".", help="Repository root path")
+    p_apply.add_argument("--packs-dir", default=None, help="Custom rule packs directory")
     p_apply.add_argument("--except", dest="except_rules", default=None, help="Comma-separated rule ids to omit")
     p_apply.add_argument("--exception", action="append", help="rule:path:reason exception mapping")
     p_apply.add_argument("--yes", action="store_true", help="Confirm writing to profile without interactive prompt")
@@ -629,9 +687,11 @@ def main():
     p_diff = sp.add_parser("diff", help="Diff installed pack against packaged version")
     p_diff.add_argument("pack_id", help="Rule pack id")
     p_diff.add_argument("--profile", default=".agents/project-profile.yaml", help="Profile path")
+    p_diff.add_argument("--root", default=".", help="Repository root path")
+    p_diff.add_argument("--packs-dir", default=None, help="Custom rule packs directory")
 
     p_lint = sp.add_parser("lint", help="Lint all rule pack files")
-    p_lint.add_argument("--dir", default=None, help="Custom rule packs directory")
+    p_lint.add_argument("--dir", "--packs-dir", dest="dir", default=None, help="Custom rule packs directory")
 
     args = ap.parse_args()
 
