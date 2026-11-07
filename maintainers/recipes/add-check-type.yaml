@@ -1,0 +1,22 @@
+name: add-check-type
+args:
+  - check_type
+touchpoints:
+  - file: skills/rules-to-tests/scripts/run_rule_checks.py
+    contains: 'elif t == "{check_type}":'
+    why: Machine check execution logic in test runner
+  - file: skills/rules-to-tests/references/check-patterns.md
+    contains: "{check_type}"
+    why: Pattern catalog, configuration options, and examples
+  - file: skills/project-bootstrap/references/profile-schema.md
+    contains: "{check_type}"
+    why: Profile schema allowed check types definition
+  - file: skills/project-bootstrap/scripts/validate_profile.py
+    contains: '"{check_type}"'
+    why: Profile schema validator recognition in CHECK_TYPES
+  - file: skills/rules-to-tests/SKILL.md
+    contains: "{check_type}"
+    why: Operational guidance instructions for the check
+  - file: CHANGELOG.md
+    contains: "{check_type}"
+    why: Release notes entry recording new check type

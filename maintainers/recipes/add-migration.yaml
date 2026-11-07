@@ -1,0 +1,18 @@
+name: add-migration
+args:
+  - from_version
+  - to_version
+touchpoints:
+  - file: skills/project-bootstrap/scripts/migrate_profile.py
+    contains: "migrate_v{from_version}_to_v{to_version}"
+    why: Migration transformation function implementation
+  - file: skills/project-bootstrap/scripts/migrate_profile.py
+    contains: "{from_version}: migrate_v{from_version}_to_v{to_version}"
+    why: Registration in MIGRATIONS dictionary
+  - file: MAINTAINING.md
+    contains: "migrate_v{from_version}_to_v{to_version}"
+    why: Maintainer guide migration log
+  - file: tests/test_lifecycle.py
+    contains: "schema_version {from_version} -> {to_version}"
+    why: Automated migration lifecycle regression test
+

@@ -1,0 +1,22 @@
+{
+  "core": [
+    "atomic-commits",
+    "audit-and-planning",
+    "extend-pipeline",
+    "feature-delivery",
+    "project-blueprints",
+    "repo-search",
+    "sync-skills-and-docs"
+  ],
+  "new-app": [
+    "legal-and-settings-pages",
+    "product-spec",
+    "project-bootstrap",
+    "rules-to-tests",
+    "scaffold-app"
+  ],
+  "module": [
+    "targeted-module-testing"
+  ]
+}
+

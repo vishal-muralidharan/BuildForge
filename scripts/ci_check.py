@@ -130,6 +130,8 @@ def check_skills(skills_dir, errors):
                     errors.append(f"Frontmatter failure: '{skill_md}' description is missing.")
                 elif len(str(desc)) > 1024:
                     errors.append(f"Frontmatter failure: '{skill_md}' description length {len(str(desc))} > 1024.")
+                elif re.search(r"^\s*TODO:\s", str(desc)) or "TODO: describe" in str(desc):
+                    errors.append(f"Frontmatter failure: '{skill_md}' description contains unfinished TODO placeholder.")
 
                 if compat is not None and len(str(compat)) > 500:
                     errors.append(f"Frontmatter failure: '{skill_md}' compatibility length {len(str(compat))} > 500.")
@@ -528,6 +530,20 @@ def check_allowlist_integrity(integrity_path, errors):
             errors.append(f"Allowlist failure: could not parse integrity.json: {e}")
 
 
+def check_triggers_yaml(repo_root, errors):
+    triggers_file = os.path.join(repo_root, "tests", "triggers.yaml")
+    if os.path.isfile(triggers_file):
+        try:
+            with open(triggers_file, "r", encoding="utf-8") as fh:
+                for line_num, line in enumerate(fh, 1):
+                    if "TODO" in line:
+                        errors.append(
+                            f"Triggers failure: '{triggers_file}:{line_num}' contains unfinished TODO item."
+                        )
+        except Exception as e:
+            errors.append(f"Error reading triggers.yaml: {e}")
+
+
 def check_allowlist_pack_output(pack_json_str, errors):
     """Sub-check: npm pack --json output against ALLOWED_SKILLS."""
     import json
@@ -536,6 +552,10 @@ def check_allowlist_pack_output(pack_json_str, errors):
         files = pack_data[0].get("files", []) if pack_data else []
         for entry in files:
             path_str = entry.get("path", "").replace("\\", "/")
+            if path_str.startswith("maintainers/") or path_str.startswith("scripts/"):
+                errors.append(
+                    f"Packaging failure: npm pack includes unpackageable path '{path_str}'."
+                )
             parts = path_str.split("/")
             if len(parts) >= 2 and parts[0] == "skills":
                 skill_name = parts[1]
@@ -879,6 +899,16 @@ def run_field_adoption_tests(repo_root, errors):
             errors.append(f"Field adoption integration test failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_maintainer_tooling_tests(repo_root, errors):
+    test_script = os.path.join(repo_root, "tests", "test_maintainer_tooling.py")
+    if os.path.isfile(test_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_script], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Maintainer tooling test failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -888,6 +918,7 @@ def main():
     print("Running CI checks...")
     check_skills(skills_dir, errors)
     check_skill_placeholders(skills_dir, errors)
+    check_triggers_yaml(repo_root, errors)
     check_skill_contracts_rule(repo_root, errors)
     check_python_files(repo_root, errors)
     check_py_ast_lint(repo_root, errors)
@@ -936,6 +967,9 @@ def main():
 
     print("Running field adoption integration tests...")
     run_field_adoption_tests(repo_root, errors)
+
+    print("Running maintainer tooling tests...")
+    run_maintainer_tooling_tests(repo_root, errors)
 
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)

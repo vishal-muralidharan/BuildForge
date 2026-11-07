@@ -1,0 +1,19 @@
+name: add-cli-command
+args:
+  - command
+touchpoints:
+  - file: bin/build-forge.js
+    contains: "function {command}Command"
+    why: CLI command handler implementation
+  - file: bin/build-forge.js
+    contains: "'{command}'"
+    why: Command dispatcher and help listing
+  - file: bin/build-forge.js
+    contains: "{command}Command"
+    why: Module exports for CLI command
+  - file: README.md
+    contains: "build-forge {command}"
+    why: Documentation for command usage
+  - file: tests/test_lifecycle.py
+    contains: "{command}"
+    why: Integration test for command execution

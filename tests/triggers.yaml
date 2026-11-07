@@ -1,0 +1,156 @@
+atomic-commits:
+  positive:
+    - "commit these changes"
+    - "make an atomic commit"
+    - "create a git commit"
+    - "commit with conventional scope"
+    - "commit staged files"
+  negative:
+    - "run the test suite"
+    - "deploy to staging"
+    - "install npm packages"
+
+audit-and-planning:
+  positive:
+    - "plan this feature"
+    - "audit the codebase before starting"
+    - "create an atomic task plan"
+    - "plan bug fix steps"
+    - "diagnose root cause and plan"
+  negative:
+    - "push commits to origin"
+    - "format markdown tables"
+    - "publish npm package"
+
+extend-pipeline:
+  positive:
+    - "add external skill reference"
+    - "vet and pin third party skill"
+    - "install reference skill"
+    - "update pinned reference"
+    - "dedupe external references"
+  negative:
+    - "create an empty repository"
+    - "run unit tests"
+    - "check git branch status"
+
+feature-delivery:
+  positive:
+    - "run feature delivery pipeline"
+    - "conduct 7-stage build pipeline"
+    - "deliver this feature through all gates"
+    - "execute task through pipeline stages"
+    - "ship code using gated delivery"
+  negative:
+    - "read package readme"
+    - "list local git branches"
+    - "inspect node version"
+
+legal-and-settings-pages:
+  positive:
+    - "add privacy policy page"
+    - "create settings and account page"
+    - "add gdpr data deletion flow"
+    - "implement cookie terms consent"
+    - "scaffold terms of service page"
+  negative:
+    - "run python linter"
+    - "commit git staged diff"
+    - "build docker container"
+
+product-spec:
+  positive:
+    - "turn idea into a product spec"
+    - "create milestones and spec"
+    - "write product specification"
+    - "define user flows and milestones"
+    - "spec out new application"
+  negative:
+    - "run integration tests"
+    - "check python syntax"
+    - "inspect npm dependencies"
+
+project-blueprints:
+  positive:
+    - "extract project blueprint"
+    - "query codebase blueprints"
+    - "show auth and data blueprints"
+    - "check blueprint drift"
+    - "adopt blueprint facts"
+  negative:
+    - "create git tag"
+    - "publish release"
+    - "install dependencies"
+
+project-bootstrap:
+  positive:
+    - "bootstrap this project"
+    - "initialize build forge profile"
+    - "create AGENTS.md and project profile"
+    - "onboard repository to build forge"
+    - "run bootstrap skill"
+  negative:
+    - "deploy production site"
+    - "git cherry pick commit"
+    - "run ast linter"
+
+repo-search:
+  positive:
+    - "search repo for symbols"
+    - "find components and tokens"
+    - "read-only codebase discovery"
+    - "locate auth and layout patterns"
+    - "generate repository map"
+  negative:
+    - "delete source files"
+    - "make git commit"
+    - "install new skill"
+
+rules-to-tests:
+  positive:
+    - "turn rules into automated checks"
+    - "run rule machine checks"
+    - "add automated test for rule"
+    - "generate rule enforcement check"
+    - "check project profile rules"
+  negative:
+    - "publish npm package"
+    - "write product spec"
+    - "create user interview"
+
+scaffold-app:
+  positive:
+    - "scaffold green skeleton app"
+    - "scaffold new project skeleton"
+    - "generate initial app structure"
+    - "create skeleton application"
+    - "scaffold from framework template"
+  negative:
+    - "merge pull request"
+    - "run benchmark suite"
+    - "check git log"
+
+sync-skills-and-docs:
+  positive:
+    - "sync skills and documentation"
+    - "check doc and profile drift"
+    - "update repo map and readme"
+    - "run check sync tool"
+    - "detect profile and skills drift"
+  negative:
+    - "deploy to cloud host"
+    - "bump package version"
+    - "generate secret token"
+
+targeted-module-testing:
+  positive:
+    - "run targeted module testing"
+    - "run post-build verification"
+    - "verify build and test suite"
+    - "run module checks before deploy"
+    - "execute verification loop"
+  negative:
+    - "create git repository"
+    - "write marketing copy"
+    - "design ui mockup"
+

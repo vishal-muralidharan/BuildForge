@@ -1,0 +1,16 @@
+name: add-profile-field
+args:
+  - field_name
+touchpoints:
+  - file: skills/project-bootstrap/references/profile-schema.md
+    contains: "{field_name}"
+    why: Profile schema structure documentation
+  - file: skills/project-bootstrap/scripts/validate_profile.py
+    contains: '"{field_name}"'
+    why: Schema validator recognition and enforcement
+  - file: tests/test_validate_profile.py
+    contains: "{field_name}"
+    why: Automated validation test verifying the field
+  - file: CHANGELOG.md
+    contains: "{field_name}"
+    why: Release notes tracking profile field addition
