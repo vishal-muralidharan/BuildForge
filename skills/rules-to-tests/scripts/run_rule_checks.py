@@ -28,7 +28,7 @@ IGNORE_DIRS = {"node_modules", "dist", "build", ".git", ".next", ".nuxt", "cover
                "venv", "__pycache__", ".turbo", ".vercel", ".netlify", "target", "out"}
 ROOT_IGNORE = {".git", "node_modules", "dist", "build", ".DS_Store", "coverage"}
 MAX_BYTES = 1_000_000
-RUNNER_VERSION = 1
+RUNNER_VERSION = 2
 
 
 def expand_braces(pattern):
@@ -101,9 +101,16 @@ def run_check(rule, prof, root, files):
     chk = rule["check"]
     t = chk.get("type") if isinstance(chk, dict) else chk
     problems = []
+    excludes = list(chk.get("exclude") or []) if isinstance(chk, dict) else []
+    for exc in rule.get("exceptions", []) or []:
+        if isinstance(exc, dict) and exc.get("path"):
+            excludes.append(exc["path"])
+        elif isinstance(exc, str):
+            excludes.append(exc)
+
     if t == "forbid":
         rx = re.compile(chk["pattern"])
-        for rel in matching(files, chk.get("include"), chk.get("exclude")):
+        for rel in matching(files, chk.get("include"), excludes):
             p = root / rel
             try:
                 if p.stat().st_size > MAX_BYTES:
@@ -119,7 +126,7 @@ def run_check(rule, prof, root, files):
         if not (root / chk["path"]).exists():
             problems.append(f"missing file: {chk['path']}")
     elif t == "forbid_file":
-        for rel in matching(files, chk.get("include"), chk.get("exclude")):
+        for rel in matching(files, chk.get("include"), excludes):
             problems.append(f"forbidden file: {rel}")
     elif t == "root_only":
         allowed = {a.rstrip("/") for a in (prof.get("structure") or {}).get("root_allowed", [])}
@@ -153,12 +160,118 @@ def run_check(rule, prof, root, files):
     return problems
 
 
+def run_selftest(rules):
+    total_bad = 0
+    total_good = 0
+    failures = []
+
+    for r in rules:
+        chk = r.get("check")
+        if not isinstance(chk, dict):
+            continue
+        examples = chk.get("examples")
+        if not isinstance(examples, dict):
+            continue
+        t = chk.get("type")
+        rid = r.get("id", "unknown")
+        bad_examples = examples.get("bad", [])
+        good_examples = examples.get("good", [])
+
+        if t == "forbid":
+            pat = chk.get("pattern", "")
+            try:
+                rx = re.compile(pat)
+            except re.error as e:
+                failures.append(f"{rid}: Invalid regex '{pat}': {e}")
+                continue
+
+            for b in bad_examples:
+                total_bad += 1
+                if not rx.search(b):
+                    failures.append(f"{rid}: Bad example failed to match pattern: {b}")
+
+            for g in good_examples:
+                total_good += 1
+                if rx.search(g):
+                    failures.append(f"{rid}: Good example unexpectedly matched pattern: {g}")
+
+        elif t == "forbid_file":
+            inc = chk.get("include") or []
+            exc = list(chk.get("exclude") or [])
+            for e in r.get("exceptions", []) or []:
+                if isinstance(e, dict) and e.get("path"):
+                    exc.append(e["path"])
+                elif isinstance(e, str):
+                    exc.append(e)
+
+            for b in bad_examples:
+                total_bad += 1
+                matched = matching([b], inc, exc)
+                if not matched:
+                    failures.append(f"{rid}: Bad file example was not flagged: {b}")
+
+            for g in good_examples:
+                total_good += 1
+                matched = matching([g], inc, exc)
+                if matched:
+                    failures.append(f"{rid}: Good file example was unexpectedly flagged: {g}")
+
+    if failures:
+        print(f"Selftest failed ({len(failures)} failure(s)):")
+        for f in failures:
+            print(f"  FAIL: {f}")
+        return False
+
+    print(f"Selftest passed: {total_bad} bad example(s) caught, {total_good} good example(s) allowed.")
+    return True
+
+
+def explain_rule(r):
+    rid = r.get("id", "unknown")
+    print(f"Rule: {rid}")
+    print(f"Area: {r.get('area', 'none')}")
+    print(f"Text: {r.get('text', '')}")
+    print(f"Enforced by: {r.get('enforced_by', 'manual')}")
+    chk = r.get("check")
+    if isinstance(chk, dict):
+        print(f"Check type: {chk.get('type')}")
+        if "pattern" in chk:
+            print(f"Pattern: {chk['pattern']}")
+        if "include" in chk:
+            print(f"Include: {chk['include']}")
+        if "exclude" in chk:
+            print(f"Exclude: {chk['exclude']}")
+        if "hint" in chk:
+            print(f"Hint: {chk['hint']}")
+        if "examples" in chk:
+            exs = chk["examples"]
+            print("Examples:")
+            print(f"  Bad: {exs.get('bad', [])}")
+            print(f"  Good: {exs.get('good', [])}")
+    elif chk:
+        print(f"Check: {chk}")
+    else:
+        print("Check: none")
+    exceptions = r.get("exceptions") or []
+    if exceptions:
+        print(f"Exceptions ({len(exceptions)}):")
+        for exc in exceptions:
+            if isinstance(exc, dict):
+                print(f"  - Path: {exc.get('path')} | Reason: {exc.get('reason')}")
+            else:
+                print(f"  - {exc}")
+    else:
+        print("Exceptions: none")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", default=".agents/project-profile.yaml")
     ap.add_argument("--root", default=".")
     ap.add_argument("--only", default=None)
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--selftest", action="store_true", help="Run self-tests on rule examples.")
+    ap.add_argument("--explain", default=None, metavar="RULE_ID", help="Explain a rule by id.")
     a = ap.parse_args()
 
     root = Path(a.root).resolve()
@@ -167,6 +280,18 @@ def main():
         prof_path = root / a.profile
     prof = yaml.safe_load(prof_path.read_text()) or {}
     rules = prof.get("rules") or []
+
+    if a.selftest:
+        ok = run_selftest(rules)
+        sys.exit(0 if ok else 1)
+
+    if a.explain:
+        matching_rules = [r for r in rules if r.get("id") == a.explain]
+        if not matching_rules:
+            sys.exit(f"No rule found with id '{a.explain}'")
+        explain_rule(matching_rules[0])
+        return
+
     checked = [r for r in rules if isinstance(r.get("check"), (dict, str))]
     unchecked = [r for r in rules if not isinstance(r.get("check"), (dict, str))]
 
@@ -174,7 +299,9 @@ def main():
         for r in checked:
             chk = r["check"]
             ctype = chk.get("type") if isinstance(chk, dict) else chk
-            print(f"{r['id']}: {ctype}")
+            exc_count = len(r.get("exceptions", []) or [])
+            exc_str = f" ({exc_count} exception{'s' if exc_count != 1 else ''})" if exc_count else ""
+            print(f"{r['id']}: {ctype}{exc_str}")
         print(f"\n{len(checked)} checked, {len(unchecked)} without a check")
         return
     if a.only:
@@ -189,6 +316,9 @@ def main():
         if problems:
             failed += 1
             print(f"FAIL {r['id']}: {r['text']}")
+            hint = r.get("check", {}).get("hint") if isinstance(r.get("check"), dict) else None
+            if hint:
+                print(f"     Hint: {hint}")
             for line in problems[:5]:
                 print(f"     {line}")
             if len(problems) > 5:

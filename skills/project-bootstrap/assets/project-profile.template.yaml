@@ -103,12 +103,14 @@ capabilities:               # optional helpers. A disabled slot is skipped by th
 #    path: ""               # set when installed, relative to the repo root
 
 rules:                      # write each rule ONCE, here
+  # Rule packs available: web-hazards, native-controls
   - id: "example-rule"
     area: design            # design, tokens, motion, responsive, structure, naming, data, security, verify, git, docs, process
     text: "One sentence. Imperative."
     enforced_by: manual     # manual | test | lint
     # optional machine check, run by rules-to-tests. Types: forbid, require_file, forbid_file, root_only
-    # check: {type: forbid, pattern: '#[0-9a-fA-F]{3,8}\b', include: ["src/**/*.css"], exclude: ["src/index.css"]}
+    # check: {type: forbid, pattern: '#[0-9a-fA-F]{3,8}\b', include: ["src/**/*.css"], exclude: ["src/index.css"], hint: "Use tokens", examples: {bad: ["#fff"], good: ["var(--bg)"]}}
+    # exceptions: [{path: "src/legacy/button.css", reason: "Migration in progress"}]
 
 docs:
   readme: README.md

@@ -28,9 +28,10 @@ ENFORCED = {"manual", "test", "lint", "check"}
 STATUS = {"declared", "installed", "rejected"}
 PUSH = {"never", "ask", "allowed"}
 MODES = {"existing", "new"}
-RULE_KEYS = {"id", "area", "text", "enforced_by", "check", "evidence"}
+RULE_KEYS = {"id", "area", "text", "enforced_by", "check", "evidence", "exceptions"}
 CHECK_TYPES = {"forbid", "require_file", "forbid_file", "root_only", "no_dual_homed_skills"}
-CHECK_KEYS = {"type", "pattern", "include", "exclude", "path"}
+CHECK_KEYS = {"type", "pattern", "include", "exclude", "path", "examples", "hint"}
+KNOWN_PACKS = {"web-hazards", "native-controls"}
 NAMING_KEYS = {"item", "style", "example"}
 LAYER_KEYS = {"path", "purpose"}
 BP_KEYS = {"from", "layout"}
@@ -356,6 +357,26 @@ def main():
                     ep_norm = strip_dot_slash(ep_clean)
                     if ep_norm and not (root_path / ep_norm).exists():
                         warnings.append(f"rule {rid} evidence path does not exist: '{ep}'")
+        exc = r.get("exceptions")
+        if exc is not None:
+            if not isinstance(exc, list):
+                errors.append(f"rules[{i}] ({rid}) exceptions must be a list")
+            else:
+                for xidx, item in enumerate(exc):
+                    if not isinstance(item, dict):
+                        errors.append(f"rules[{i}] ({rid}) exceptions[{xidx}] must be a mapping with path and reason")
+                        continue
+                    epath = item.get("path")
+                    reason = item.get("reason")
+                    if not epath or not isinstance(epath, str):
+                        errors.append(f"rules[{i}] ({rid}) exceptions[{xidx}].path is required")
+                    if not reason or not isinstance(reason, str) or not reason.strip():
+                        errors.append(f"rules[{i}] ({rid}) exceptions[{xidx}].reason is required and non-empty")
+                    if a.root and epath and isinstance(epath, str):
+                        root_path = Path(a.root)
+                        norm_epath = strip_dot_slash(epath)
+                        if not path_matches(root_path, norm_epath):
+                            warnings.append(f"rule {rid} exception path matches no file: '{epath}'")
         chk = r.get("check")
         if chk is not None:
             if isinstance(chk, str):
@@ -381,6 +402,16 @@ def main():
                     errors.append(f"rules[{i}] ({rid}) check.path is required for require_file")
                 if t == "root_only" and not get(prof, "structure.root_allowed"):
                     errors.append(f"rules[{i}] ({rid}) root_only needs structure.root_allowed")
+                if "examples" in chk:
+                    exs = chk["examples"]
+                    if not isinstance(exs, dict):
+                        errors.append(f"rules[{i}] ({rid}) check.examples must be a mapping with bad and good lists")
+                    else:
+                        for ek in ("bad", "good"):
+                            if ek in exs and not isinstance(exs[ek], list):
+                                errors.append(f"rules[{i}] ({rid}) check.examples.{ek} must be a list of strings")
+                if "hint" in chk and not isinstance(chk["hint"], str):
+                    errors.append(f"rules[{i}] ({rid}) check.hint must be a string")
             if r.get("enforced_by") != "test":
                 warnings.append(f"rule {rid} has a check, so enforced_by should be test")
         if r.get("enforced_by") in ("test", "lint") and not get(prof, "design.enforced_by") and r.get("area") in ("design", "tokens"):

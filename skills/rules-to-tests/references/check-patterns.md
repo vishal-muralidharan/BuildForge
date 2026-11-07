@@ -7,8 +7,9 @@ YAML tip: write regexes in single quotes so backslashes stay literal.
 ## Contents
 
 1. Patterns
-2. Narrowing a noisy pattern
-3. What a script cannot judge
+2. Rule packs
+3. Narrowing a noisy pattern
+4. What a script cannot judge
 
 ## 1. Patterns
 
@@ -124,14 +125,133 @@ check:
   include: ["src/pages/**"]
 ```
 
-## 2. Narrowing a noisy pattern
+## 2. Rule packs
+
+Ready packs combining multiple rules for common stacks.
+
+### Web hazards pack (`web-hazards`)
+
+Common security and hygiene hazards to prevent in any web codebase. Each rule has a check, examples and a hint.
+
+#### 1. No console in shipped code (`web-no-console`)
+
+```yaml
+- id: web-no-console
+  area: verify
+  text: Never ship console.log or console.debug in production code. Use a dedicated logger or test file.
+  enforced_by: test
+  check:
+    type: forbid
+    pattern: '(?<![\w.$])console\.(?:log|debug)\s*\('
+    include: ["src/**/*.{js,jsx,ts,tsx,vue,svelte,html}"]
+    exclude: ["**/*.test.*", "**/*.spec.*", "src/test/**"]
+    hint: Remove console.log or console.debug, or use a dedicated logging primitive.
+    examples:
+      bad:
+        - 'console.log("user data:", user);'
+        - 'console.debug("fetching auth state");'
+      good:
+        - 'console.error("failed to initialize:", err);'
+        - 'console.warn("deprecated property accessed");'
+        - 'logger.log("audit event");'
+```
+
+#### 2. Target blank rel protection (`web-target-blank-rel`)
+
+Flags `target="_blank"` without `rel` containing `noopener` or `noreferrer` on the same tag line.
+Note on multi-line limit: Multi-line HTML tags where `rel` is on a separate line are not matched by this single-line regex.
+
+```yaml
+- id: web-target-blank-rel
+  area: security
+  text: Links with target="_blank" must include rel="noopener" or rel="noreferrer" on the same line to avoid tabnabbing.
+  enforced_by: test
+  check:
+    type: forbid
+    pattern: '^(?!.*rel=["\x27][^"\x27]*(?:noopener|noreferrer)).*target=["\x27]_blank["\x27]'
+    include: ["src/**/*.{js,jsx,ts,tsx,vue,svelte,html}"]
+    hint: Add rel="noopener" or rel="noopener noreferrer" to links with target="_blank".
+    examples:
+      bad:
+        - '<a href="https://example.com" target="_blank">External Link</a>'
+        - "<a target='_blank' href=\"https://example.com\">Documentation</a>"
+      good:
+        - '<a href="https://example.com" target="_blank" rel="noopener">External Link</a>'
+        - '<a href="https://example.com" rel="noopener noreferrer" target="_blank">Documentation</a>'
+        - '<a href="/dashboard" target="_self">Dashboard</a>'
+```
+
+#### 3. No raw eval (`web-no-raw-eval`)
+
+```yaml
+- id: web-no-raw-eval
+  area: security
+  text: Never use eval() or equivalent dynamic execution without a listed exception.
+  enforced_by: test
+  check:
+    type: forbid
+    pattern: '(?<![\w$])(?:window\.)?eval\s*\('
+    include: ["src/**/*.{js,jsx,ts,tsx,vue,svelte,html}"]
+    hint: Do not use eval(). Parse structured data with JSON.parse or safe dispatch.
+    examples:
+      bad:
+        - 'eval(untrustedInput);'
+        - 'window.eval("calculate()");'
+      good:
+        - 'JSON.parse(untrustedInput);'
+        - 'calculateValue(payload);'
+```
+
+#### 4. No raw innerHTML or dangerouslySetInnerHTML (`web-no-inner-html`)
+
+```yaml
+- id: web-no-inner-html
+  area: security
+  text: Never assign to innerHTML or use dangerouslySetInnerHTML without a listed exception.
+  enforced_by: test
+  check:
+    type: forbid
+    pattern: '(?<![\w$])(?:innerHTML\s*=|dangerouslySetInnerHTML\b)'
+    include: ["src/**/*.{js,jsx,ts,tsx,vue,svelte,html}"]
+    hint: Do not inject raw HTML. Use textContent or sanitized framework primitives.
+    examples:
+      bad:
+        - 'container.innerHTML = renderedSnippet;'
+        - '<div dangerouslySetInnerHTML={{ __html: rawHtml }} />'
+      good:
+        - 'container.textContent = textValue;'
+        - '<div className="content">{textValue}</div>'
+```
+
+#### 5. No committed .env file (`web-no-committed-env`)
+
+```yaml
+- id: web-no-committed-env
+  area: security
+  text: Never commit .env files containing local configurations or secrets.
+  enforced_by: test
+  check:
+    type: forbid_file
+    include: [".env", ".env.local", ".env.*.local", "**/.env", "**/.env.local"]
+    exclude: [".env.example", ".env.template", "**/.env.example", "**/.env.template"]
+    hint: Never commit .env files with secrets or local config. Add .env to .gitignore and commit .env.example.
+    examples:
+      bad:
+        - '.env'
+        - 'apps/web/.env.local'
+      good:
+        - '.env.example'
+        - 'apps/web/.env.template'
+```
+
+## 3. Narrowing a noisy pattern
 
 - **Too many hits on valid code:** tighten with lookbehind, such as `(?<![\w&/])`, or require a surrounding character.
 - **A known safe file:** add it to `exclude`. List it by path. Never exclude a whole source folder.
 - **Generated files:** exclude the generated folder explicitly.
 - **Tests that must contain the bad value:** exclude `**/*.test.*`.
 
-## 3. What a script cannot judge
+## 4. What a script cannot judge
 
 Leave these as `manual`, or cover them with browser checks if that capability is on:
 
