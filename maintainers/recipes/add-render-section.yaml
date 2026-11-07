@@ -11,3 +11,4 @@ touchpoints:
   - file: tests/test_render_custom_blocks.py
     contains: "{section_name}"
     why: Automated test asserting section generation and custom block preservation
+

@@ -45,3 +45,4 @@ Run `python3 scripts/dev.py recipe verify <name> --arg key=value` to confirm all
 
 Scaffolding templates live under `maintainers/templates/`:
 - `templates/skill/SKILL.md`: base template for new skills.
+

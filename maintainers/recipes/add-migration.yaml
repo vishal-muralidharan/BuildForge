@@ -15,3 +15,4 @@ touchpoints:
   - file: tests/test_lifecycle.py
     contains: "schema_version {from_version} -> {to_version}"
     why: Automated migration lifecycle regression test
+

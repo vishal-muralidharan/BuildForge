@@ -385,10 +385,13 @@ def cmd_fixture(args, repo_root: Path) -> None:
         print(f"Created new fixture directory at {target_dir} with INVENTED.md.")
 
     elif action == "check":
-        fixture_roots = [
-            repo_root / "tests" / "fixtures",
-            repo_root / "tests" / "evals" / "fixtures",
-        ]
+        if getattr(args, "root", None):
+            fixture_roots = [Path(args.root)]
+        else:
+            fixture_roots = [
+                repo_root / "tests" / "fixtures",
+                repo_root / "tests" / "evals" / "fixtures",
+            ]
 
         allowed_hosts = {"example.com", "example.org", "localhost", "127.0.0.1"}
         forbidden_license_phrases = ["copyright (c)", "spdx-license-identifier", "licensed under"]
@@ -419,7 +422,10 @@ def cmd_fixture(args, repo_root: Path) -> None:
 
                     for fname in files:
                         p = Path(root, fname)
-                        rel = p.relative_to(repo_root).as_posix()
+                        try:
+                            rel = p.relative_to(repo_root).as_posix()
+                        except ValueError:
+                            rel = p.as_posix()
 
                         # 2. No file over 50 KB
                         try:
@@ -600,6 +606,7 @@ def main():
     p_fix = subparsers.add_parser("fixture", help="Manage test fixtures")
     p_fix.add_argument("fixture_action", choices=["new", "check"], help="Fixture action")
     p_fix.add_argument("name", nargs="?", default="", help="Fixture name (for new)")
+    p_fix.add_argument("--root", default=None, help="Root folder to check (for check)")
 
     # release-plan
     subparsers.add_parser("release-plan", help="Generate read only release plan")
@@ -622,3 +629,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

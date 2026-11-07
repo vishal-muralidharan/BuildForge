@@ -14,3 +14,4 @@ touchpoints:
   - file: skills/rules-to-tests/references/check-patterns.md
     contains: "{pack_name}"
     why: Check patterns and documentation for the pack rules
+

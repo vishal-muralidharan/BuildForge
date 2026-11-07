@@ -58,3 +58,4 @@ Edits to `skills/` require explicit maintainer approval in the prompt before any
 
 7. **Version bump advice**
    Adding a new skill is a minor version bump (for example, 0.1.0 to 0.2.0).
+

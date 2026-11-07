@@ -13,3 +13,4 @@ description: "TODO: describe <this-skill> trigger words and purpose"
 
 ## Rules
 - Respect project profile configuration and constraints.
+
