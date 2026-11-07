@@ -1,0 +1,25 @@
+name: add-skill
+args:
+  - name
+touchpoints:
+  - file: skills/{name}/SKILL.md
+    contains: "name: {name}"
+    why: Skill definition entrypoint and frontmatter boundary
+  - file: scripts/ci_check.py
+    contains: '"{name}",'
+    why: ALLOWED_SKILLS allowlist in CI verification
+  - file: tiers.json
+    contains: '"{name}"'
+    why: Skill tier classification registry
+  - file: tests/triggers.yaml
+    contains: "{name}:"
+    why: Trigger phrase test suite positive and negative assertions
+  - file: integrity.json
+    contains: "skills/{name}/SKILL.md"
+    why: SHA-256 package integrity manifest
+  - file: README.md
+    contains: "`{name}`"
+    why: Main skills documentation table
+  - file: CHANGELOG.md
+    contains: "`{name}`"
+    why: Unreleased additions tracking new skill

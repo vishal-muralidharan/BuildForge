@@ -1,0 +1,19 @@
+name: add-analyzer
+args:
+  - area
+touchpoints:
+  - file: skills/project-blueprints/scripts/analyzers/{area}.py
+    contains: "def extract("
+    why: Analyzer fact extraction function
+  - file: skills/project-blueprints/scripts/blueprint.py
+    contains: "{area}"
+    why: Blueprint runner analyzer import and dispatch
+  - file: skills/project-blueprints/references/blueprint-format.md
+    contains: "{area}"
+    why: Blueprint markdown format specification
+  - file: skills/project-blueprints/SKILL.md
+    contains: "{area}"
+    why: Operational guidance mentioning the analyzer area
+  - file: tests/test_project_blueprints.py
+    contains: "{area}"
+    why: Automated unit and integration test coverage

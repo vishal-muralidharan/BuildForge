@@ -1,0 +1,16 @@
+name: add-rule-pack
+args:
+  - pack_name
+touchpoints:
+  - file: skills/project-bootstrap/references/profile-schema.md
+    contains: "{pack_name}"
+    why: Profile schema allowed pack definitions
+  - file: skills/project-bootstrap/assets/project-profile.template.yaml
+    contains: "{pack_name}"
+    why: Starter profile template presets
+  - file: skills/project-bootstrap/scripts/validate_profile.py
+    contains: "{pack_name}"
+    why: Profile schema validation for rule packs
+  - file: skills/rules-to-tests/references/check-patterns.md
+    contains: "{pack_name}"
+    why: Check patterns and documentation for the pack rules

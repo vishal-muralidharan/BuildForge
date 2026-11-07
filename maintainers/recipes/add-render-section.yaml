@@ -1,0 +1,13 @@
+name: add-render-section
+args:
+  - section_name
+touchpoints:
+  - file: skills/project-bootstrap/scripts/render.py
+    contains: "{section_name}"
+    why: Generator logic for the rendered markdown section
+  - file: skills/sync-skills-and-docs/scripts/check_sync.py
+    contains: "{section_name}"
+    why: Section drift detection and synchronization logic
+  - file: tests/test_render_custom_blocks.py
+    contains: "{section_name}"
+    why: Automated test asserting section generation and custom block preservation
