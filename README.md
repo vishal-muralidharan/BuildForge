@@ -733,3 +733,6 @@ Build Forge is distributed under the [Build Forge License](LICENSE). Below is a 
 ## Maintainers
 
 For release steps, skill updates, and repo administration, see [MAINTAINING.md](MAINTAINING.md).
+Maintainer tooling, playbooks, recipes, and templates live in [maintainers/README.md](maintainers/README.md).
+Run maintainer workflows through `python3 scripts/dev.py`.
+Internal maintainer tooling and scripts are excluded from npm packaging.

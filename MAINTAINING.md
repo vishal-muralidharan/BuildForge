@@ -4,25 +4,39 @@ This guide covers publishing, skill changes, testing, and repository settings fo
 
 The rules in [AGENTS.md](AGENTS.md) apply to all work in this repository.
 
+## Maintainer toolkit (`scripts/dev.py`)
+
+Maintainer tasks use `scripts/dev.py`:
+- Scaffold a new skill: `python3 scripts/dev.py new-skill <name> --tier core|new-app|module [--scripts] [--refs]`
+- Run checks: `python3 scripts/dev.py check [--fast]`
+- Search impact: `python3 scripts/dev.py impact <token>`
+- Manage recipes: `python3 scripts/dev.py recipe list | show <name> | verify <name> --arg key=value`
+- Manage fixtures: `python3 scripts/dev.py fixture new <name> | check`
+- Release readiness: `python3 scripts/dev.py release-plan`
+
+For playbooks, recipes, and templates, see [maintainers/README.md](maintainers/README.md).
+
 ## Release steps
 
 Follow these steps to publish a new release:
 
-1. Update the version number in `package.json`.
-2. Run `python3 scripts/make_integrity.py` to refresh `integrity.json`.
-3. Run `python3 scripts/ci_check.py` to ensure all checks pass.
-4. Run `npm pack --dry-run` and inspect the packaged file list.
-5. Commit the version bump, integrity manifest, and any doc updates.
-6. Create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
-7. In GitHub Actions, approve the deployment to the "release" environment so `publish.yml` executes.
+1. Run `python3 scripts/dev.py release-plan` to inspect readiness and suggested bump.
+2. Update the version number in `package.json`.
+3. Run `python3 scripts/make_integrity.py` to refresh `integrity.json`.
+4. Run `python3 scripts/dev.py check` to ensure all checks pass.
+5. Run `npm pack --dry-run` and inspect the packaged file list (assert `maintainers/` and `scripts/` are excluded).
+6. Commit the version bump, integrity manifest, and doc updates.
+7. Create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
+8. In GitHub Actions, approve the deployment to the "release" environment so `publish.yml` executes.
 
 ## How to change a skill
 
 1. Changes to files under `skills/` require prior maintainer approval.
-2. Make the approved modifications.
-3. Regenerate `integrity.json` by running `python3 scripts/make_integrity.py`.
-4. Add an entry describing the changes in [CHANGELOG.md](CHANGELOG.md).
-5. Verify changes with `python3 scripts/ci_check.py`.
+2. Read the playbook at `maintainers/skills/author-skill/SKILL.md`.
+3. Make approved modifications.
+4. Regenerate `integrity.json` by running `python3 scripts/make_integrity.py`.
+5. Add an entry describing the changes in [CHANGELOG.md](CHANGELOG.md).
+6. Verify changes with `python3 scripts/dev.py check`.
 
 ## How to test locally
 
