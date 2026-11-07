@@ -28,7 +28,7 @@ ENFORCED = {"manual", "test", "lint", "check"}
 STATUS = {"declared", "installed", "rejected"}
 PUSH = {"never", "ask", "allowed"}
 MODES = {"existing", "new"}
-RULE_KEYS = {"id", "area", "text", "enforced_by", "check", "evidence", "exceptions"}
+RULE_KEYS = {"id", "area", "text", "enforced_by", "check", "evidence", "exceptions", "pack", "enforced_by_ref"}
 CHECK_TYPES = {"forbid", "require_file", "forbid_file", "root_only", "no_dual_homed_skills"}
 CHECK_KEYS = {"type", "pattern", "include", "exclude", "path", "examples", "hint"}
 KNOWN_PACKS = {"web-hazards", "native-controls"}
@@ -89,6 +89,7 @@ def main():
     ap.add_argument("--root", default=None)
     ap.add_argument("--strict", action="store_true")
     ap.add_argument("--strict-paths", action="store_true", help="Treat unmatched paths and globs as errors.")
+    ap.add_argument("--strict-claims", action="store_true", help="Treat claim-unverified warnings as errors.")
     a = ap.parse_args()
 
     errors, warnings = [], []
@@ -322,6 +323,51 @@ def main():
         if isinstance(val, (list, dict)):
             errors.append(f"Do not store lists of keys or tokens in profile ({banned_path}). Facts belong in blueprints.")
 
+    # Discover packaged rule packs
+    script_dir = Path(__file__).resolve().parent
+    packaged_packs_dir = script_dir.parent / "references" / "rule-packs"
+    packaged_packs = {}
+    if packaged_packs_dir.is_dir():
+        for yf in packaged_packs_dir.glob("*.yaml"):
+            try:
+                ydata = yaml.safe_load(yf.read_text(encoding="utf-8")) or {}
+                if isinstance(ydata, dict) and "id" in ydata and "version" in ydata:
+                    packaged_packs[ydata["id"]] = ydata["version"]
+            except Exception:
+                pass
+
+    rule_packs = prof.get("rule_packs")
+    if rule_packs is not None:
+        if not isinstance(rule_packs, list):
+            errors.append("rule_packs must be a list")
+        else:
+            for rpidx, rp in enumerate(rule_packs):
+                if not isinstance(rp, dict):
+                    errors.append(f"rule_packs[{rpidx}] must be a mapping")
+                    continue
+                pid = rp.get("id")
+                pver = rp.get("version")
+                if not pid or not isinstance(pid, str):
+                    errors.append(f"rule_packs[{rpidx}].id is required")
+                if pver is None or not isinstance(pver, int):
+                    errors.append(f"rule_packs[{rpidx}].version is required and must be an integer")
+                if pid and packaged_packs:
+                    if pid not in packaged_packs:
+                        warnings.append(f"rule_packs[{rpidx}] unknown pack id '{pid}'")
+                    elif isinstance(pver, int) and pver < packaged_packs[pid]:
+                        warnings.append(
+                            f"rule_packs[{rpidx}] pack '{pid}' version {pver} is older than packaged version {packaged_packs[pid]}"
+                        )
+
+    dropped_rules = prof.get("dropped_pack_rules")
+    if dropped_rules is not None:
+        if not isinstance(dropped_rules, list):
+            errors.append("dropped_pack_rules must be a list of rule ids")
+        else:
+            for dridx, dr in enumerate(dropped_rules):
+                if not isinstance(dr, str) or not dr.strip():
+                    errors.append(f"dropped_pack_rules[{dridx}] must be a non-empty string rule id")
+
     ids = set()
     for i, r in enumerate(prof.get("rules") or []):
         if not isinstance(r, dict):
@@ -377,6 +423,20 @@ def main():
                         norm_epath = strip_dot_slash(epath)
                         if not path_matches(root_path, norm_epath):
                             warnings.append(f"rule {rid} exception path matches no file: '{epath}'")
+        rpack = r.get("pack")
+        if rpack is not None:
+            if not isinstance(rpack, str) or not re.match(r"^[a-z0-9-]+@\d+$", rpack):
+                errors.append(f"rules[{i}] ({rid}) pack '{rpack}' must be in format <id>@<version>")
+        e_ref = r.get("enforced_by_ref")
+        if e_ref is not None:
+            if not isinstance(e_ref, dict):
+                errors.append(f"rules[{i}] ({rid}) enforced_by_ref must be a mapping")
+            else:
+                bad_ref_keys = sorted(set(e_ref) - {"file", "contains"})
+                if bad_ref_keys:
+                    errors.append(f"rules[{i}] ({rid}) enforced_by_ref has unexpected keys: {bad_ref_keys}")
+                if not e_ref.get("file") or not isinstance(e_ref["file"], str):
+                    errors.append(f"rules[{i}] ({rid}) enforced_by_ref.file is required")
         chk = r.get("check")
         if chk is not None:
             if isinstance(chk, str):
@@ -414,8 +474,41 @@ def main():
                     errors.append(f"rules[{i}] ({rid}) check.hint must be a string")
             if r.get("enforced_by") != "test":
                 warnings.append(f"rule {rid} has a check, so enforced_by should be test")
-        if r.get("enforced_by") in ("test", "lint") and not get(prof, "design.enforced_by") and r.get("area") in ("design", "tokens"):
-            warnings.append(f"rule {rid} claims {r['enforced_by']} enforcement but design.enforced_by is empty")
+        claim_issue = errors.append if a.strict_claims else warnings.append
+        enforced = r.get("enforced_by", "manual")
+        if enforced in ("test", "lint"):
+            has_check = chk is not None
+            has_ref = e_ref is not None and bool(e_ref.get("file"))
+            is_design_covered = False
+            design_enforced_by = get(prof, "design.enforced_by")
+            if r.get("area") in ("design", "tokens") and design_enforced_by:
+                if a.root:
+                    des_file = root_path / strip_dot_slash(design_enforced_by)
+                    if des_file.is_file():
+                        try:
+                            if f"[{rid}]" in des_file.read_text(encoding="utf-8", errors="ignore"):
+                                is_design_covered = True
+                        except Exception:
+                            pass
+                else:
+                    is_design_covered = True
+
+            if not (has_check or has_ref or is_design_covered):
+                claim_issue(f"claim-unverified: rule {rid} claims {enforced} enforcement without check or enforced_by_ref")
+
+            if a.root and has_ref:
+                ref_file_rel = strip_dot_slash(e_ref["file"])
+                ref_file = root_path / ref_file_rel
+                if not ref_file.exists():
+                    claim_issue(f"rule {rid} enforced_by_ref file not found: '{e_ref['file']}'")
+                else:
+                    expected_contains = e_ref.get("contains") or f"[{rid}]"
+                    try:
+                        f_text = ref_file.read_text(encoding="utf-8", errors="ignore")
+                        if expected_contains not in f_text:
+                            claim_issue(f"rule {rid} enforced_by_ref file '{e_ref['file']}' does not contain '{expected_contains}'")
+                    except Exception as ex:
+                        claim_issue(f"rule {rid} cannot read enforced_by_ref file '{e_ref['file']}': {ex}")
 
     for field in ("docs.skills_dir", "docs.agents_file", "docs.repo_map"):
         if not get(prof, field):

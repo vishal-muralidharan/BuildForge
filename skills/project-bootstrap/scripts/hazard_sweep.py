@@ -120,6 +120,12 @@ def define_hazard_specs(traits: dict):
         "description": "Prevent unstyled native pickers, selects, and browser dialogs.",
         "checks": [
             {
+                "id": "ui-no-native-pickers",
+                "pattern": r"(?<![\w-])type\s*=\s*(?:\{\s*)?[\"'](?:date|time|color|datetime-local|month|week)[\"']",
+                "exts": (".jsx", ".tsx", ".html", ".vue", ".svelte"),
+                "exclude_dirs": ["components/ui", "components/primitives"]
+            },
+            {
                 "id": "ui-no-native-selects",
                 "pattern": r"<select\b",
                 "exts": (".jsx", ".tsx", ".html", ".vue", ".svelte"),

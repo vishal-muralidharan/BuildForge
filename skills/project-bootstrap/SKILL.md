@@ -46,7 +46,17 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
 5. Scaffold and extract blueprints on day 0:
    After the profile exists, run `python3 .agents/skills/project-blueprints/scripts/blueprint.py init` then `python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`. Show `candidates.md` in batches by area and ask which become rules. Add accepted candidates to the profile with evidence.
 6. Move every remaining uninventoried rule from guideline files into the `rules` list. One sentence each, imperative, with an id and an area. Set `enforced_by` to `test` or `lint` only after you find the test or lint rule that enforces it. Otherwise use `manual`. Add 1 default yes proposal for the rule `refs-no-dual-home`, shown with the other rule proposals and applied only after the user says yes. Say that a reference lives in `.agents/vendor` or `.agents/skills`, never both.
-7. Hazard sweep:
+7. Rule pack proposals:
+   After the draft profile is written, evaluate `applies_when` for every pack against detected platforms and tech hints using `python3 .agents/skills/project-bootstrap/scripts/packs.py plan <id> --root <repo_root>`.
+   Present 1 question per matching pack with its 2 line summary and default:
+   - `web-hazards`: default yes for web projects.
+   - `native-controls`: default yes when UI exists (web, desktop, or mobile UI).
+   - `mobile-web`: default yes when mobile platform detected.
+   - Other packs (`ui-states`, `shortcuts`, `a11y-basics`, `motion-basics`, `testing-practices`, `browser-checks`): default no.
+   The user can say "None".
+   Before writing the rules, run the checks of accepted packs as a probe. If the current code already violates a check, show the violating lines and ask: fix now (through `feature-delivery`), or exclude the file in exceptions (`exceptions: [{path, reason}]`)?
+   If accepted, apply the pack using `python3 .agents/skills/project-bootstrap/scripts/packs.py apply <id> --root <repo_root> --yes`. This appends the pack's rules to `profile.rules` with `pack: <id>@<version>`, appends `{id, version}` to `profile.rule_packs`, and appends any `verify_checks` to `profile.quality_gates` or test instructions. Rules requiring `component_dirs` expand `{{component_dirs}}` dynamically, skipping those rules with a note if `design.component_dirs` is empty.
+8. Hazard sweep:
    Run `python3 .agents/skills/project-bootstrap/scripts/hazard_sweep.py <repo_root>`.
    After rule proposals, show 1 short checklist of common hazards for the detected stack, each mapped to a pack or pattern, with default yes:
    - Native controls: `native-controls` pack (`ui-no-native-pickers`, `ui-no-native-selects`, `ui-no-browser-dialogs`). Default yes for web, desktop, and mobile UI projects.
@@ -56,13 +66,13 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
    - Any in TypeScript: pattern `ts-no-any` (`:\s*any\b`). Default yes only when TypeScript is detected in the stack.
    - Storage outside the storage layer: pattern `data-storage-layer-only` (`\b(?:localStorage|sessionStorage|indexedDB)\b`). Default yes only when a storage layer exists (`data.storage` is configured or storage hints detected).
 
-   The user picks. Each accepted hazard is proven on both sides on the current code before it is written:
+   The sweep coordinates with `web-hazards`, `native-controls` and project rules. The user picks. Each accepted hazard is proven on both sides on the current code before it is written:
    - Run the check pattern against the current code.
    - If the current code already violates a pattern, list each violation with file:line and ask: fix now (through `feature-delivery`), or record as an exception with a reason (`exceptions: [{path, reason}]`).
    - Run a deliberate violation in a temporary file to confirm the check fails, then delete the temporary file. Never add an unproven check.
-8. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
-9. Run the external references step below.
-10. Validate, render and report (see "Finish").
+9. Ask the user about gaps in 1 batch of 5 questions or fewer. Offer your best guess as the default for each. See `references/interview.md` for the gap questions.
+10. Run the external references step below.
+11. Validate, render and report (see "Finish").
 
 ## New mode
 
@@ -71,7 +81,7 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
 3. Fill `structure.layers` with the folders the stack needs. Fill `commands` with the commands the chosen tooling will provide.
 4. On day 0, run blueprint init (`python3 .agents/skills/project-blueprints/scripts/blueprint.py init`) then blueprint extract (`python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`) to scaffold missing blueprint contracts and extract initial facts.
 5. Run the external references step below.
-6. Hazard sweep: run the hazard sweep checklist for the chosen stack. Add accepted packs or rules with checks and examples to the profile.
+6. Rule pack proposals and hazard sweep: evaluate matching rule packs for the chosen stack and run the hazard sweep checklist. Add accepted packs or rules with checks and examples to the profile.
 7. Validate and render.
 8. Scaffolding: if the `scaffold-app` skill is available, hand off to it. Otherwise create only the empty folders from `structure.layers` and tell the user that code scaffolding is the next step. Do not generate application code here.
 9. Blueprint extraction: wait until `scaffold-app` finishes, then run `python3 .agents/skills/project-blueprints/scripts/blueprint.py extract`.

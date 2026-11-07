@@ -325,6 +325,27 @@ def main():
     else:
         print("NOTE  project-blueprints skill not installed; skipping blueprint drift check")
 
+    # 12. Check enforcement claims
+    for r in prof.get("rules") or []:
+        rid = r.get("id", "unknown")
+        enforced = r.get("enforced_by", "manual")
+        if enforced in ("test", "lint"):
+            has_check = r.get("check") is not None
+            e_ref = r.get("enforced_by_ref")
+            has_ref = e_ref is not None and bool(e_ref.get("file"))
+            is_design_covered = False
+            des_enf = prof.get("design", {}).get("enforced_by")
+            if r.get("area") in ("design", "tokens") and des_enf:
+                des_file = root / strip_dot_slash(des_enf)
+                if des_file.is_file():
+                    try:
+                        if f"[{rid}]" in des_file.read_text(encoding="utf-8", errors="ignore"):
+                            is_design_covered = True
+                    except Exception:
+                        pass
+            if not (has_check or has_ref or is_design_covered):
+                warnings.append(f"claim-unverified: rule {rid} claims {enforced} enforcement without check or enforced_by_ref")
+
     for w in sorted(set(warnings)):
         print(f"WARN  {w}")
     for e in errors:

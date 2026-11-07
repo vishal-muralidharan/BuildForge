@@ -31,6 +31,8 @@ File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml
 | `verification.*` | mixed | `zero_warnings`, `browser_checks`, `post_build_report`. |
 | `docs.*` | paths | `skills_dir`, `agents_file`, `repo_map` are required. `spec` is optional and names the product spec file. |
 | `blueprints.*` | mixed | Optional. `enabled`, `dir`, and `areas`. Do not store raw lists of keys or tokens in profile. |
+| `rule_packs` | list of objects | Optional. Recorded installed rule packs as `[{id, version}]`. |
+| `dropped_pack_rules` | list of strings | Optional. List of pack rule IDs permanently omitted by the user. |
 
 ### Commit scopes (`git.scopes`)
 
@@ -56,6 +58,10 @@ Each rule is written once, here. Never copy a rule into AGENTS.md or a skill by 
   area: design             # design, tokens, motion, responsive, structure, naming, data, security, verify, git, docs, process
   text: No emojis anywhere.
   enforced_by: test        # manual, test or lint
+  pack: "native-controls@1" # optional: pack and version that supplied the rule
+  enforced_by_ref:         # optional: file and snippet proving enforcement when check is omitted
+    file: "tests/lint.test.js"
+    contains: "[ui-no-emoji]"
   evidence:                # optional list of source paths backing this rule
     - src/components/Emoji.tsx
 ```
@@ -105,9 +111,21 @@ A check block can include:
 
 ### Rule packs
 
-Predefined rule collections can be adopted during bootstrap hazard sweep:
-- `web-hazards`: web security and hygiene (`web-no-console`, `web-target-blank-rel`, `web-no-raw-eval`, `web-no-inner-html`, `web-no-committed-env`).
-- `native-controls`: prevent unthemed browser form controls.
+Predefined rule collections can be adopted during bootstrap hazard sweep or applied with `packs.py`:
+- `native-controls`: Prevent unthemed native browser form controls outside component folders.
+- `web-hazards`: Prevent common web security and hygiene hazards.
+- `ui-states`: Require loading skeletons, empty states, and error alerts.
+- `mobile-web`: Mobile web usability for input font sizing, tap targets, viewport insets, and pinch zoom.
+- `shortcuts`: Keyboard shortcut conventions across platforms.
+- `a11y-basics`: Accessibility fundamentals for semantic HTML, focus visibility, contrast, and image alt attributes.
+- `motion-basics`: Motion and transition best practices and reduced motion support.
+- `testing-practices`: Testing practices avoiding style assertions and brittle queries.
+- `browser-checks`: Quality verification checks for console errors, contrast, listener cleanup, and viewport fit.
+
+Profile fields for rule packs:
+- `rule_packs`: list of installed packs as `[{id: <id>, version: <int>}]`.
+- `rule.pack`: string in `<id>@<version>` format marking which pack and version supplied the rule.
+- `dropped_pack_rules`: list of rule IDs permanently omitted by the user. `packs.py apply` never re-adds these rules.
 
 - `enforced_by: test` or `lint` is a claim. Check that the test or rule exists before you set it.
 - Where each area renders: `design` and `motion` go to `build-ui`. `tokens` goes to `maintain-design-system`. `responsive`, `structure`, `naming` and `data` go to the skill of the same topic. `process`, `security`, `verify`, `git` and `docs` go to the "Project rules" section of AGENTS.md.
