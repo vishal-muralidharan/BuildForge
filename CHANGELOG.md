@@ -5,6 +5,12 @@ All notable changes to Build Forge will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Rule pack `web-hazards` with checks, hints, and examples covering console logging, target=_blank rel attributes, raw eval, innerHTML/dangerouslySetInnerHTML, and committed .env files.
+- Rule schema enhancements in `validate_profile.py` supporting `exceptions: [{path, reason}]`, check `hint`, and check `examples`.
+- Check runner enhancements in `run_rule_checks.py` (version 2) supporting `--selftest`, `--explain <id>`, exception merging into excludes, and hint reporting on check failure.
+- Hazard sweep scanner `skills/project-bootstrap/scripts/hazard_sweep.py` and bootstrap checklist integration for common stack hazards.
+- Incident to rule workflow `skills/feature-delivery/references/workflows/incident-to-rule.md`, task router entry, final message rule gaps line, and Post-Build Audit rule gap question in `targeted-module-testing`.
+- Test suite `tests/test_hazard_sweep.py` covering rule pattern matching, runner selftest and explain, exceptions, validate_profile enforcement, clean and flagged sweep scans, and skill contracts.
 - Form controls analysis in UI blueprint analyzer `skills/project-blueprints/scripts/analyzers/ui.py` detecting native controls, low-level widgets, themed primitives, gap/violation status, and candidate proposals.
 - Form controls guidance section in generated `build-ui` skill, `audit-and-planning` Phase 2 form control checklist, and `scaffold-app` component creation rule.
 - Maintainer developer toolkit `scripts/dev.py` supporting `new-skill`, `check`, `impact`, `recipe`, `fixture`, and `release-plan`.
