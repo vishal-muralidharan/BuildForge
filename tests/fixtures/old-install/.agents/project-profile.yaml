@@ -1,0 +1,23 @@
+schema_version: 1
+
+project:
+  name: test-app
+  summary: Test application for safe update.
+  mode: existing
+
+stack:
+  language: typescript
+  framework: react
+  package_manager: npm
+
+design:
+  enabled: true
+  component_dirs:
+    - src/components
+  tokens_file: src/tokens.css
+
+external_references:
+  - name: old-vendor-skill
+    path: .agents/vendor/old-vendor-skill
+    purpose: Legacy vendor skill
+    status: active
