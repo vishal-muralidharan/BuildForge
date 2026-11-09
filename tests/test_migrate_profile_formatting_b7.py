@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Tests for Bug B7: migrate_profile.py preserves comments, quotes, key order, line wrapping."""
+import os
 import re
 import subprocess
 import sys
@@ -8,6 +9,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MIGRATE_SCRIPT = REPO_ROOT / "skills" / "project-bootstrap" / "scripts" / "migrate_profile.py"

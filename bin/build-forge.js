@@ -751,6 +751,7 @@ function areDirsIdentical(dirA, dirB) {
 }
 
 function verifyCommand(cwd) {
+  const targetSkillsDir = path.join(cwd, '.agents', 'skills');
   const result = checkSkillsIntegrity(cwd);
   if (!result.ok && result.error === 'NO_LOCK') {
     console.error(`Verify error: ${result.message}`);
