@@ -249,46 +249,74 @@ function pruneObsoleteSkillFiles(packageSkillDir, targetSkillDir, skillName, old
   return pruned;
 }
 
-function generateSkillPatch(packageSkillDir, targetSkillDir, skillName) {
-  let patch = '';
-  try {
-    const res = spawnSync('git', ['diff', '--no-index', '--', packageSkillDir, targetSkillDir], {
-      encoding: 'utf8',
-      maxBuffer: 10 * 1024 * 1024
-    });
-    if (res.stdout && res.stdout.length > 0) {
-      patch = res.stdout;
+function generateSkillPatch(packageSkillDir, targetSkillDir, skillName, oldLockData = null) {
+  if (!fs.existsSync(targetSkillDir)) return '';
+
+  function walk(dir) {
+    const list = [];
+    if (!fs.existsSync(dir)) return list;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name !== '__pycache__') list.push(...walk(full));
+      } else {
+        if (!e.name.endsWith('.pyc') && e.name !== '.DS_Store') list.push(full);
+      }
     }
-  } catch (e) {}
-  if (!patch) {
-    const python = findPythonCommand();
-    if (python) {
-      const pyScript = `
-import difflib, os, sys
+    return list;
+  }
+
+  const diskFiles = walk(targetSkillDir);
+  const modifiedRels = [];
+  for (const f of diskFiles) {
+    const rel = path.relative(targetSkillDir, f).replace(/\\/g, '/');
+    const lockKey = `skills/${skillName}/${rel}`;
+    const oldHash = oldLockData ? oldLockData[lockKey] : null;
+    const curHash = hashFile(f);
+    // If it was in oldLockData and matches oldHash, user did NOT modify it
+    if (oldHash && curHash === oldHash) {
+      continue;
+    }
+    // Otherwise it has local modifications or is a newly created file
+    modifiedRels.push(rel);
+  }
+
+  if (modifiedRels.length === 0) {
+    return '';
+  }
+
+  const python = findPythonCommand();
+  if (python) {
+    const pyScript = `
+import difflib, os, sys, json
 pkg_dir = sys.argv[1]
 target_dir = sys.argv[2]
-skill_name = sys.argv[3]
+modified_rels = json.loads(sys.argv[3])
 diff_lines = []
-for root, _, files in sorted(os.walk(target_dir)):
-    for f in sorted(files):
-        p_target = os.path.join(root, f)
-        rel = os.path.relpath(p_target, target_dir)
-        p_pkg = os.path.join(pkg_dir, rel)
-        if os.path.exists(p_pkg):
-            with open(p_pkg, 'r', errors='ignore') as fp1, open(p_target, 'r', errors='ignore') as fp2:
-                l1 = fp1.readlines()
-                l2 = fp2.readlines()
-                d = list(difflib.unified_diff(l1, l2, fromfile=f"a/.agents/skills/{skill_name}/{rel}", tofile=f"b/.agents/skills/{skill_name}/{rel}"))
-                diff_lines.extend(d)
+for rel in sorted(modified_rels):
+    p_pkg = os.path.join(pkg_dir, rel)
+    p_target = os.path.join(target_dir, rel)
+    l1 = []
+    if os.path.exists(p_pkg):
+        with open(p_pkg, 'r', encoding='utf-8', errors='ignore') as fp:
+            l1 = fp.readlines()
+    l2 = []
+    if os.path.exists(p_target):
+        with open(p_target, 'r', encoding='utf-8', errors='ignore') as fp:
+            l2 = fp.readlines()
+    d = list(difflib.unified_diff(l1, l2, fromfile=f"a/{rel}", tofile=f"b/{rel}"))
+    diff_lines.extend(d)
 sys.stdout.writelines(diff_lines)
 `;
-      try {
-        const res = spawnSync(python.cmd, [...python.args, '-c', pyScript, packageSkillDir, targetSkillDir, skillName], { encoding: 'utf8' });
-        if (res.stdout) patch = res.stdout;
-      } catch (e) {}
-    }
+    try {
+      const res = spawnSync(python.cmd, [...python.args, '-c', pyScript, packageSkillDir, targetSkillDir, JSON.stringify(modifiedRels)], {
+        encoding: 'utf8',
+        maxBuffer: 10 * 1024 * 1024
+      });
+      if (res.stdout) return res.stdout;
+    } catch (e) {}
   }
-  return patch;
+  return '';
 }
 
 function parseArgs(args) {
@@ -1852,7 +1880,7 @@ function updateCommand(cwd, options = {}) {
       const pkgSkillDir = path.join(packageSkillsDir, name);
       pruneObsoleteSkillFiles(pkgSkillDir, targetSkillDir, name, lockData, workDir);
       if (fs.existsSync(targetSkillDir)) {
-        const pDiff = generateSkillPatch(pkgSkillDir, targetSkillDir, name);
+        const pDiff = generateSkillPatch(pkgSkillDir, targetSkillDir, name, lockData);
         if (pDiff) {
           const patchFile = path.join(workDir, `overwritten-${name}.patch`);
           fs.writeFileSync(patchFile, pDiff, 'utf8');
