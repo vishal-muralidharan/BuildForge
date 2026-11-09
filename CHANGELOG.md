@@ -19,6 +19,7 @@ All notable changes to Build Forge will be documented in this file.
 - Doctor check reporting pending upgrade actions as warnings.
 
 ### Added
+- Opt-in branch workflow configuration under `git.workflow` in project profile (`default_branch`, `mode`, `branch_format`, `sync`, `merge_method`, `remote`, `cleanup`, `worktree`).
 - Rule pack system in `skills/project-bootstrap/scripts/packs.py` supporting `list`, `show`, `plan`, `apply`, `diff`, and `lint` commands.
 - 9 curated, opt-in rule packs in `skills/project-bootstrap/references/rule-packs/`: `native-controls`, `web-hazards`, `ui-states`, `mobile-web`, `shortcuts`, `a11y-basics`, `motion-basics`, `testing-practices`, and `browser-checks`.
 - Rule pack schema validation in `validate_profile.py` supporting `rule_packs` (`[{id, version}]`), `rule.pack` (`<id>@<version>`), `dropped_pack_rules`, `enforced_by_ref: {file, contains}`, and `claim-unverified` warnings with `--strict-claims`.

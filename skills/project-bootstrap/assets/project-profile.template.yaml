@@ -73,6 +73,15 @@ git:
   scopes: []                # list of strings or {name, purpose, paths} objects. Empty means free scope
   push: never               # never | ask | allowed
   stage: granular           # granular | all
+  workflow:                 # opt-in branch workflow
+    default_branch: main
+    mode: ask               # off | ask | always
+    branch_format: "<type>/<slug>"
+    sync: merge             # merge | rebase
+    merge_method: squash    # squash | merge | rebase
+    remote: origin
+    cleanup: ask            # ask | keep
+    worktree: false
 
 verification:
   zero_warnings: true

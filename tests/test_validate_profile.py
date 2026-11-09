@@ -340,6 +340,62 @@ class TestBlueprintsValidation(unittest.TestCase):
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("Do not store lists of keys or tokens", res.stdout + res.stderr)
 
+    def test_git_workflow_validation(self):
+        """git.workflow fields validation and unexpected key rejection."""
+        # 1. Valid workflow passes
+        valid_wf = BASE_PROFILE + (
+            "git:\n"
+            "  push: never\n"
+            "  commit_format: '<type>: <subject>'\n"
+            "  workflow:\n"
+            "    default_branch: main\n"
+            "    mode: ask\n"
+            "    branch_format: '<type>/<slug>'\n"
+            "    sync: merge\n"
+            "    merge_method: squash\n"
+            "    remote: origin\n"
+            "    cleanup: ask\n"
+            "    worktree: false\n"
+        )
+        res = self.run_val(valid_wf)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+
+        # 2. Invalid mode fails
+        bad_mode = BASE_PROFILE + (
+            "git:\n"
+            "  push: never\n"
+            "  commit_format: '<type>: <subject>'\n"
+            "  workflow:\n"
+            "    mode: invalid_mode\n"
+        )
+        res_m = self.run_val(bad_mode)
+        self.assertNotEqual(res_m.returncode, 0)
+        self.assertIn("git.workflow.mode must be off, ask or always", res_m.stdout)
+
+        # 3. Invalid sync fails
+        bad_sync = BASE_PROFILE + (
+            "git:\n"
+            "  push: never\n"
+            "  commit_format: '<type>: <subject>'\n"
+            "  workflow:\n"
+            "    sync: fast_forward\n"
+        )
+        res_s = self.run_val(bad_sync)
+        self.assertNotEqual(res_s.returncode, 0)
+        self.assertIn("git.workflow.sync must be rebase or merge", res_s.stdout)
+
+        # 4. Unexpected key fails
+        bad_key = BASE_PROFILE + (
+            "git:\n"
+            "  push: never\n"
+            "  commit_format: '<type>: <subject>'\n"
+            "  workflow:\n"
+            "    unexpected_field: true\n"
+        )
+        res_k = self.run_val(bad_key)
+        self.assertNotEqual(res_k.returncode, 0)
+        self.assertIn("git.workflow has unexpected keys", res_k.stdout)
+
 
 class TestSupportedSchemaVersionsAndMigration(unittest.TestCase):
     def setUp(self):
