@@ -205,8 +205,8 @@ class TestRenderCustomBlocks(unittest.TestCase):
         self.assertIn("SKIPPED .agents/skills/build-ui/SKILL.md (unstamped; use --migrate-custom to wrap in legacy block)", res1.stdout)
         self.assertEqual(bui.read_text(encoding="utf-8"), unstamped_text)
 
-        # With --overwrite-unstamped
-        res2 = self.run_render("--force", "--overwrite-unstamped")
+        # With --overwrite-unstamped (requires --discard-edits and --yes-discard per D8)
+        res2 = self.run_render("--force", "--overwrite-unstamped", "--discard-edits", "--yes-discard")
         self.assertEqual(res2.returncode, 0)
         self.assertIn("OVERWROTE .agents/skills/build-ui/SKILL.md (unstamped; forced with --overwrite-unstamped)", res2.stdout)
         self.assertIn("<!-- build-forge:generated v1 body=", bui.read_text(encoding="utf-8"))

@@ -928,7 +928,7 @@ def main():
                 if not a.dry_run:
                     write_text_lf(dest, final_content)
                 updated.append((dest, 0, 0))
-                print(f"OVERWROTE {rel_label} (unstamped; forced with --overwrite-unstamped, discarded {discarded_count} line(s))")
+                print(f"OVERWROTE {rel_label} (unstamped; forced with --overwrite-unstamped)")
                 continue
 
             elif not a.force and not a.update and not a.salvage and kind == "agents":
