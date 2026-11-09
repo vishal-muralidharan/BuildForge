@@ -99,6 +99,18 @@ class TestCheckPackage(unittest.TestCase):
         output = res.stdout + res.stderr
         self.assertIn(removed_skill, output)
 
+    def test_core_tier_contains_self_contained_set(self):
+        """Core tier contains minimum self-contained set (project-bootstrap, rules-to-tests, targeted-module-testing)."""
+        tiers_path = REPO_ROOT / "tiers.json"
+        data = json.loads(tiers_path.read_text(encoding="utf-8"))
+        core_skills = set(data.get("core", []))
+        for required in ("project-bootstrap", "rules-to-tests", "targeted-module-testing"):
+            self.assertIn(
+                required,
+                core_skills,
+                f"Required skill '{required}' missing from core tier in tiers.json",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

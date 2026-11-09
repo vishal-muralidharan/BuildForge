@@ -5,18 +5,17 @@
     "extend-pipeline",
     "feature-delivery",
     "project-blueprints",
+    "project-bootstrap",
     "repo-search",
-    "sync-skills-and-docs"
+    "rules-to-tests",
+    "sync-skills-and-docs",
+    "targeted-module-testing"
   ],
   "new-app": [
-    "legal-and-settings-pages",
     "product-spec",
-    "project-bootstrap",
-    "rules-to-tests",
     "scaffold-app"
   ],
   "module": [
-    "targeted-module-testing"
+    "legal-and-settings-pages"
   ]
 }
-
