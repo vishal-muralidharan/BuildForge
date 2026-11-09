@@ -208,10 +208,52 @@ function installCommand(cwd, force, agentsArg) {
   manifest['_version'] = pkgVersion;
   fs.writeFileSync(lockFilePath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
-  console.log(`Build Forge: ${added.length} skill(s) installed in .agents/skills`);
-  for (const n of added) console.log(`  added  ${n}`);
-  for (const n of kept) console.log(`  kept   ${n} (exists, use --force to overwrite)`);
-  console.log('  lock   .agents/build-forge.lock.json written');
+  const differingKept = [];
+  if (kept.length > 0) {
+    const diskManifest = computeSkillsManifest(targetSkillsDir, new Set(kept));
+    for (const name of kept) {
+      let differs = false;
+      for (const [relFile, hash] of Object.entries(integrity)) {
+        if (relFile.startsWith(`skills/${name}/`)) {
+          if (!diskManifest[relFile] || diskManifest[relFile] !== hash) {
+            differs = true;
+            break;
+          }
+        }
+      }
+      if (!differs) {
+        for (const relFile of Object.keys(diskManifest)) {
+          if (relFile.startsWith(`skills/${name}/`) && !integrity[relFile]) {
+            differs = true;
+            break;
+          }
+        }
+      }
+      if (differs) {
+        differingKept.push(name);
+      }
+    }
+  }
+
+  if (kept.length > 0 && differingKept.length > 0) {
+    console.log(`Build Forge: ${added.length} skill(s) installed, ${kept.length} existing skill(s) kept.`);
+    for (const n of added) console.log(`  added  ${n}`);
+    for (const n of kept) {
+      if (differingKept.includes(n)) {
+        console.log(`  kept   ${n} (differs from package; use --force to overwrite)`);
+      } else {
+        console.log(`  kept   ${n} (exists, use --force to overwrite)`);
+      }
+    }
+    console.log('  lock   .agents/build-forge.lock.json written');
+    console.log(`\nNotice: ${differingKept.length} kept skill(s) differ from the package: ${differingKept.join(', ')}`);
+    console.log('To review and update skills safely, run: npx @v1006/build-forge update');
+  } else {
+    console.log(`Build Forge: ${added.length} skill(s) installed in .agents/skills`);
+    for (const n of added) console.log(`  added  ${n}`);
+    for (const n of kept) console.log(`  kept   ${n} (exists, use --force to overwrite)`);
+    console.log('  lock   .agents/build-forge.lock.json written');
+  }
 
   // Ensure transient work and vendor directories are ignored if .gitignore exists
   const gitignorePath = path.join(cwd, '.gitignore');

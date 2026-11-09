@@ -376,6 +376,35 @@ class TestSafeUpdate(unittest.TestCase):
             )
             self.assertEqual(res_py_verify.returncode, 1, "verify_integrity.py did not flag modified skill")
 
+    def test_11_d5_install_over_existing_skills_reports_kept_differs_and_points_to_update(self):
+        """D5: install over existing skills says which folders kept, says they differ, and points to update."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            # Create pre-existing differing skill
+            existing_skill = p / ".agents" / "skills" / "atomic-commits"
+            existing_skill.mkdir(parents=True, exist_ok=True)
+            (existing_skill / "SKILL.md").write_text("# Old atomic commits\n", encoding="utf-8")
+
+            res = run_node(["install"], p)
+            self.assertEqual(res.returncode, 0)
+            stdout = res.stdout + res.stderr
+
+            # 1. Says which folders it kept
+            self.assertIn("kept   atomic-commits", stdout)
+
+            # 2. Says they differ from the package
+            self.assertTrue(
+                "differs from package" in stdout or "differ from" in stdout,
+                f"Output did not indicate kept skills differ from package:\n{stdout}"
+            )
+
+            # 3. Points to update
+            self.assertIn("update", stdout)
+            self.assertTrue(
+                "npx @v1006/build-forge update" in stdout or "build-forge update" in stdout,
+                f"Output did not point to build-forge update command:\n{stdout}"
+            )
+
 
 def main():
     unittest.main()
