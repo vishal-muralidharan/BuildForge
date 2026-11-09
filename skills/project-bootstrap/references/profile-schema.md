@@ -13,7 +13,7 @@ File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml
 
 | Field | Type | Notes |
 |---|---|---|
-| `schema_version` | int | 1 or 2. |
+| `schema_version` | int | 1 or 2 (SUPPORTED_SCHEMA_VERSIONS = (1, 2)). |
 | `project.name` | string | Required. |
 | `project.summary` | string | Required. One sentence. |
 | `project.mode` | `existing` or `new` | Required. |

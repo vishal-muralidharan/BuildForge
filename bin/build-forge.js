@@ -46,6 +46,7 @@ const AGENTS = [
 ];
 
 const POINTER_CONTENT = 'Read AGENTS.md first and follow it. If AGENTS.md does not exist yet, run the project-bootstrap skill at .agents/skills/project-bootstrap/SKILL.md.\n';
+const SUPPORTED_SCHEMA_VERSIONS = [1, 2];
 
 function hashFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
@@ -900,26 +901,37 @@ function doctorCommand(cwd, isJson) {
   if (!fs.existsSync(profilePath)) {
     addCheck('Profile', 'WARN', '.agents/project-profile.yaml not found', 'Run project-bootstrap to create .agents/project-profile.yaml');
   } else {
-    let valScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
-    if (!fs.existsSync(valScript)) {
-      valScript = path.join(__dirname, '..', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
-    }
-    if (python && fs.existsSync(valScript)) {
-      try {
-        const resVal = spawnSync(python.cmd, [...python.args, valScript, '--profile', profilePath, '--root', cwd], {
-          encoding: 'utf8',
-          timeout: 10000
-        });
-        if (resVal.status === 0) {
-          addCheck('Profile', 'OK', '.agents/project-profile.yaml is valid');
-        } else {
-          addCheck('Profile', 'FAIL', 'Profile validation errors found', 'Run: python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .');
-        }
-      } catch (e) {
-        addCheck('Profile', 'FAIL', `Could not run profile validator: ${e.message}`, 'Check Python configuration.');
-      }
+    let schemaVersion = null;
+    try {
+      const pText = fs.readFileSync(profilePath, 'utf8');
+      const m = pText.match(/^schema_version:\s*(\d+)/m);
+      if (m) schemaVersion = parseInt(m[1], 10);
+    } catch (e) {}
+
+    if (schemaVersion !== null && !SUPPORTED_SCHEMA_VERSIONS.includes(schemaVersion)) {
+      addCheck('Profile', 'FAIL', `Unsupported schema_version ${schemaVersion} in profile (supported: ${SUPPORTED_SCHEMA_VERSIONS.join(', ')})`, 'Run: python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py apply --apply');
     } else {
-      addCheck('Profile', 'OK', '.agents/project-profile.yaml exists');
+      let valScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
+      if (!fs.existsSync(valScript)) {
+        valScript = path.join(__dirname, '..', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
+      }
+      if (python && fs.existsSync(valScript)) {
+        try {
+          const resVal = spawnSync(python.cmd, [...python.args, valScript, '--profile', profilePath, '--root', cwd], {
+            encoding: 'utf8',
+            timeout: 10000
+          });
+          if (resVal.status === 0) {
+            addCheck('Profile', 'OK', `.agents/project-profile.yaml is valid (schema_version ${schemaVersion || 2})`);
+          } else {
+            addCheck('Profile', 'FAIL', 'Profile validation errors found', 'Run: python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .');
+          }
+        } catch (e) {
+          addCheck('Profile', 'FAIL', `Could not run profile validator: ${e.message}`, 'Check Python configuration.');
+        }
+      } else {
+        addCheck('Profile', 'OK', '.agents/project-profile.yaml exists');
+      }
     }
   }
 
