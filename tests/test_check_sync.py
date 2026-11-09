@@ -308,6 +308,8 @@ Here is an architectural metrics table:
 
         # Initialize a git repo inside self.root
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(self.root), check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(self.root), check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(self.root), check=True)
         (self.root / "README.md").write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "README.md"], cwd=str(self.root), check=True)
         subprocess.run(["git", "commit", "-m", "chore: init"], cwd=str(self.root), check=True)
