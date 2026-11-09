@@ -453,6 +453,34 @@ class TestSafeUpdate(unittest.TestCase):
             res_verify_after = run_node(["verify"], p)
             self.assertEqual(res_verify_after.returncode, 0)
 
+    def test_13_d9_install_gitignore_handling_and_no_gitignore_flag(self):
+        """D9: install edits .gitignore minimally, idempotently, and respects --no-gitignore."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            gi = p / ".gitignore"
+            initial_content = "node_modules/\n.DS_Store\n"
+            gi.write_text(initial_content, encoding="utf-8")
+
+            # 1. install with --no-gitignore must leave file completely untouched
+            res_no_gi = run_node(["install", "--no-gitignore"], p)
+            self.assertEqual(res_no_gi.returncode, 0)
+            self.assertEqual(gi.read_text(encoding="utf-8"), initial_content, "--no-gitignore did not leave .gitignore untouched")
+            self.assertNotIn("ignore added", res_no_gi.stdout)
+
+            # 2. Plain install adds only .agents/work/ and .agents/vendor/
+            res_plain = run_node(["install"], p)
+            self.assertEqual(res_plain.returncode, 0)
+            after_plain = gi.read_text(encoding="utf-8")
+            self.assertIn(".agents/work/", after_plain)
+            self.assertIn(".agents/vendor/", after_plain)
+            self.assertIn("node_modules/", after_plain)
+            self.assertIn("ignore added", res_plain.stdout)
+
+            # 3. Running again is idempotent
+            res_idemp = run_node(["install"], p)
+            self.assertEqual(res_idemp.returncode, 0)
+            self.assertEqual(gi.read_text(encoding="utf-8"), after_plain, "install is not idempotent on .gitignore")
+
 
 def main():
     unittest.main()

@@ -130,6 +130,7 @@ function parseArgs(args) {
   let adopt = false;
   let yes = false;
   let patch = false;
+  let noGitignore = false;
   const keepModified = new Set();
   const restore = new Set();
 
@@ -147,6 +148,8 @@ function parseArgs(args) {
       yes = true;
     } else if (a === '--patch') {
       patch = true;
+    } else if (a === '--no-gitignore') {
+      noGitignore = true;
     } else if (a === '--keep-modified') {
       const next = args[++i];
       if (next) next.split(',').forEach(s => s.trim() && keepModified.add(s.trim()));
@@ -175,7 +178,7 @@ function parseArgs(args) {
     }
   }
 
-  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch };
+  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore };
 }
 
 function resolveSelectedAgents(agentsArg, cwd) {
@@ -204,7 +207,18 @@ function resolveSelectedAgents(agentsArg, cwd) {
   return AGENTS.filter(agent => ids.includes(agent.id));
 }
 
-function installCommand(cwd, force, agentsArg) {
+function installCommand(cwd, options = {}, legacyAgentsArg = null) {
+  let force = false;
+  let agentsArg = null;
+  let noGitignore = false;
+  if (typeof options === 'boolean') {
+    force = options;
+    agentsArg = legacyAgentsArg;
+  } else if (options && typeof options === 'object') {
+    force = !!options.force;
+    agentsArg = options.agentsArg || null;
+    noGitignore = !!options.noGitignore;
+  }
   const packageSkillsDir = path.join(__dirname, '..', 'skills');
   const targetSkillsDir = path.join(cwd, '.agents', 'skills');
   const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
@@ -301,28 +315,30 @@ function installCommand(cwd, force, agentsArg) {
   }
 
   // Ensure transient work and vendor directories are ignored if .gitignore exists
-  const gitignorePath = path.join(cwd, '.gitignore');
-  if (fs.existsSync(gitignorePath)) {
-    try {
-      let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-      const lines = gitignoreContent.split(/\r?\n/).map(l => l.trim());
-      const toAdd = [];
-      if (!lines.includes('.agents/work/') && !lines.includes('.agents/work')) {
-        toAdd.push('.agents/work/');
-      }
-      if (!lines.includes('.agents/vendor/') && !lines.includes('.agents/vendor')) {
-        toAdd.push('.agents/vendor/');
-      }
-      if (toAdd.length > 0) {
-        if (!gitignoreContent.endsWith('\n') && gitignoreContent.length > 0) {
-          gitignoreContent += '\n';
+  if (!noGitignore) {
+    const gitignorePath = path.join(cwd, '.gitignore');
+    if (fs.existsSync(gitignorePath)) {
+      try {
+        let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+        const lines = gitignoreContent.split(/\r?\n/).map(l => l.trim());
+        const toAdd = [];
+        if (!lines.includes('.agents/work/') && !lines.includes('.agents/work')) {
+          toAdd.push('.agents/work/');
         }
-        gitignoreContent += toAdd.join('\n') + '\n';
-        fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
-        console.log(`  ignore added ${toAdd.join(', ')} to .gitignore`);
+        if (!lines.includes('.agents/vendor/') && !lines.includes('.agents/vendor')) {
+          toAdd.push('.agents/vendor/');
+        }
+        if (toAdd.length > 0) {
+          if (!gitignoreContent.endsWith('\n') && gitignoreContent.length > 0) {
+            gitignoreContent += '\n';
+          }
+          gitignoreContent += toAdd.join('\n') + '\n';
+          fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
+          console.log(`  ignore added ${toAdd.join(', ')} to .gitignore`);
+        }
+      } catch (e) {
+        // Non-fatal if .gitignore is not writable
       }
-    } catch (e) {
-      // Non-fatal if .gitignore is not writable
     }
   }
 
@@ -1762,11 +1778,11 @@ function listCommand(cwd) {
 
 function main() {
   const args = process.argv.slice(2);
-  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch } = parseArgs(args);
+  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore } = parseArgs(args);
   const cwd = process.cwd();
 
   if (command === 'install') {
-    installCommand(cwd, force, agentsArg);
+    installCommand(cwd, { force, agentsArg, noGitignore });
   } else if (command === 'link') {
     linkCommand(cwd, agentsArg);
   } else if (command === 'unlink') {
