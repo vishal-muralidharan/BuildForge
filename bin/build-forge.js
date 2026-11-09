@@ -126,6 +126,8 @@ function parseArgs(args) {
   let command = 'install';
   const positional = [];
   let force = false;
+  let all = false;
+  let help = false;
   let agentsArg = null;
   let json = false;
   let dryRun = false;
@@ -138,7 +140,11 @@ function parseArgs(args) {
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === '--force') {
+    if (a === '--help' || a === '-h') {
+      help = true;
+    } else if (a === '--all') {
+      all = true;
+    } else if (a === '--force') {
       force = true;
     } else if (a === '--json') {
       json = true;
@@ -180,7 +186,11 @@ function parseArgs(args) {
     }
   }
 
-  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore };
+  if (help) {
+    command = 'help';
+  }
+
+  return { command, positional, force, all, help, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore };
 }
 
 function resolveSelectedAgents(agentsArg, cwd) {
@@ -211,6 +221,7 @@ function resolveSelectedAgents(agentsArg, cwd) {
 
 function installCommand(cwd, options = {}, legacyAgentsArg = null) {
   let force = false;
+  let all = false;
   let agentsArg = null;
   let noGitignore = false;
   if (typeof options === 'boolean') {
@@ -218,6 +229,7 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
     agentsArg = legacyAgentsArg;
   } else if (options && typeof options === 'object') {
     force = !!options.force;
+    all = !!options.all;
     agentsArg = options.agentsArg || null;
     noGitignore = !!options.noGitignore;
   }
@@ -1886,11 +1898,11 @@ function listCommand(cwd) {
 
 function main() {
   const args = process.argv.slice(2);
-  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore } = parseArgs(args);
+  const { command, positional, force, all, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore } = parseArgs(args);
   const cwd = process.cwd();
 
   if (command === 'install') {
-    installCommand(cwd, { force, agentsArg, noGitignore });
+    installCommand(cwd, { force, all, agentsArg, noGitignore });
   } else if (command === 'link') {
     linkCommand(cwd, agentsArg);
   } else if (command === 'unlink') {
@@ -1918,19 +1930,21 @@ function main() {
     listCommand(cwd);
   } else if (command === 'help') {
     console.log('Build Forge CLI');
+    console.log('Usage: npx @v1006/build-forge <command> [options]\n');
     console.log('Commands:');
-    console.log('  install [--force] [--agents <ids|auto|all>]');
+    console.log('  install [--all] [--force] [--agents <ids|auto|all>] [--no-gitignore]');
     console.log('  link [--agents <ids|auto|all>]');
     console.log('  unlink [--agents <ids|auto|all>]');
     console.log('  verify');
     console.log('  status');
-    console.log('  diff');
+    console.log('  diff [--patch]');
     console.log('  doctor [--json]');
     console.log('  outdated [--json]');
     console.log('  update [--dry-run] [--adopt] [--keep-modified <skill>] [--restore <skill>]');
     console.log('  upgrade done <action-id>');
     console.log('  add <skill-name>');
     console.log('  list');
+    console.log('  help, --help, -h');
   }
 }
 
