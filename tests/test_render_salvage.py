@@ -427,6 +427,36 @@ class TestRenderSalvage(unittest.TestCase):
         self.assertEqual(res_idemp.returncode, 0)
         self.assertEqual(rev_file.read_text(encoding="utf-8"), content_after)
 
+    def test_d8_overwriting_unstamped_requires_discard_edits_and_yes_discard(self):
+        """D8: Overwriting unstamped content requires --discard-edits and --yes-discard together, prints count, obeys dirty tree."""
+        # 1. Render clean initial state
+        res_init = self.run_render()
+        self.assertEqual(res_init.returncode, 0)
+
+        # 2. Make build-ui unstamped with custom lines
+        bui = self.root / ".agents" / "skills" / "build-ui" / "SKILL.md"
+        unstamped_text = "# Unstamped Build UI\nLine 1\nLine 2\nLine 3\n"
+        bui.write_text(unstamped_text, encoding="utf-8")
+
+        # 3. Running with --force --overwrite-unstamped alone MUST refuse
+        res_refuse = self.run_render("--force", "--overwrite-unstamped")
+        self.assertNotEqual(res_refuse.returncode, 0, "--force --overwrite-unstamped alone should refuse")
+        self.assertIn("REFUSED", res_refuse.stdout + res_refuse.stderr)
+        self.assertEqual(bui.read_text(encoding="utf-8"), unstamped_text)
+
+        # 4. Running with --discard-edits alone (without --yes-discard) refuses
+        res_no_yes = self.run_render("--force", "--overwrite-unstamped", "--discard-edits")
+        self.assertNotEqual(res_no_yes.returncode, 0)
+        self.assertIn("requires --yes-discard", res_no_yes.stderr + res_no_yes.stdout)
+
+        # 5. Running with both --discard-edits and --yes-discard succeeds and prints count of discarded lines
+        res_ok = self.run_render("--force", "--overwrite-unstamped", "--discard-edits", "--yes-discard")
+        self.assertEqual(res_ok.returncode, 0, res_ok.stderr)
+        combined = res_ok.stdout + res_ok.stderr
+        self.assertIn("DISCARDED 4 line(s)", combined)
+        self.assertIn("OVERWROTE", combined)
+        self.assertNotEqual(bui.read_text(encoding="utf-8"), unstamped_text)
+
 
 if __name__ == "__main__":
     unittest.main()

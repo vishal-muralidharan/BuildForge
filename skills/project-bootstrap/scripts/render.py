@@ -912,18 +912,23 @@ def main():
                 continue
 
             elif a.force and a.overwrite_unstamped:
-                if a.discard_edits and a.yes_discard:
-                    discarded = disk_text.splitlines()
-                    if discarded:
-                        print(f"DISCARDED {len(discarded)} line(s) from {rel_label}:")
-                        for d in discarded:
-                            print(f"  - {d}")
+                if not (a.discard_edits and a.yes_discard):
+                    refused.append((dest, "overwriting unstamped content requires --discard-edits and --yes-discard"))
+                    print(f"REFUSED {rel_label} (overwriting unstamped content requires --discard-edits and --yes-discard)")
+                    continue
+
+                discarded = disk_text.splitlines()
+                discarded_count = len(discarded)
+                if discarded:
+                    print(f"DISCARDED {discarded_count} line(s) from {rel_label}:")
+                    for d in discarded:
+                        print(f"  - {d}")
                 body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(raw_tmpl, body_hash)
                 if not a.dry_run:
                     write_text_lf(dest, final_content)
                 updated.append((dest, 0, 0))
-                print(f"OVERWROTE {rel_label} (unstamped; forced with --overwrite-unstamped)")
+                print(f"OVERWROTE {rel_label} (unstamped; forced with --overwrite-unstamped, discarded {discarded_count} line(s))")
                 continue
 
             elif not a.force and not a.update and not a.salvage and kind == "agents":
