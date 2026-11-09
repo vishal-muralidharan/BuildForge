@@ -84,6 +84,11 @@ function parseArgs(args) {
   let force = false;
   let agentsArg = null;
   let json = false;
+  let dryRun = false;
+  let adopt = false;
+  let yes = false;
+  const keepModified = new Set();
+  const restore = new Set();
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -91,6 +96,22 @@ function parseArgs(args) {
       force = true;
     } else if (a === '--json') {
       json = true;
+    } else if (a === '--dry-run') {
+      dryRun = true;
+    } else if (a === '--adopt') {
+      adopt = true;
+    } else if (a === '--yes') {
+      yes = true;
+    } else if (a === '--keep-modified') {
+      const next = args[++i];
+      if (next) next.split(',').forEach(s => s.trim() && keepModified.add(s.trim()));
+    } else if (a.startsWith('--keep-modified=')) {
+      a.slice('--keep-modified='.length).split(',').forEach(s => s.trim() && keepModified.add(s.trim()));
+    } else if (a === '--restore') {
+      const next = args[++i];
+      if (next) next.split(',').forEach(s => s.trim() && restore.add(s.trim()));
+    } else if (a.startsWith('--restore=')) {
+      a.slice('--restore='.length).split(',').forEach(s => s.trim() && restore.add(s.trim()));
     } else if (a === '--agents') {
       agentsArg = args[++i];
     } else if (a.startsWith('--agents=')) {
@@ -104,12 +125,12 @@ function parseArgs(args) {
 
   if (positional.length > 0) {
     const first = positional[0].toLowerCase();
-    if (['install', 'link', 'unlink', 'verify', 'status', 'diff', 'doctor', 'outdated', 'update', 'help'].includes(first)) {
+    if (['install', 'link', 'unlink', 'verify', 'status', 'diff', 'doctor', 'outdated', 'update', 'upgrade', 'add', 'list', 'help'].includes(first)) {
       command = first;
     }
   }
 
-  return { command, force, agentsArg, json };
+  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore };
 }
 
 function resolveSelectedAgents(agentsArg, cwd) {
@@ -980,6 +1001,37 @@ function doctorCommand(cwd, isJson) {
     addCheck('Rule runner', 'OK', 'No project rule runner configured');
   }
 
+  // 15. Pending upgrade actions
+  const upgradeNotesPath = path.join(__dirname, '..', 'upgrade-notes.json');
+  const upgradeStatePath = path.join(cwd, '.agents', 'upgrade-state.json');
+  if (fs.existsSync(upgradeNotesPath)) {
+    let notes = [];
+    try { notes = JSON.parse(fs.readFileSync(upgradeNotesPath, 'utf8')); } catch (e) {}
+    let state = { completed: [] };
+    if (fs.existsSync(upgradeStatePath)) {
+      try { state = JSON.parse(fs.readFileSync(upgradeStatePath, 'utf8')); } catch (e) {}
+    }
+    const completedSet = new Set(Array.isArray(state.completed) ? state.completed : []);
+    const pending = [];
+    for (const entry of notes) {
+      for (const action of entry.actions || []) {
+        if (!completedSet.has(action.id)) {
+          pending.push(action);
+        }
+      }
+    }
+    if (pending.length > 0) {
+      addCheck(
+        'Upgrade actions',
+        'WARN',
+        `${pending.length} pending upgrade action(s): ${pending.map(p => p.id).join(', ')}`,
+        'Run pending actions then mark done with: npx @v1006/build-forge upgrade done <id>'
+      );
+    } else {
+      addCheck('Upgrade actions', 'OK', 'All upgrade actions completed');
+    }
+  }
+
   const okCount = checks.filter(c => c.status === 'OK').length;
   const warnCount = checks.filter(c => c.status === 'WARN').length;
   const failCount = checks.filter(c => c.status === 'FAIL').length;
@@ -1082,16 +1134,137 @@ function outdatedCommand(cwd, isJson) {
   }
 }
 
-function updateCommand(cwd) {
+function updateCommand(cwd, options = {}) {
+  const dryRun = !!options.dryRun;
+  const adopt = !!options.adopt;
+  const keepModified = options.keepModified || new Set();
+  const restore = options.restore || new Set();
+
   const packageSkillsDir = path.join(__dirname, '..', 'skills');
   const targetSkillsDir = path.join(cwd, '.agents', 'skills');
   const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
+  const integrityPath = path.join(__dirname, '..', 'integrity.json');
+  const tiersPath = path.join(__dirname, '..', 'tiers.json');
+  const upgradeNotesPath = path.join(__dirname, '..', 'upgrade-notes.json');
 
+  let integrity = {};
+  if (fs.existsSync(integrityPath)) {
+    try { integrity = JSON.parse(fs.readFileSync(integrityPath, 'utf8')); } catch (e) {}
+  }
+  let tiers = { core: [] };
+  if (fs.existsSync(tiersPath)) {
+    try { tiers = JSON.parse(fs.readFileSync(tiersPath, 'utf8')); } catch (e) {}
+  }
+  const coreSkills = new Set(tiers.core || []);
+
+  let pkgVersion = '0.1.0';
+  try {
+    const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    pkgVersion = pkgJson.version || pkgVersion;
+  } catch (e) {}
+
+  // Case 1: No lock file
   if (!fs.existsSync(lockFilePath)) {
-    console.error('Update error: Lock file not found at .agents/build-forge.lock.json. Run install first.');
-    process.exit(1);
+    if (!adopt) {
+      console.error('Update error: Lock file not found at .agents/build-forge.lock.json.');
+      console.error('Run npx @v1006/build-forge update --adopt to adopt existing skills.');
+      process.exit(1);
+    }
+
+    const installedSkills = [];
+    if (fs.existsSync(targetSkillsDir)) {
+      for (const name of fs.readdirSync(targetSkillsDir)) {
+        if (fs.existsSync(path.join(packageSkillsDir, name)) && fs.statSync(path.join(targetSkillsDir, name)).isDirectory()) {
+          installedSkills.push(name);
+        }
+      }
+    }
+
+    const matchingSkills = [];
+    const differingSkills = [];
+    const diffFilesBySkill = {};
+
+    for (const name of installedSkills) {
+      const manifest = computeSkillsManifest(targetSkillsDir, new Set([name]));
+      const pkgFiles = Object.keys(integrity).filter(k => k.startsWith(`skills/${name}/`));
+      let differs = false;
+      const diffList = [];
+
+      for (const relFile of pkgFiles) {
+        if (!manifest[relFile] || manifest[relFile] !== integrity[relFile]) {
+          differs = true;
+          diffList.push(relFile);
+        }
+      }
+      for (const relFile of Object.keys(manifest)) {
+        if (!integrity[relFile]) {
+          differs = true;
+          diffList.push(relFile);
+        }
+      }
+
+      if (differs) {
+        differingSkills.push(name);
+        diffFilesBySkill[name] = diffList;
+      } else {
+        matchingSkills.push(name);
+      }
+    }
+
+    const unresolved = [];
+    for (const name of differingSkills) {
+      if (!keepModified.has(name) && !restore.has(name)) {
+        unresolved.push(name);
+      }
+    }
+
+    if (unresolved.length > 0) {
+      console.error('Adopt aborted: The following skill(s) differ from the package:');
+      for (const name of unresolved) {
+        console.error(`  differs: ${name} (${diffFilesBySkill[name].length} file(s) differ)`);
+        for (const f of diffFilesBySkill[name].slice(0, 3)) {
+          console.error(`    - .agents/${f}`);
+        }
+      }
+      console.error('\nPass --keep-modified <skill> to keep your version, or --restore <skill> to overwrite with package version.');
+      process.exit(1);
+    }
+
+    if (dryRun) {
+      console.log('DRY RUN: update --adopt plan:');
+      console.log(`  Matching skills: ${matchingSkills.join(', ') || 'none'}`);
+      console.log(`  Kept modified:   ${Array.from(keepModified).join(', ') || 'none'}`);
+      console.log(`  Restoring:       ${Array.from(restore).join(', ') || 'none'}`);
+      console.log(`  Would write:     .agents/build-forge.lock.json (version ${pkgVersion})`);
+      return;
+    }
+
+    // Apply restore
+    for (const name of restore) {
+      fs.cpSync(path.join(packageSkillsDir, name), path.join(targetSkillsDir, name), { recursive: true, force: true });
+      console.log(`  restored skill: ${name}`);
+    }
+
+    // Install missing core tier skills
+    for (const coreSkill of coreSkills) {
+      if (!fs.existsSync(path.join(targetSkillsDir, coreSkill))) {
+        fs.cpSync(path.join(packageSkillsDir, coreSkill), path.join(targetSkillsDir, coreSkill), { recursive: true, force: true });
+        console.log(`  installed missing core skill: ${coreSkill}`);
+      }
+    }
+
+    // Write lock file
+    const allInstalledPkgSkills = new Set(
+      fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
+    );
+    const newManifest = computeSkillsManifest(targetSkillsDir, allInstalledPkgSkills);
+    newManifest['_version'] = pkgVersion;
+    fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
+    console.log(`Adopt complete: .agents/build-forge.lock.json written with version ${pkgVersion}.`);
+    return;
   }
 
+  // Case 2: Lock file exists
   let lockData = {};
   try {
     lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
@@ -1100,7 +1273,8 @@ function updateCommand(cwd) {
     process.exit(1);
   }
 
-  // 1. Verify pipeline skills first
+  const installedVersion = lockData._version || lockData.version || '0.1.0';
+
   const allowedSkills = new Set();
   if (fs.existsSync(packageSkillsDir)) {
     for (const name of fs.readdirSync(packageSkillsDir)) {
@@ -1117,48 +1291,176 @@ function updateCommand(cwd) {
   }
 
   const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
-  const modified = [];
+
+  // Check local modifications against lockData
+  const modifiedSkills = new Map();
   for (const [relFile, expectedHash] of Object.entries(lockData)) {
     if (relFile.startsWith('_') || relFile === 'version') continue;
     const curHash = currentManifest[relFile];
-    if (curHash && curHash !== expectedHash) {
-      modified.push(`.agents/${relFile}`);
+    if (!curHash || curHash !== expectedHash) {
+      const skillName = relFile.split('/')[1];
+      if (!modifiedSkills.has(skillName)) modifiedSkills.set(skillName, []);
+      modifiedSkills.get(skillName).push(relFile);
     }
   }
 
-  if (modified.length > 0) {
-    console.error('Update aborted: The following pipeline skill(s) have local modifications:');
-    for (const f of modified) {
-      console.error(`  modified  ${f}`);
+  const unapproved = [];
+  for (const [skillName, files] of modifiedSkills.entries()) {
+    if (!keepModified.has(skillName) && !restore.has(skillName)) {
+      unapproved.push({ skillName, files });
     }
-    console.error('\nRevert or stash your changes before updating.');
+  }
+
+  if (unapproved.length > 0) {
+    console.error('Update aborted: The following pipeline skill(s) have local modifications:');
+    for (const { skillName, files } of unapproved) {
+      console.error(`  modified skill: ${skillName}`);
+      for (const f of files) {
+        console.error(`    .agents/${f}`);
+      }
+    }
+    console.error('\nTo keep your local edits, pass --keep-modified <skill>. To discard and overwrite, pass --restore <skill> or run install --force.');
     process.exit(1);
   }
 
-  // 2. Install --force for pipeline skills only
-  fs.mkdirSync(targetSkillsDir, { recursive: true });
-  const updatedSkills = [];
-  for (const name of fs.readdirSync(packageSkillsDir)) {
-    const from = path.join(packageSkillsDir, name);
-    if (!fs.statSync(from).isDirectory()) continue;
-    const to = path.join(targetSkillsDir, name);
-    fs.cpSync(from, to, { recursive: true, force: true });
-    updatedSkills.push(name);
+  // Missing core tier skills
+  const missingCore = [];
+  for (const coreSkill of coreSkills) {
+    if (!fs.existsSync(path.join(targetSkillsDir, coreSkill))) {
+      missingCore.push(coreSkill);
+    }
   }
 
-  // Update lockfile
-  const newManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
-  let pkgVersion = '0.1.0';
-  try {
-    const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-    pkgVersion = pkgJson.version || pkgVersion;
-  } catch (e) {}
+  // Pipeline skills that differ from integrity.json
+  const differingSkills = [];
+  if (fs.existsSync(targetSkillsDir)) {
+    for (const name of fs.readdirSync(targetSkillsDir)) {
+      if (!fs.existsSync(path.join(packageSkillsDir, name))) continue;
+      if (keepModified.has(name)) continue;
+
+      if (restore.has(name)) {
+        differingSkills.push(name);
+        continue;
+      }
+
+      const pkgFiles = Object.keys(integrity).filter(k => k.startsWith(`skills/${name}/`));
+      let differs = false;
+      for (const relFile of pkgFiles) {
+        if (!currentManifest[relFile] || currentManifest[relFile] !== integrity[relFile]) {
+          differs = true;
+          break;
+        }
+      }
+      if (!differs) {
+        for (const relFile of Object.keys(currentManifest)) {
+          if (relFile.startsWith(`skills/${name}/`) && !integrity[relFile]) {
+            differs = true;
+            break;
+          }
+        }
+      }
+      if (differs) {
+        differingSkills.push(name);
+      }
+    }
+  }
+
+  // Available non-core skills
+  const nonCoreTiers = ['new-app', 'module'];
+  const availableNonCore = [];
+  for (const tierKey of nonCoreTiers) {
+    for (const name of (tiers[tierKey] || [])) {
+      if (!fs.existsSync(path.join(targetSkillsDir, name))) {
+        availableNonCore.push(name);
+      }
+    }
+  }
+
+  // Upgrade notes check
+  let pendingUpgradeActions = [];
+  if (fs.existsSync(upgradeNotesPath)) {
+    let notes = [];
+    try { notes = JSON.parse(fs.readFileSync(upgradeNotesPath, 'utf8')); } catch (e) {}
+    const upgradeStatePath = path.join(cwd, '.agents', 'upgrade-state.json');
+    let state = { completed: [] };
+    if (fs.existsSync(upgradeStatePath)) {
+      try { state = JSON.parse(fs.readFileSync(upgradeStatePath, 'utf8')); } catch (e) {}
+    }
+    const completedSet = new Set(Array.isArray(state.completed) ? state.completed : []);
+
+    for (const entry of notes) {
+      for (const action of entry.actions || []) {
+        if (!completedSet.has(action.id)) {
+          pendingUpgradeActions.push(action);
+        }
+      }
+    }
+  }
+
+  if (dryRun) {
+    console.log(`DRY RUN: update plan for Build Forge ${pkgVersion}:`);
+    if (keepModified.size > 0) {
+      console.log(`  Keeping modified skill(s): ${Array.from(keepModified).join(', ')}`);
+    }
+    if (missingCore.length > 0) {
+      console.log(`  Would install missing core skill(s): ${missingCore.join(', ')}`);
+    }
+    if (differingSkills.length > 0) {
+      console.log(`  Would update differing skill(s): ${differingSkills.join(', ')}`);
+    }
+    if (availableNonCore.length > 0) {
+      console.log(`  Available optional skill(s) to add: ${availableNonCore.join(', ')}`);
+    }
+    if (pendingUpgradeActions.length > 0) {
+      console.log(`  Pending upgrade action(s): ${pendingUpgradeActions.map(a => a.id).join(', ')}`);
+    }
+    console.log('DRY RUN: No files were changed.');
+    return;
+  }
+
+  fs.mkdirSync(targetSkillsDir, { recursive: true });
+
+  // 1. Install missing core tier skills
+  for (const coreSkill of missingCore) {
+    fs.cpSync(path.join(packageSkillsDir, coreSkill), path.join(targetSkillsDir, coreSkill), { recursive: true, force: true });
+    console.log(`  installed missing core skill: ${coreSkill}`);
+  }
+
+  // 2. Reinstall differing pipeline skills
+  for (const name of differingSkills) {
+    fs.cpSync(path.join(packageSkillsDir, name), path.join(targetSkillsDir, name), { recursive: true, force: true });
+    console.log(`  updated skill: ${name}`);
+  }
+
+  // 3. Update lockfile
+  const allInstalledPkgSkills = new Set(
+    fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
+  );
+  const newManifest = computeSkillsManifest(targetSkillsDir, allInstalledPkgSkills);
   newManifest['_version'] = pkgVersion;
   fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
+  console.log(`Build Forge: Updated pipeline skills and lockfile to version ${pkgVersion}.`);
 
-  console.log(`Build Forge: Updated ${updatedSkills.length} pipeline skill(s) in .agents/skills.`);
+  // 4. List available non-core skills
+  if (availableNonCore.length > 0) {
+    console.log('\nAvailable optional skills:');
+    for (const name of availableNonCore) {
+      console.log(`  ${name} (add with: npx @v1006/build-forge add ${name})`);
+    }
+  }
 
-  // Check for dual-homed collisions
+  // 5. Print pending upgrade actions
+  if (pendingUpgradeActions.length > 0) {
+    console.log(`\nPending upgrade actions for Build Forge ${pkgVersion}:`);
+    for (const action of pendingUpgradeActions) {
+      console.log(`  - [${action.id}] ${action.title}`);
+      console.log(`    Command: ${action.command}`);
+      console.log(`    Mark done: npx @v1006/build-forge upgrade done ${action.id}`);
+    }
+    console.log('See UPGRADING.md for instructions.');
+  }
+
+  // 6. Dual-home collisions check
   const vendorDir = path.join(cwd, '.agents', 'vendor');
   if (fs.existsSync(vendorDir) && fs.existsSync(targetSkillsDir)) {
     try {
@@ -1172,38 +1474,95 @@ function updateCommand(cwd) {
       }
     } catch (e) {}
   }
+}
 
-  // 3. Print migrate plan and command to apply it
-  const profilePath = path.join(cwd, '.agents', 'project-profile.yaml');
-  let migrateScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'migrate_profile.py');
-  if (!fs.existsSync(migrateScript)) {
-    migrateScript = path.join(packageSkillsDir, 'project-bootstrap', 'scripts', 'migrate_profile.py');
+function upgradeCommand(cwd, subcmd, actionId) {
+  if (subcmd !== 'done' || !actionId) {
+    console.error('Usage: npx @v1006/build-forge upgrade done <action-id>');
+    process.exit(1);
+  }
+  const statePath = path.join(cwd, '.agents', 'upgrade-state.json');
+  let state = { completed: [] };
+  if (fs.existsSync(statePath)) {
+    try {
+      state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    } catch (e) {
+      state = { completed: [] };
+    }
+  }
+  if (!Array.isArray(state.completed)) {
+    state.completed = [];
+  }
+  if (!state.completed.includes(actionId)) {
+    state.completed.push(actionId);
+  }
+  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n', 'utf8');
+  console.log(`Upgrade action '${actionId}' marked as completed in .agents/upgrade-state.json.`);
+}
+
+function addCommand(cwd, skillName) {
+  if (!skillName) {
+    console.error('Usage: npx @v1006/build-forge add <skill-name>');
+    process.exit(1);
+  }
+  const packageSkillsDir = path.join(__dirname, '..', 'skills');
+  const targetSkillsDir = path.join(cwd, '.agents', 'skills');
+  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
+  const src = path.join(packageSkillsDir, skillName);
+  const dest = path.join(targetSkillsDir, skillName);
+
+  if (!fs.existsSync(src) || !fs.statSync(src).isDirectory()) {
+    console.error(`Skill '${skillName}' not found in package.`);
+    process.exit(1);
+  }
+  if (fs.existsSync(dest)) {
+    console.log(`Skill '${skillName}' is already installed at .agents/skills/${skillName}.`);
+    return;
+  }
+  fs.mkdirSync(dest, { recursive: true });
+  fs.cpSync(src, dest, { recursive: true });
+  console.log(`Added skill '${skillName}' to .agents/skills/${skillName}.`);
+
+  if (fs.existsSync(lockFilePath)) {
+    try {
+      const lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+      const skillManifest = computeSkillsManifest(targetSkillsDir, new Set([skillName]));
+      for (const [k, v] of Object.entries(skillManifest)) {
+        lockData[k] = v;
+      }
+      fs.writeFileSync(lockFilePath, JSON.stringify(lockData, null, 2) + '\n', 'utf8');
+      console.log(`Updated .agents/build-forge.lock.json with '${skillName}'.`);
+    } catch (e) {}
+  }
+}
+
+function listCommand(cwd) {
+  const targetSkillsDir = path.join(cwd, '.agents', 'skills');
+  const tiersPath = path.join(__dirname, '..', 'tiers.json');
+  let tiers = { core: [], 'new-app': [], module: [] };
+  if (fs.existsSync(tiersPath)) {
+    try { tiers = JSON.parse(fs.readFileSync(tiersPath, 'utf8')); } catch (e) {}
   }
 
-  const python = findPythonCommand();
-  if (fs.existsSync(profilePath) && fs.existsSync(migrateScript) && python) {
-    try {
-      const resPlan = spawnSync(python.cmd, [...python.args, migrateScript, 'plan', '--profile', profilePath, '--root', cwd], {
-        encoding: 'utf8',
-        timeout: 10000
-      });
-      if (resPlan.stdout && resPlan.stdout.includes('Migration plan:')) {
-        console.log('\n--- Profile Migration Plan ---');
-        console.log(resPlan.stdout.trim());
-        console.log('\nTo apply this profile migration, run:');
-        console.log('  python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py apply --apply');
+  console.log('Build Forge Skills:\n');
+  for (const [tier, skills] of Object.entries(tiers)) {
+    console.log(`${tier.toUpperCase()}:`);
+    for (const name of skills) {
+      const installed = fs.existsSync(path.join(targetSkillsDir, name));
+      if (installed) {
+        console.log(`  [installed]     ${name}`);
       } else {
-        console.log('\nProject profile is up to date.');
+        console.log(`  [not installed] ${name} (add with: npx @v1006/build-forge add ${name})`);
       }
-    } catch (e) {
-      // Non-fatal
     }
+    console.log('');
   }
 }
 
 function main() {
   const args = process.argv.slice(2);
-  const { command, force, agentsArg, json } = parseArgs(args);
+  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore } = parseArgs(args);
   const cwd = process.cwd();
 
   if (command === 'install') {
@@ -1223,7 +1582,16 @@ function main() {
   } else if (command === 'outdated') {
     outdatedCommand(cwd, json);
   } else if (command === 'update') {
-    updateCommand(cwd);
+    updateCommand(cwd, { dryRun, adopt, keepModified, restore });
+  } else if (command === 'upgrade') {
+    const subcmd = positional[1];
+    const actionId = positional[2];
+    upgradeCommand(cwd, subcmd, actionId);
+  } else if (command === 'add') {
+    const skillName = positional[1];
+    addCommand(cwd, skillName);
+  } else if (command === 'list') {
+    listCommand(cwd);
   } else if (command === 'help') {
     console.log('Build Forge CLI');
     console.log('Commands:');
@@ -1235,7 +1603,10 @@ function main() {
     console.log('  diff');
     console.log('  doctor [--json]');
     console.log('  outdated [--json]');
-    console.log('  update');
+    console.log('  update [--dry-run] [--adopt] [--keep-modified <skill>] [--restore <skill>]');
+    console.log('  upgrade done <action-id>');
+    console.log('  add <skill-name>');
+    console.log('  list');
   }
 }
 
@@ -1256,5 +1627,8 @@ module.exports = {
   diffCommand,
   doctorCommand,
   outdatedCommand,
-  updateCommand
+  updateCommand,
+  upgradeCommand,
+  addCommand,
+  listCommand
 };

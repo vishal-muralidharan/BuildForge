@@ -45,6 +45,10 @@ CUSTOM_BLOCK_RE = re.compile(
     re.DOTALL
 )
 CUSTOM_NAME_RE = re.compile(r"^[a-z0-9-]{1,40}$")
+OLD_BANNER_RE = re.compile(
+    r"<!--\s*Generated from .+? by project-bootstrap\.\s*Edit the profile, then re-render\.\s*-->",
+    re.IGNORECASE,
+)
 
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"),
@@ -690,6 +694,7 @@ def main():
     ap.add_argument("--salvage", action="store_true", help="Regenerate stamped files and salvage hand edits outside custom blocks into 'salvaged' block")
     ap.add_argument("--force", action="store_true", help="Force updates (behaves like --salvage unless --discard-edits and --yes-discard are passed)")
     ap.add_argument("--overwrite-unstamped", action="store_true", help="Allow --force to overwrite unstamped files")
+    ap.add_argument("--upgrade-unstamped", action="store_true", help="Upgrade unstamped convention skills carrying old banner to stamped template while salvaging hand edits")
     ap.add_argument("--migrate-custom", action="store_true", help="Wrap unstamped file body into 'legacy' custom block and render generated skill around it")
     ap.add_argument("--discard-edits", action="store_true", help="Discard hand edits outside custom blocks (requires --yes-discard)")
     ap.add_argument("--yes-discard", action="store_true", help="Confirm discarding hand edits outside custom blocks")
@@ -741,7 +746,7 @@ def main():
 
     # Dirty tree guard: check existing target files
     existing_targets = [dest for dest, _, _ in targets if dest.is_file()]
-    if (a.update or a.salvage or a.force or a.migrate_custom) and existing_targets:
+    if (a.update or a.salvage or a.force or a.migrate_custom or a.upgrade_unstamped) and existing_targets:
         check_git_dirty(root, existing_targets, a.allow_dirty)
 
     # Pre-flight check for --update: transactional validation
@@ -814,7 +819,58 @@ def main():
 
         if not stamp_m:
             # Unstamped file
-            if a.migrate_custom:
+            if a.upgrade_unstamped:
+                if not OLD_BANNER_RE.search(disk_text):
+                    skipped.append((dest, "unstamped file has no old generator banner"))
+                    print(f"SKIPPED {rel_label} (unstamped; no generator banner)")
+                    continue
+
+                disk_blocks = extract_custom_blocks(disk_text, rel_label)
+                clean_disk = strip_custom_blocks(strip_stamp(disk_text))
+                clean_tmpl = strip_custom_blocks(raw_tmpl)
+                salvaged_lines = compute_salvaged_lines(clean_tmpl, clean_disk)
+                salvaged_lines = [l for l in salvaged_lines if not OLD_BANNER_RE.search(l)]
+
+                salvaged_count = 0
+                salvaged_body = ""
+                if salvaged_lines:
+                    salvaged_body = "\n".join(salvaged_lines).strip() + "\n"
+                    scan_secrets(salvaged_body, rel_label)
+                    header = "<!-- Salvaged hand edits from unstamped file -->\n"
+                    full_content = header + salvaged_body
+                    if "salvaged" in disk_blocks:
+                        disk_blocks["salvaged"] = disk_blocks["salvaged"].rstrip() + "\n\n" + salvaged_body
+                    else:
+                        disk_blocks["salvaged"] = full_content
+                    salvaged_count = len(salvaged_lines)
+
+                # Ensure special custom blocks (salvaged, legacy) are present in template before injection
+                for special_block in ("legacy", "salvaged"):
+                    if special_block in disk_blocks and f"<!-- BEGIN CUSTOM: {special_block} -->" not in raw_tmpl:
+                        marker = f"<!-- BEGIN CUSTOM: {special_block} -->\n<!-- END CUSTOM: {special_block} -->\n"
+                        if "<!-- BEGIN CUSTOM: notes -->" in raw_tmpl:
+                            raw_tmpl = raw_tmpl.replace("<!-- BEGIN CUSTOM: notes -->", marker + "<!-- BEGIN CUSTOM: notes -->", 1)
+                        else:
+                            raw_tmpl = raw_tmpl.rstrip() + "\n\n" + marker
+
+                merged, n_pres, orphans = inject_custom_blocks(raw_tmpl, disk_blocks)
+                for oname, ocontent in orphans.items():
+                    all_orphans.append((rel_label, oname, ocontent))
+
+                new_body_hash = compute_body_hash(raw_tmpl)
+                final_content = stamp_text(merged, new_body_hash)
+                if not a.dry_run:
+                    write_text_lf(dest, final_content)
+                    if salvaged_count > 160 or (salvaged_lines and has_large_table_or_fenced_block(salvaged_body)):
+                        route_overflow(root, dest, "salvaged", disk_blocks["salvaged"], rel_label)
+
+                log_render_action(root, rel_label, "upgrade-unstamped", salvaged_count)
+                updated.append((dest, n_pres, salvaged_count))
+                prefix = "DRY RUN " if a.dry_run else ""
+                print(f"{prefix}UPGRADED {rel_label} (preserved {n_pres} block(s), salvaged {salvaged_count} line(s))")
+                continue
+
+            elif a.migrate_custom:
                 existing_body = disk_text
                 scan_secrets(existing_body, rel_label)
                 lines = existing_body.splitlines()
@@ -887,7 +943,7 @@ def main():
         all_warnings.extend(warns)
         has_hand_edits = (disk_body_hash != stamp_hash)
 
-        if not a.update and not a.force and not a.salvage:
+        if not a.update and not a.force and not a.salvage and not a.upgrade_unstamped:
             # Plain render.py: default behavior is skip existing files
             if kind == "agents":
                 gen_dest = dest.with_name(dest.stem + ".generated" + dest.suffix)
@@ -949,7 +1005,7 @@ def main():
             write_text_lf(dest, final_content)
 
         # Route overflow blocks if in salvage run
-        if is_salvage_run and not a.dry_run:
+        if (is_salvage_run or a.upgrade_unstamped) and not a.dry_run:
             for bname, bcontent in list(disk_blocks.items()):
                 blines = bcontent.splitlines()
                 if len(blines) > 160:

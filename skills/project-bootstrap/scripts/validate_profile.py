@@ -100,8 +100,8 @@ def main():
     if not isinstance(prof, dict):
         sys.exit("ERROR: profile must be a YAML mapping")
 
-    if prof.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
+    if prof.get("schema_version") not in (1, 2):
+        errors.append("schema_version must be 1 or 2")
 
     for path in ("project.name", "project.summary", "stack.language", "stack.framework", "stack.package_manager"):
         if not get(prof, path):

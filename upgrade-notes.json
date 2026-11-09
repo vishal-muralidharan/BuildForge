@@ -1,0 +1,44 @@
+[
+  {
+    "version": "0.2.0",
+    "since": "0.1.0",
+    "notes": "Build Forge 0.2.0 introduces project blueprints, curated rule packs, and integrity-verified updates.",
+    "actions": [
+      {
+        "id": "profile-migrate",
+        "title": "Preview and run project profile migration",
+        "command": "python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py plan --profile .agents/project-profile.yaml --root .",
+        "risk": "low",
+        "optional": false
+      },
+      {
+        "id": "blueprints-init",
+        "title": "Scaffold and extract project blueprints",
+        "command": "python3 .agents/skills/project-blueprints/scripts/blueprint.py init && python3 .agents/skills/project-blueprints/scripts/blueprint.py extract",
+        "risk": "low",
+        "optional": true
+      },
+      {
+        "id": "rule-packs",
+        "title": "Audit code hazards and adopt curated rule packs",
+        "command": "python3 .agents/skills/project-bootstrap/scripts/packs.py list",
+        "risk": "low",
+        "optional": true
+      },
+      {
+        "id": "migrate-external-refs",
+        "title": "Move deprecated external_references from profile to references.yaml",
+        "command": "python3 .agents/skills/extend-pipeline/scripts/refs.py migrate",
+        "risk": "low",
+        "optional": true
+      },
+      {
+        "id": "upgrade-unstamped",
+        "title": "Upgrade unstamped generated convention skills to stamped template",
+        "command": "python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root . --upgrade-unstamped --dry-run",
+        "risk": "low",
+        "optional": false
+      }
+    ]
+  }
+]
