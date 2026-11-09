@@ -49,24 +49,63 @@ VALID_MODES = {"advisory", "gate"}
 VALID_ACTIVATIONS = {"pipeline-only", "native"}
 VALID_STATUSES = {"declared", "installed", "rejected"}
 
-VET_SCRIPT_EXTENSIONS = {".sh", ".bash", ".py", ".js", ".mjs", ".cjs", ".ts", ".rb", ".pl", ".php", ".bin", ".exe"}
-VET_NETWORK_PATTERNS = re.compile(r"\b(curl|wget|fetch|axios|urllib|requests|http\.client|socket|aiohttp)\b", re.IGNORECASE)
-VET_EXEC_PATTERNS = re.compile(r"\b(subprocess|os\.system|exec|spawn|eval|popen|child_process)\b", re.IGNORECASE)
-VET_CREDENTIAL_PATTERNS = re.compile(r"\b(api_key|token|secret|password|private_key|auth_token|bearer|npm_token|github_token)\b", re.IGNORECASE)
-VET_PATH_ESCAPE_PATTERNS = re.compile(r"(/etc/|/usr/|/tmp/|~/\.ssh|~/\.bashrc|\.\./\.\.)")
-VET_PUBLISH_PATTERNS = re.compile(r"\b(git\s+push|npm\s+publish|twine\s+upload|docker\s+push)\b", re.IGNORECASE)
-VET_ZERO_WIDTH_CHARS = re.compile(r"[\u200b\u200c\u200d\ufeff\u202a-\u202e]")
-VET_HTML_COMMENTS = re.compile(r"<!--[\s\S]*?-->")
+# HIGH severity script extensions (case-insensitive)
+VET_HIGH_SCRIPT_EXTENSIONS = {
+    ".py", ".sh", ".bash", ".zsh", ".js", ".cjs", ".mjs",
+    ".ts", ".cts", ".mts", ".jsx", ".tsx", ".ps1", ".bat",
+    ".cmd", ".rb", ".pl", ".php"
+}
+
+# Zero-width and bidirectional control characters
+VET_ZERO_WIDTH_CHARS = re.compile(r"[\u200b\u200c\u200d\ufeff\u202a-\u202e\u2066-\u2069]")
+
+# Instruction override / prompt injection phrases
 VET_INJECTION_PHRASES = [
     "ignore previous instructions",
+    "ignore all previous instructions",
+    "disregard the rules",
     "disregard all previous instructions",
-    "disregard",
+    "disregard previous instructions",
+    "disregard instructions",
     "do not tell the user",
+    "hide this from the user",
     "system prompt",
     "override instructions",
     "bypass security",
     "hidden instruction"
 ]
+
+# Instruction-like words and imperative verbs in HTML comments
+VET_COMMENT_INSTRUCTION_WORDS = re.compile(
+    r"\b(ignore|disregard|override|bypass|hide|run|execute|eval|install|delete|remove|download|upload|curl|wget|fetch|send|post|set|export|write|exfiltrate|system|prompt|instruction)\b",
+    re.IGNORECASE
+)
+
+# MEDIUM patterns inside code block or inline code
+VET_CODE_INSTALL_PATTERNS = re.compile(
+    r"(\b(npx|pnpm\s+dlx|bunx|yarn\s+dlx)\b|\b(npm\s+(i|install))\b|\b(pip\s+install)\b|(curl|wget)\s+[^|\n]*\|\s*(sh|bash|zsh)|@latest)",
+    re.IGNORECASE
+)
+VET_CODE_CREDENTIAL_PATTERNS = re.compile(
+    r"(\bexport\s+[A-Za-z0-9_]*(TOKEN|KEY|SECRET|PASSWORD)\s*=|"
+    r"\b(npm|docker|gh|gcloud|aws)\s+(auth\s+)?login\b|"
+    r"\b(ssh-keygen|openssl\s+genrsa|gpg\s+--gen-key|keytool\s+-genkey)\b)",
+    re.IGNORECASE
+)
+VET_CODE_PATH_ESCAPE_PATTERNS = re.compile(
+    r"((?<!\w)~/|(?<!\w)/tmp\b|/etc/|/usr/|\$HOME|%USERPROFILE%|(?<![A-Za-z0-9])[A-Za-z]:[\\/])",
+    re.IGNORECASE
+)
+VET_CODE_NETWORK_PATTERNS = re.compile(
+    r"(\b(curl|wget)\b|\bfetch\s*\(|\b(urllib|axios|aiohttp|http\.client)\b)",
+    re.IGNORECASE
+)
+
+# LOW patterns in plain prose
+VET_PROSE_KEYWORDS = re.compile(
+    r"\b(fetch|requests|token|socket|secret|password)\b",
+    re.IGNORECASE
+)
 
 
 def hash_file(file_path):
@@ -427,27 +466,53 @@ def cmd_fetch(args):
 # -------------------------------------------------------------------------
 # Subcommand: vet
 # -------------------------------------------------------------------------
-def cmd_vet(args):
-    scan_dir = os.path.abspath(args.dir)
-    if not os.path.isdir(scan_dir):
-        sys.exit(f"Vetting directory '{scan_dir}' not found.")
+def split_line_code_spans(line):
+    """Split line into list of (is_code, text) segments based on markdown backticks."""
+    segments = []
+    pattern = re.compile(r"(`+)(.+?)\1")
+    last_end = 0
+    for match in pattern.finditer(line):
+        start, end = match.span()
+        if start > last_end:
+            segments.append((False, line[last_end:start]))
+        segments.append((True, match.group(2)))
+        last_end = end
+    if last_end < len(line):
+        segments.append((False, line[last_end:]))
+    return segments
 
+
+def run_vet_scan(scan_dir):
+    """Run comprehensive security vetting scan across files in scan_dir.
+
+    Returns a list of tuples: (severity, rel_path, line_number_or_None, message).
+    """
     findings = []
+    scan_dir = os.path.abspath(scan_dir)
 
     for root, dirs, files in os.walk(scan_dir):
-        # Ignore .git
         if ".git" in dirs:
             dirs.remove(".git")
 
-        for f in files:
+        for f in sorted(files):
             file_path = os.path.join(root, f)
             rel_path = os.path.relpath(file_path, scan_dir).replace("\\", "/")
             _, ext = os.path.splitext(f)
+            ext_lower = ext.lower()
 
-            # 1. Scripts present
-            if ext in VET_SCRIPT_EXTENSIONS or "scripts" in Path(rel_path).parts:
+            # 1. HIGH: Script files by extension
+            if ext_lower in VET_HIGH_SCRIPT_EXTENSIONS:
                 findings.append(("HIGH", rel_path, None, f"Executable script file present: {rel_path}"))
 
+            # 2. HIGH: Executable bit
+            try:
+                st = os.stat(file_path)
+                if st.st_mode & 0o111:
+                    findings.append(("HIGH", rel_path, None, f"Executable permission bit set on file: mode {oct(st.st_mode)}"))
+            except Exception:
+                pass
+
+            # Read file contents
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as fh:
                     lines = fh.readlines()
@@ -455,62 +520,250 @@ def cmd_vet(args):
                 findings.append(("MEDIUM", rel_path, None, f"Could not read file: {e}"))
                 continue
 
+            # Check if file has frontmatter (starts with --- on line 1)
+            frontmatter_end = 0
+            if lines and lines[0].strip() == "---":
+                for idx in range(1, len(lines)):
+                    if lines[idx].strip() == "---":
+                        frontmatter_end = idx + 1
+                        break
+
+            in_fenced_code = False
+            fence_marker = None
+            in_html_comment = False
+            comment_start_line = 0
+            comment_buffer = []
+
             for line_idx, line in enumerate(lines, 1):
-                # 2. Network calls
-                net_match = VET_NETWORK_PATTERNS.search(line)
-                if net_match:
-                    findings.append(("HIGH", rel_path, line_idx, f"Network call pattern detected: '{net_match.group(0)}'"))
+                # 3. HIGH: Shebang line on line 1
+                if line_idx == 1 and line.startswith("#!"):
+                    findings.append(("HIGH", rel_path, 1, f"Shebang line detected on line 1: '{line.strip()}'"))
 
-                # 3. Shell execution
-                exec_match = VET_EXEC_PATTERNS.search(line)
-                if exec_match:
-                    findings.append(("HIGH", rel_path, line_idx, f"Shell/code execution pattern detected: '{exec_match.group(0)}'"))
-
-                # 4. Credential or token identifiers
-                cred_match = VET_CREDENTIAL_PATTERNS.search(line)
-                if cred_match:
-                    findings.append(("HIGH", rel_path, line_idx, f"Credential/token keyword detected: '{cred_match.group(0)}'"))
-
-                # 5. Writes outside project boundary
-                path_match = VET_PATH_ESCAPE_PATTERNS.search(line)
-                if path_match:
-                    findings.append(("HIGH", rel_path, line_idx, f"Path referencing outside project boundary: '{path_match.group(0)}'"))
-
-                # 6. Remote publishing commands
-                pub_match = VET_PUBLISH_PATTERNS.search(line)
-                if pub_match:
-                    findings.append(("HIGH", rel_path, line_idx, f"Publishing/pushing command detected: '{pub_match.group(0)}'"))
-
-                # 7. Invisible / bidirectional unicode
+                # 4. HIGH: Zero-width or bidirectional unicode characters
                 if VET_ZERO_WIDTH_CHARS.search(line):
                     findings.append(("HIGH", rel_path, line_idx, "Zero-width or bidirectional Unicode character discovered."))
 
-                # 8. HTML comments
-                if VET_HTML_COMMENTS.search(line):
-                    findings.append(("MEDIUM", rel_path, line_idx, "HTML comment present in text."))
-
-                # 9. Instruction override / prompt injection phrases
-                l_lower = line.lower()
+                # 5. HIGH: Instruction override phrases
+                line_lower = line.lower()
                 for phrase in VET_INJECTION_PHRASES:
-                    if phrase in l_lower:
-                        findings.append(("HIGH", rel_path, line_idx, f"Suspicious instruction override phrase detected: '{phrase}'"))
+                    if phrase in line_lower:
+                        findings.append(("HIGH", rel_path, line_idx, f"Instruction override phrase detected: '{phrase}'"))
+                        break
+
+                # Lines inside frontmatter are not scanned for HTML comments, code blocks, or prose keywords
+                if line_idx <= frontmatter_end:
+                    continue
+
+                # Handle multi-line HTML comment state
+                if in_html_comment:
+                    close_pos = line.find("-->")
+                    if close_pos == -1:
+                        comment_buffer.append(line)
+                        continue
+                    else:
+                        comment_buffer.append(line[:close_pos])
+                        full_body = "".join(comment_buffer).strip()
+                        snippet = (full_body.replace("\n", " ")[:60]).strip()
+                        if re.match(r"^e\.g\b", full_body, re.IGNORECASE):
+                            findings.append(("LOW", rel_path, comment_start_line, f"Placeholder HTML comment: '<!-- {snippet} -->'"))
+                        elif VET_COMMENT_INSTRUCTION_WORDS.search(full_body):
+                            m_w = VET_COMMENT_INSTRUCTION_WORDS.search(full_body).group(0)
+                            findings.append(("HIGH", rel_path, comment_start_line, f"HTML comment containing instruction or imperative verb detected ('{m_w}'): '<!-- {snippet} -->'"))
+                        else:
+                            findings.append(("MEDIUM", rel_path, comment_start_line, f"HTML comment present in text: '<!-- {snippet} -->'"))
+                        in_html_comment = False
+                        comment_buffer = []
+                        line = line[close_pos + 3:]
+                        if not line.strip():
+                            continue
+
+                # Check for fenced code block toggle
+                stripped = line.strip()
+                if not in_fenced_code:
+                    if stripped.startswith("```") or stripped.startswith("~~~"):
+                        in_fenced_code = True
+                        fence_marker = stripped[:3]
+                        continue
+                else:
+                    if stripped.startswith(fence_marker):
+                        in_fenced_code = False
+                        fence_marker = None
+                        continue
+
+                # If inside fenced code block, check MEDIUM patterns on the whole line
+                if in_fenced_code:
+                    m = VET_CODE_INSTALL_PATTERNS.search(line)
+                    if m:
+                        findings.append(("MEDIUM", rel_path, line_idx, f"Download or install command in code: '{m.group(0)}'"))
+                    m = VET_CODE_CREDENTIAL_PATTERNS.search(line)
+                    if m:
+                        findings.append(("MEDIUM", rel_path, line_idx, f"Credential command in code: '{m.group(0)}'"))
+                    m = VET_CODE_PATH_ESCAPE_PATTERNS.search(line)
+                    if m:
+                        findings.append(("MEDIUM", rel_path, line_idx, f"Path referencing outside project boundary in code: '{m.group(0)}'"))
+                    m = VET_CODE_NETWORK_PATTERNS.search(line)
+                    if m:
+                        findings.append(("MEDIUM", rel_path, line_idx, f"Network call in code: '{m.group(0)}'"))
+                    continue
+
+                # Outside fenced code blocks: extract inline code spans and non-code spans
+                segments = split_line_code_spans(line)
+                new_segments = []
+                for is_code, seg_text in segments:
+                    if is_code:
+                        new_segments.append((True, seg_text))
+                    else:
+                        # Extract HTML comments from non-code text
+                        pos = 0
+                        while pos < len(seg_text):
+                            open_pos = seg_text.find("<!--", pos)
+                            if open_pos == -1:
+                                new_segments.append((False, seg_text[pos:]))
+                                break
+                            if open_pos > pos:
+                                new_segments.append((False, seg_text[pos:open_pos]))
+                            close_pos = seg_text.find("-->", open_pos + 4)
+                            if close_pos != -1:
+                                comment_body = seg_text[open_pos + 4 : close_pos].strip()
+                                snippet = (comment_body.replace("\n", " ")[:60]).strip()
+                                if re.match(r"^e\.g\b", comment_body, re.IGNORECASE):
+                                    findings.append(("LOW", rel_path, line_idx, f"Placeholder HTML comment: '<!-- {snippet} -->'"))
+                                elif VET_COMMENT_INSTRUCTION_WORDS.search(comment_body):
+                                    m_w = VET_COMMENT_INSTRUCTION_WORDS.search(comment_body).group(0)
+                                    findings.append(("HIGH", rel_path, line_idx, f"HTML comment containing instruction or imperative verb detected ('{m_w}'): '<!-- {snippet} -->'"))
+                                else:
+                                    findings.append(("MEDIUM", rel_path, line_idx, f"HTML comment present in text: '<!-- {snippet} -->'"))
+                                pos = close_pos + 3
+                            else:
+                                in_html_comment = True
+                                comment_start_line = line_idx
+                                comment_buffer = [seg_text[open_pos + 4 :]]
+                                pos = len(seg_text)
+                                break
+
+                # Scan processed segments
+                for is_code, seg_text in new_segments:
+                    if is_code:
+                        m = VET_CODE_INSTALL_PATTERNS.search(seg_text)
+                        if m:
+                            findings.append(("MEDIUM", rel_path, line_idx, f"Download or install command in code: '{m.group(0)}'"))
+                        m = VET_CODE_CREDENTIAL_PATTERNS.search(seg_text)
+                        if m:
+                            findings.append(("MEDIUM", rel_path, line_idx, f"Credential command in code: '{m.group(0)}'"))
+                        m = VET_CODE_PATH_ESCAPE_PATTERNS.search(seg_text)
+                        if m:
+                            findings.append(("MEDIUM", rel_path, line_idx, f"Path referencing outside project boundary in code: '{m.group(0)}'"))
+                        m = VET_CODE_NETWORK_PATTERNS.search(seg_text)
+                        if m:
+                            findings.append(("MEDIUM", rel_path, line_idx, f"Network call in code: '{m.group(0)}'"))
+                    else:
+                        for m in VET_PROSE_KEYWORDS.finditer(seg_text):
+                            findings.append(("LOW", rel_path, line_idx, f"Informational keyword in prose: '{m.group(0)}'"))
+
+            # Handle unclosed HTML comment at end of file
+            if in_html_comment and comment_buffer:
+                full_body = "".join(comment_buffer).strip()
+                snippet = (full_body.replace("\n", " ")[:60]).strip()
+                if re.match(r"^e\.g\b", full_body, re.IGNORECASE):
+                    findings.append(("LOW", rel_path, comment_start_line, f"Placeholder HTML comment: '<!-- {snippet} -->'"))
+                elif VET_COMMENT_INSTRUCTION_WORDS.search(full_body):
+                    m_w = VET_COMMENT_INSTRUCTION_WORDS.search(full_body).group(0)
+                    findings.append(("HIGH", rel_path, comment_start_line, f"HTML comment containing instruction or imperative verb detected ('{m_w}'): '<!-- {snippet} -->'"))
+                else:
+                    findings.append(("MEDIUM", rel_path, comment_start_line, f"HTML comment present in text: '<!-- {snippet} -->'"))
+
+    return findings
+
+
+def print_vet_report(scan_dir, findings, show_all=False, as_json=False):
+    """Print formatted vetting report matching severity model."""
+    if as_json:
+        totals = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        by_file = {}
+        findings_list = []
+        for sev, file_p, line_n, msg in findings:
+            totals[sev] = totals.get(sev, 0) + 1
+            if file_p not in by_file:
+                by_file[file_p] = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+            by_file[file_p][sev] = by_file[file_p].get(sev, 0) + 1
+            findings_list.append({
+                "severity": sev,
+                "file": file_p,
+                "line": line_n,
+                "message": msg
+            })
+        data = {
+            "scan_dir": scan_dir,
+            "totals": totals,
+            "files": by_file,
+            "findings": findings_list
+        }
+        print(json.dumps(data, indent=2))
+        return
 
     print(f"=== VETTING REPORT FOR {scan_dir} ===")
-    high_findings = [f for f in findings if f[0] == "HIGH"]
-    med_findings = [f for f in findings if f[0] == "MEDIUM"]
+
+    totals = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+    by_file = {}
+    for sev, file_p, line_n, msg in findings:
+        totals[sev] = totals.get(sev, 0) + 1
+        if file_p not in by_file:
+            by_file[file_p] = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        by_file[file_p][sev] = by_file[file_p].get(sev, 0) + 1
 
     if not findings:
         print("OK: No security findings detected.")
-        print("\nNote: A clean scan is not proof of safety. Verify all third party text by hand.")
-        sys.exit(0)
+        print("\nSummary: 0 HIGH, 0 MEDIUM, 0 LOW finding(s).")
+        print("Note: A clean scan is not proof of safety. Never execute unverified code.")
+        return
 
-    for severity, file_p, line_n, msg in findings:
-        loc = f"{file_p}:{line_n}" if line_n else file_p
-        print(f"[{severity}] {loc} - {msg}")
+    # 1. Summary first (counts per severity, per file)
+    print("\nSummary by file:")
+    for f_path in sorted(by_file.keys()):
+        counts = by_file[f_path]
+        print(f"  {f_path}: {counts.get('HIGH', 0)} HIGH, {counts.get('MEDIUM', 0)} MEDIUM, {counts.get('LOW', 0)} LOW")
+    print(f"\nTotal: {totals.get('HIGH', 0)} HIGH, {totals.get('MEDIUM', 0)} MEDIUM, {totals.get('LOW', 0)} LOW finding(s).\n")
 
-    print(f"\nSummary: {len(high_findings)} HIGH, {len(med_findings)} MEDIUM finding(s).")
-    print("Note: A clean scan is not proof of safety. Never execute unverified code.")
+    # 2. Findings: HIGH and MEDIUM in full
+    high_findings = [f for f in findings if f[0] == "HIGH"]
+    med_findings = [f for f in findings if f[0] == "MEDIUM"]
+    low_findings = [f for f in findings if f[0] == "LOW"]
 
+    if show_all:
+        for sev, file_p, line_n, msg in findings:
+            loc = f"{file_p}:{line_n}" if line_n is not None else file_p
+            print(f"[{sev}] {loc} - {msg}")
+    else:
+        for sev, file_p, line_n, msg in high_findings:
+            loc = f"{file_p}:{line_n}" if line_n is not None else file_p
+            print(f"[{sev}] {loc} - {msg}")
+
+        for sev, file_p, line_n, msg in med_findings:
+            loc = f"{file_p}:{line_n}" if line_n is not None else file_p
+            print(f"[{sev}] {loc} - {msg}")
+
+        # LOW collapsed into 1 count per file
+        low_by_file = {}
+        for sev, file_p, line_n, msg in low_findings:
+            low_by_file[file_p] = low_by_file.get(file_p, 0) + 1
+
+        for file_p in sorted(low_by_file.keys()):
+            cnt = low_by_file[file_p]
+            plural = "finding" if cnt == 1 else "findings"
+            print(f"[LOW] {file_p} - {cnt} informational {plural} (prose keywords or placeholder comments; use --all to view)")
+
+    print("\nNote: A clean scan is not proof of safety. Never execute unverified code.")
+
+
+def cmd_vet(args):
+    scan_dir = os.path.abspath(args.dir)
+    if not os.path.isdir(scan_dir):
+        sys.exit(f"Vetting directory '{scan_dir}' not found.")
+
+    findings = run_vet_scan(scan_dir)
+    print_vet_report(scan_dir, findings, show_all=bool(args.all), as_json=bool(args.json))
+
+    high_findings = [f for f in findings if f[0] == "HIGH"]
     if high_findings:
         sys.exit(1)
     sys.exit(0)
@@ -606,6 +859,14 @@ def cmd_add(args):
 
         if not skill_source.is_dir():
             sys.exit(f"Skill source path '{skill_source}' does not exist or is not a directory.")
+
+        # Vetting summary at approval time
+        vet_findings = run_vet_scan(str(skill_source))
+        high_count = sum(1 for f in vet_findings if f[0] == "HIGH")
+        med_count = sum(1 for f in vet_findings if f[0] == "MEDIUM")
+        low_count = sum(1 for f in vet_findings if f[0] == "LOW")
+        print(f"\nVetting summary for '{name}': {high_count} HIGH, {med_count} MEDIUM, {low_count} LOW finding(s).")
+        print("Approval focuses on reviewing HIGH and MEDIUM findings. Review all warnings before deploying.\n")
 
         # Copy into destination
         target_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -1123,6 +1384,8 @@ def main():
     # vet
     p_vet = subparsers.add_parser("vet")
     p_vet.add_argument("dir")
+    p_vet.add_argument("--all", action="store_true", help="Print all findings in full, including LOW")
+    p_vet.add_argument("--json", action="store_true", help="Output findings as JSON")
 
     # add
     p_add = subparsers.add_parser("add")
