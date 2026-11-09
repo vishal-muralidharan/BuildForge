@@ -98,6 +98,12 @@ All notable changes to Build Forge will be documented in this file.
 - Restricted scope discovery in `check_sync.py` to the Scope guide table.
 - Fixed prefix stripping in `legacy_import.py` for references starting with `.`.
 - Added troubleshooting row to `README.md` for false warnings from `check_sync`.
+- `update --dry-run` prints full update plan and `Blocked by:` list when local modifications exist instead of aborting immediately, exiting 0 if clean and 1 if blocked.
+- Installed skills are explicitly tracked in `build-forge.lock.json` under `_installed`; `verify`, `doctor`, and `update` check installed skills only, ignoring uninstalled optional skills. Added `build-forge remove` command with core skill protection (`--force`).
+- Obsolete pipeline files removed upstream are pruned on update across `update`, `update --restore`, and `install --force`, while user additions and locally modified files are preserved with warnings and backups.
+- Unified integrity verification logic between `build-forge verify` and `build-forge doctor` using shared `checkSkillsIntegrity` to ensure consistent reporting of missing, modified, and extra files.
+- Saved patch headers in `build-forge diff --patch` and `update --restore` use portable relative paths (`a/<path>`, `b/<path>`) compatible with `git apply`, and patches are skipped for unmodified upstream upgrades.
+- Profile migration in `migrate_profile.py` uses line-based editing instead of `yaml.safe_dump`, preserving comments, quoting, indentation, line wrapping, and key order when bumping schema version to 2 and adding `blueprints`.
 - Reference collision detection and deduplication tool `refs.py dedupe` in `skills/extend-pipeline/scripts/refs.py` resolving dual-homed references between `.agents/vendor` and `.agents/skills`.
 - Machine check `no_dual_homed_skills` in `run_rule_checks.py` with `RUNNER_VERSION = 1` and validation schema support.
 - Dual-home, orphan vendor folder, and rule runner version diagnostic checks in `bin/build-forge.js doctor`.
