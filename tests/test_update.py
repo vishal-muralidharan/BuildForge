@@ -87,6 +87,18 @@ class TestSafeUpdate(unittest.TestCase):
         after = snapshot_dir(self.project_dir)
         self.assertEqual(before, after, "update --dry-run modified files on disk")
 
+    def test_01b_update_dry_run_with_unapproved_modification_prints_plan_and_blocks(self):
+        """B1: update --dry-run always prints plan and Blocked by list, exiting 1 if blocked."""
+        # atomic-commits is modified in fixture
+        res = run_node(["update", "--dry-run"], self.project_dir)
+        self.assertEqual(res.returncode, 1)
+        combined = res.stdout + res.stderr
+        self.assertIn("DRY RUN", combined)
+        self.assertIn("Blocked by", combined)
+        self.assertIn("atomic-commits", combined)
+        self.assertIn("Would install missing core skill(s)", combined)
+        self.assertIn("No files were changed", combined)
+
     def test_02_modified_pipeline_skill_stops_and_keep_modified_works(self):
         """update stops on modified pipeline skills; --keep-modified preserves edits and succeeds."""
         # 1. Update without --keep-modified must stop because atomic-commits was modified

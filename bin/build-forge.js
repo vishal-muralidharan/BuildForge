@@ -1476,7 +1476,7 @@ function updateCommand(cwd, options = {}) {
       }
     }
 
-    if (unresolved.length > 0) {
+    if (unresolved.length > 0 && !dryRun) {
       console.error('Adopt aborted: The following skill(s) differ from the package:');
       for (const name of unresolved) {
         console.error(`  differs: ${name} (${diffFilesBySkill[name].length} file(s) differ)`);
@@ -1494,7 +1494,14 @@ function updateCommand(cwd, options = {}) {
       console.log(`  Kept modified:   ${Array.from(keepModified).join(', ') || 'none'}`);
       console.log(`  Restoring:       ${restore.has('all') ? 'all differing skills' : (Array.from(restore).join(', ') || 'none')}`);
       console.log(`  Would write:     .agents/build-forge.lock.json (version ${pkgVersion})`);
-      return;
+      if (unresolved.length > 0) {
+        console.log('\nBlocked by:');
+        for (const name of unresolved) {
+          console.log(`  - ${name}: differs from package in ${diffFilesBySkill[name].length} file(s); pass --keep-modified ${name} or --restore ${name}`);
+        }
+      }
+      console.log('\nDRY RUN: No files were changed.');
+      process.exit(unresolved.length > 0 ? 1 : 0);
     }
 
     // Apply restore
@@ -1599,7 +1606,7 @@ function updateCommand(cwd, options = {}) {
     }
   }
 
-  if (unapproved.length > 0) {
+  if (unapproved.length > 0 && !dryRun) {
     console.error('Update aborted: The following pipeline skill(s) have local modifications:');
     for (const { skillName, files } of unapproved) {
       console.error(`  modified skill: ${skillName}`);
@@ -1690,6 +1697,9 @@ function updateCommand(cwd, options = {}) {
     if (keepModified.size > 0) {
       console.log(`  Keeping modified skill(s): ${Array.from(keepModified).join(', ')}`);
     }
+    if (restore.size > 0) {
+      console.log(`  Restoring skill(s): ${Array.from(restore).join(', ')}`);
+    }
     if (missingCore.length > 0) {
       console.log(`  Would install missing core skill(s): ${missingCore.join(', ')}`);
     }
@@ -1702,8 +1712,14 @@ function updateCommand(cwd, options = {}) {
     if (pendingUpgradeActions.length > 0) {
       console.log(`  Pending upgrade action(s): ${pendingUpgradeActions.map(a => a.id).join(', ')}`);
     }
-    console.log('DRY RUN: No files were changed.');
-    return;
+    if (unapproved.length > 0) {
+      console.log('\nBlocked by:');
+      for (const { skillName, files } of unapproved) {
+        console.log(`  - ${skillName}: has local modifications in ${files.length} file(s); pass --keep-modified ${skillName} to preserve or --restore ${skillName} to overwrite`);
+      }
+    }
+    console.log('\nDRY RUN: No files were changed.');
+    process.exit(unapproved.length > 0 ? 1 : 0);
   }
 
   fs.mkdirSync(targetSkillsDir, { recursive: true });
