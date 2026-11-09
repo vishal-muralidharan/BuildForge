@@ -19,6 +19,8 @@ All notable changes to Build Forge will be documented in this file.
 - Doctor check reporting pending upgrade actions as warnings.
 
 ### Added
+- Permanent clean-room packaging check `scripts/check_package.py` and test suite `tests/test_check_package.py` verifying npm pack tarball extraction, bin targets, forbidden files exclusion, tiers and integrity alignment, and multi-project CLI clean-room installation.
+- Documentation truth check `scripts/check_docs_truth.py` verifying all documented CLI commands and Python scripts exist across documentation.
 - Opt-in branch workflow configuration under `git.workflow` in project profile (`default_branch`, `mode`, `branch_format`, `sync`, `merge_method`, `remote`, `cleanup`, `worktree`).
 - Task branch workflow tool `skills/feature-delivery/scripts/branchflow.py` supporting `status`, `start`, `guard`, `handoff`, `sync`, `merge-local`, `sync-main`, `park`, `resume`, `abandon`, `cleanup`, and `revert-plan`.
 - Branch workflow reference guide `skills/feature-delivery/references/workflows/branch-mode.md` with state machine documentation and typed confirmation phrases.

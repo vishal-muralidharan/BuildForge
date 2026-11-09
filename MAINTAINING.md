@@ -24,10 +24,11 @@ Follow these steps to publish a new release:
 2. Update the version number in `package.json`.
 3. Run `python3 scripts/make_integrity.py` to refresh `integrity.json`.
 4. Run `python3 scripts/dev.py check` to ensure all checks pass.
-5. Run `npm pack --dry-run` and inspect the packaged file list (assert `maintainers/` and `scripts/` are excluded).
-6. Commit the version bump, integrity manifest, and doc updates.
-7. Create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
-8. In GitHub Actions, approve the deployment to the "release" environment so `publish.yml` executes.
+5. Run `python3 scripts/check_package.py` to verify package contents and clean-room installation.
+6. Run `npm pack --dry-run` and inspect the packaged file list (assert `maintainers/` and `scripts/` are excluded).
+7. Commit the version bump, integrity manifest, and doc updates.
+8. Create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
+9. In GitHub Actions, approve the deployment to the "release" environment so `publish.yml` executes.
 
 ## How to change a skill
 
