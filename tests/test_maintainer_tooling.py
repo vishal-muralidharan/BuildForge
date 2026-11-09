@@ -148,7 +148,9 @@ class TestMaintainerTooling(unittest.TestCase):
             "to_version": "2",
             "command": "update",
             "field_name": "blueprints",
-            "section_name": "salvaged"
+            "section_name": "salvaged",
+            "skill": "feature-delivery",
+            "script_name": "branchflow"
         }
 
         for rf in recipe_files:

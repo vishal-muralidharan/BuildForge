@@ -12,3 +12,4 @@ touchpoints:
   - file: tests/test_{script_name}.py
     contains: "{script_name}"
     why: Test coverage for script
+

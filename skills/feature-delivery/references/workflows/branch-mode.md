@@ -152,3 +152,4 @@ python3 .agents/skills/feature-delivery/scripts/branchflow.py revert-plan <sha|b
 4. Never delete a branch without proof of merge and the typed delete phrase.
 5. Never run `git reset --hard`, `git clean`, `git checkout -- .`, or destructive git commands.
 6. Refuse to start with uncommitted changes in the working tree.
+
