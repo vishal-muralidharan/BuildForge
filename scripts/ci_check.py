@@ -939,6 +939,26 @@ def run_update_tests(repo_root, errors):
             errors.append(f"Safe update test failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_docs_truth_check(repo_root, errors):
+    script_path = os.path.join(repo_root, "scripts", "check_docs_truth.py")
+    if os.path.isfile(script_path):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", script_path, "--root", repo_root], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Docs truth check failed:\n{res.stderr or res.stdout}".strip())
+
+
+def run_package_clean_room_check(repo_root, errors):
+    script_path = os.path.join(repo_root, "scripts", "check_package.py")
+    if os.path.isfile(script_path):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", script_path, "--root", repo_root], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Package clean room check failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -1016,6 +1036,12 @@ def main():
 
     print("Running integrity manifest checks...")
     check_integrity_manifest(repo_root, errors)
+
+    print("Running docs truth checks...")
+    run_docs_truth_check(repo_root, errors)
+
+    print("Running package clean-room checks...")
+    run_package_clean_room_check(repo_root, errors)
 
     if errors:
         print(f"\nCI checks failed with {len(errors)} error(s):")
