@@ -81,10 +81,16 @@ When all invariants pass, update `.agents/work/CURRENT_GOAL.md`: set `Status: co
 ### Post-Build Audit: Open Questions & Known Issues
 - **Goal Invariants:** <all passed, or which invariants failed with evidence>
 - **Checks:** <what ran and the result. Not run: <what was skipped and why>>
+- **Try it:**
+  1. <manual step 1 to verify behavior>
+  2. <manual step 2 to verify behavior>
+  3. <manual step 3 to verify behavior>
 - **Known Issues:** <edge cases, quirks and limits you found>
 - **Open Questions:** <decisions that need the user>
 - **Rule Gaps:** Did this change work around a missing rule? <none, or missing convention to codify with incident-to-rule>
 ```
+
+Always include 3 to 5 clear manual steps under "Try it" for each changed behavior so the user can test the change.
 
 Look for known issues in these places, depending on the profile:
 
