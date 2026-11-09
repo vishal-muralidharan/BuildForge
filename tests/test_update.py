@@ -405,6 +405,54 @@ class TestSafeUpdate(unittest.TestCase):
                 f"Output did not point to build-forge update command:\n{stdout}"
             )
 
+    def test_12_d6_keep_modified_retains_verify_flag_and_restore_saves_patch(self):
+        """D6: --keep-modified leaves lock at package hash so verify flags it; --restore saves overwritten patch."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            # Install clean project
+            res_inst = run_node(["install"], p)
+            self.assertEqual(res_inst.returncode, 0)
+
+            # Hand-edit a pipeline skill
+            skill_md = p / ".agents" / "skills" / "atomic-commits" / "SKILL.md"
+            self.assertTrue(skill_md.is_file())
+            original_content = skill_md.read_text(encoding="utf-8")
+            edited_content = original_content + "\n## Local Custom Edit\nDon't forget issue number.\n"
+            skill_md.write_text(edited_content, encoding="utf-8")
+
+            # Run update --keep-modified
+            res_km = run_node(["update", "--keep-modified", "atomic-commits"], p)
+            self.assertEqual(res_km.returncode, 0)
+            self.assertEqual(skill_md.read_text(encoding="utf-8"), edited_content)
+
+            # verify MUST still flag atomic-commits as modified
+            res_verify = run_node(["verify"], p)
+            self.assertNotEqual(res_verify.returncode, 0, "verify did not flag kept-modified skill")
+            self.assertIn("modified", res_verify.stderr + res_verify.stdout)
+
+            # diff --patch exports patch
+            res_diff = run_node(["diff", "--patch"], p)
+            self.assertEqual(res_diff.returncode, 0)
+            diff_patch = p / ".agents" / "work" / "atomic-commits.patch"
+            self.assertTrue(diff_patch.is_file(), "diff --patch did not export .agents/work/atomic-commits.patch")
+            self.assertIn("Local Custom Edit", diff_patch.read_text(encoding="utf-8"))
+
+            # Run update --restore atomic-commits
+            res_res = run_node(["update", "--restore", "atomic-commits"], p)
+            self.assertEqual(res_res.returncode, 0)
+
+            # Saved patch must exist in .agents/work/overwritten-atomic-commits.patch
+            saved_patch = p / ".agents" / "work" / "overwritten-atomic-commits.patch"
+            self.assertTrue(saved_patch.is_file(), "update --restore did not write overwritten-<skill>.patch")
+            self.assertIn("Local Custom Edit", saved_patch.read_text(encoding="utf-8"))
+
+            # Content restored
+            self.assertEqual(skill_md.read_text(encoding="utf-8"), original_content)
+
+            # verify now passes
+            res_verify_after = run_node(["verify"], p)
+            self.assertEqual(res_verify_after.returncode, 0)
+
 
 def main():
     unittest.main()

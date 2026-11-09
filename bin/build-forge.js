@@ -78,6 +78,48 @@ function computeSkillsManifest(skillsDir, allowedSkillNames = null) {
   return manifest;
 }
 
+function generateSkillPatch(packageSkillDir, targetSkillDir, skillName) {
+  let patch = '';
+  try {
+    const res = spawnSync('git', ['diff', '--no-index', '--', packageSkillDir, targetSkillDir], {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024
+    });
+    if (res.stdout && res.stdout.length > 0) {
+      patch = res.stdout;
+    }
+  } catch (e) {}
+  if (!patch) {
+    const python = findPythonCommand();
+    if (python) {
+      const pyScript = `
+import difflib, os, sys
+pkg_dir = sys.argv[1]
+target_dir = sys.argv[2]
+skill_name = sys.argv[3]
+diff_lines = []
+for root, _, files in sorted(os.walk(target_dir)):
+    for f in sorted(files):
+        p_target = os.path.join(root, f)
+        rel = os.path.relpath(p_target, target_dir)
+        p_pkg = os.path.join(pkg_dir, rel)
+        if os.path.exists(p_pkg):
+            with open(p_pkg, 'r', errors='ignore') as fp1, open(p_target, 'r', errors='ignore') as fp2:
+                l1 = fp1.readlines()
+                l2 = fp2.readlines()
+                d = list(difflib.unified_diff(l1, l2, fromfile=f"a/.agents/skills/{skill_name}/{rel}", tofile=f"b/.agents/skills/{skill_name}/{rel}"))
+                diff_lines.extend(d)
+sys.stdout.writelines(diff_lines)
+`;
+      try {
+        const res = spawnSync(python.cmd, [...python.args, '-c', pyScript, packageSkillDir, targetSkillDir, skillName], { encoding: 'utf8' });
+        if (res.stdout) patch = res.stdout;
+      } catch (e) {}
+    }
+  }
+  return patch;
+}
+
 function parseArgs(args) {
   let command = 'install';
   const positional = [];
@@ -87,6 +129,7 @@ function parseArgs(args) {
   let dryRun = false;
   let adopt = false;
   let yes = false;
+  let patch = false;
   const keepModified = new Set();
   const restore = new Set();
 
@@ -102,6 +145,8 @@ function parseArgs(args) {
       adopt = true;
     } else if (a === '--yes') {
       yes = true;
+    } else if (a === '--patch') {
+      patch = true;
     } else if (a === '--keep-modified') {
       const next = args[++i];
       if (next) next.split(',').forEach(s => s.trim() && keepModified.add(s.trim()));
@@ -130,7 +175,7 @@ function parseArgs(args) {
     }
   }
 
-  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore };
+  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch };
 }
 
 function resolveSelectedAgents(agentsArg, cwd) {
@@ -647,7 +692,8 @@ function statusCommand(cwd) {
   }
 }
 
-function diffCommand(cwd) {
+function diffCommand(cwd, options = {}) {
+  const patch = !!options.patch;
   const packageSkillsDir = path.join(__dirname, '..', 'skills');
   const targetSkillsDir = path.join(cwd, '.agents', 'skills');
 
@@ -662,15 +708,20 @@ function diffCommand(cwd) {
   );
   const currentManifest = computeSkillsManifest(targetSkillsDir, targetSkills);
 
+  const modifiedSkillNames = new Set();
   let diffs = 0;
   for (const [relFile, pkgHash] of Object.entries(pkgManifest)) {
     const curHash = currentManifest[relFile];
     if (!curHash) {
       console.log(`  missing in project: .agents/${relFile}`);
       diffs++;
+      const parts = relFile.split('/');
+      if (parts.length >= 2) modifiedSkillNames.add(parts[1]);
     } else if (curHash !== pkgHash) {
       console.log(`  modified in project: .agents/${relFile}`);
       diffs++;
+      const parts = relFile.split('/');
+      if (parts.length >= 2) modifiedSkillNames.add(parts[1]);
     }
   }
 
@@ -678,6 +729,25 @@ function diffCommand(cwd) {
     if (!pkgManifest[relFile]) {
       console.log(`  extra in project skill: .agents/${relFile}`);
       diffs++;
+      const parts = relFile.split('/');
+      if (parts.length >= 2) modifiedSkillNames.add(parts[1]);
+    }
+  }
+
+  if (patch && modifiedSkillNames.size > 0) {
+    const workDir = path.join(cwd, '.agents', 'work');
+    fs.mkdirSync(workDir, { recursive: true });
+    for (const name of modifiedSkillNames) {
+      const pDiff = generateSkillPatch(
+        path.join(packageSkillsDir, name),
+        path.join(targetSkillsDir, name),
+        name
+      );
+      if (pDiff) {
+        const patchFile = path.join(workDir, `${name}.patch`);
+        fs.writeFileSync(patchFile, pDiff, 'utf8');
+        console.log(`  exported patch: .agents/work/${name}.patch`);
+      }
     }
   }
 
@@ -1301,9 +1371,23 @@ function updateCommand(cwd, options = {}) {
         }
       }
     }
-    for (const name of skillsToRestore) {
-      fs.cpSync(path.join(packageSkillsDir, name), path.join(targetSkillsDir, name), { recursive: true, force: true });
-      console.log(`  restored skill: ${name}`);
+    if (skillsToRestore.length > 0) {
+      const workDir = path.join(cwd, '.agents', 'work');
+      fs.mkdirSync(workDir, { recursive: true });
+      for (const name of skillsToRestore) {
+        const targetSkillDir = path.join(targetSkillsDir, name);
+        const pkgSkillDir = path.join(packageSkillsDir, name);
+        if (fs.existsSync(targetSkillDir)) {
+          const pDiff = generateSkillPatch(pkgSkillDir, targetSkillDir, name);
+          if (pDiff) {
+            const patchFile = path.join(workDir, `overwritten-${name}.patch`);
+            fs.writeFileSync(patchFile, pDiff, 'utf8');
+            console.log(`  saved patch: .agents/work/overwritten-${name}.patch`);
+          }
+        }
+        fs.cpSync(pkgSkillDir, targetSkillDir, { recursive: true, force: true });
+        console.log(`  restored skill: ${name}`);
+      }
     }
 
     // Install missing core tier skills
@@ -1494,17 +1578,38 @@ function updateCommand(cwd, options = {}) {
     console.log(`  installed missing core skill: ${coreSkill}`);
   }
 
-  // 2. Reinstall differing pipeline skills
-  for (const name of differingSkills) {
-    fs.cpSync(path.join(packageSkillsDir, name), path.join(targetSkillsDir, name), { recursive: true, force: true });
-    console.log(`  updated skill: ${name}`);
+  // 2. Reinstall differing pipeline skills (saving patch first)
+  if (differingSkills.length > 0) {
+    const workDir = path.join(cwd, '.agents', 'work');
+    fs.mkdirSync(workDir, { recursive: true });
+    for (const name of differingSkills) {
+      const targetSkillDir = path.join(targetSkillsDir, name);
+      const pkgSkillDir = path.join(packageSkillsDir, name);
+      if (fs.existsSync(targetSkillDir)) {
+        const pDiff = generateSkillPatch(pkgSkillDir, targetSkillDir, name);
+        if (pDiff) {
+          const patchFile = path.join(workDir, `overwritten-${name}.patch`);
+          fs.writeFileSync(patchFile, pDiff, 'utf8');
+          console.log(`  saved patch: .agents/work/overwritten-${name}.patch`);
+        }
+      }
+      fs.cpSync(pkgSkillDir, targetSkillDir, { recursive: true, force: true });
+      console.log(`  updated skill: ${name}`);
+    }
   }
 
-  // 3. Update lockfile
+  // 3. Update lockfile: keep package integrity hashes for installed skills
   const allInstalledPkgSkills = new Set(
     fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
   );
-  const newManifest = computeSkillsManifest(targetSkillsDir, allInstalledPkgSkills);
+  const newManifest = {};
+  for (const skillName of allInstalledPkgSkills) {
+    for (const [relFile, hash] of Object.entries(integrity)) {
+      if (relFile.startsWith(`skills/${skillName}/`)) {
+        newManifest[relFile] = hash;
+      }
+    }
+  }
   newManifest['_version'] = pkgVersion;
   fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
   console.log(`Build Forge: Updated pipeline skills and lockfile to version ${pkgVersion}.`);
@@ -1657,7 +1762,7 @@ function listCommand(cwd) {
 
 function main() {
   const args = process.argv.slice(2);
-  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore } = parseArgs(args);
+  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch } = parseArgs(args);
   const cwd = process.cwd();
 
   if (command === 'install') {
@@ -1671,7 +1776,7 @@ function main() {
   } else if (command === 'status') {
     statusCommand(cwd);
   } else if (command === 'diff') {
-    diffCommand(cwd);
+    diffCommand(cwd, { patch });
   } else if (command === 'doctor') {
     doctorCommand(cwd, json);
   } else if (command === 'outdated') {
