@@ -144,6 +144,9 @@ def cmd_check(args, repo_root: Path) -> None:
         ("ci_check", repo_root / "scripts" / "ci_check.py", ["--fast"] if args.fast else []),
         ("make_integrity", repo_root / "scripts" / "make_integrity.py", ["--check"]),
     ]
+    if not args.fast:
+        tools.append(("check_docs_truth", repo_root / "scripts" / "check_docs_truth.py", []))
+        tools.append(("check_package", repo_root / "scripts" / "check_package.py", []))
 
     results = []
     print("Running maintainer checks...\n")

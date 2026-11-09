@@ -34,6 +34,12 @@ jobs:
       - name: Run CI checks
         run: python scripts/ci_check.py
 
+      - name: Verify package clean-room
+        run: python scripts/check_package.py
+
+      - name: Check documentation truth
+        run: python scripts/check_docs_truth.py
+
       - name: Validate tag matches package version
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
