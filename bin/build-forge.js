@@ -80,6 +80,98 @@ function computeSkillsManifest(skillsDir, allowedSkillNames = null) {
   return manifest;
 }
 
+function getInstalledSkills(cwd, lockData) {
+  if (lockData && Array.isArray(lockData._installed)) {
+    return new Set(lockData._installed);
+  }
+  const skillsDir = path.join(cwd, '.agents', 'skills');
+  const set = new Set();
+  const pkgSkillsDir = path.join(__dirname, '..', 'skills');
+  const pkgSkills = fs.existsSync(pkgSkillsDir)
+    ? new Set(fs.readdirSync(pkgSkillsDir, { withFileTypes: true }).filter(d => d.isDirectory() && d.name !== '__pycache__').map(d => d.name))
+    : new Set();
+  const lockSkills = new Set();
+  if (lockData && typeof lockData === 'object') {
+    for (const k of Object.keys(lockData)) {
+      if (k.startsWith('skills/')) {
+        const parts = k.split('/');
+        if (parts.length >= 2) lockSkills.add(parts[1]);
+      }
+    }
+  }
+
+  if (fs.existsSync(skillsDir)) {
+    for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name !== '__pycache__') {
+        const isPkg = pkgSkills.size === 0 || pkgSkills.has(entry.name);
+        const inLock = lockSkills.size === 0 || lockSkills.has(entry.name);
+        if (isPkg && inLock) {
+          set.add(entry.name);
+        }
+      }
+    }
+  }
+  return set;
+}
+
+function checkSkillsIntegrity(cwd) {
+  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
+  const targetSkillsDir = path.resolve(cwd, '.agents', 'skills');
+
+  if (!fs.existsSync(lockFilePath)) {
+    return { ok: false, error: 'NO_LOCK', message: 'Lock file not found at .agents/build-forge.lock.json' };
+  }
+
+  let lockData = {};
+  try {
+    lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+  } catch (err) {
+    return { ok: false, error: 'INVALID_JSON', message: 'Invalid JSON in .agents/build-forge.lock.json' };
+  }
+
+  const installedSkills = getInstalledSkills(cwd, lockData);
+  const currentManifest = computeSkillsManifest(targetSkillsDir, installedSkills);
+
+  const missing = [];
+  const modified = [];
+  const extra = [];
+
+  for (const [relFile, expectedHash] of Object.entries(lockData)) {
+    if (relFile.startsWith('_') || relFile === 'version') continue;
+    const parts = relFile.split('/');
+    if (parts.length >= 2 && parts[0] === 'skills') {
+      const skillName = parts[1];
+      if (!installedSkills.has(skillName)) continue;
+    }
+    const currentHash = currentManifest[relFile];
+    if (!currentHash) {
+      missing.push(relFile);
+    } else if (currentHash !== expectedHash) {
+      modified.push(relFile);
+    }
+  }
+
+  for (const relFile of Object.keys(currentManifest)) {
+    if (relFile.startsWith('_') || relFile === 'version') continue;
+    if (!lockData[relFile]) {
+      extra.push(relFile);
+    }
+  }
+
+  const ok = (missing.length === 0 && modified.length === 0 && extra.length === 0);
+  return {
+    ok,
+    missing,
+    modified,
+    extra,
+    installedSkills,
+    lockData,
+    currentManifest,
+    targetSkillsDir,
+    lockFilePath
+  };
+}
+
 function generateSkillPatch(packageSkillDir, targetSkillDir, skillName) {
   let patch = '';
   try {
@@ -181,7 +273,7 @@ function parseArgs(args) {
 
   if (positional.length > 0) {
     const first = positional[0].toLowerCase();
-    if (['install', 'link', 'unlink', 'verify', 'status', 'diff', 'doctor', 'outdated', 'update', 'upgrade', 'add', 'list', 'help'].includes(first)) {
+    if (['install', 'link', 'unlink', 'verify', 'status', 'diff', 'doctor', 'outdated', 'update', 'upgrade', 'add', 'remove', 'list', 'help'].includes(first)) {
       command = first;
     }
   }
@@ -279,6 +371,7 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
     pkgVersion = pkgJson.version || pkgVersion;
   } catch (e) {}
   manifest['_version'] = pkgVersion;
+  manifest['_installed'] = Array.from(allInstalledPkgSkills).sort();
   fs.writeFileSync(lockFilePath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
   const differingKept = [];
@@ -544,59 +637,29 @@ function areDirsIdentical(dirA, dirB) {
 }
 
 function verifyCommand(cwd) {
-  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
-  const targetSkillsDir = path.resolve(cwd, '.agents', 'skills');
-
-  if (!fs.existsSync(lockFilePath)) {
-    console.error('Verify error: Lock file not found at .agents/build-forge.lock.json');
+  const result = checkSkillsIntegrity(cwd);
+  if (!result.ok && result.error === 'NO_LOCK') {
+    console.error(`Verify error: ${result.message}`);
     process.exit(2);
   }
-
-  let lockData = {};
-  try {
-    lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
-  } catch (err) {
-    console.error('Verify error: Invalid JSON in .agents/build-forge.lock.json');
+  if (!result.ok && result.error === 'INVALID_JSON') {
+    console.error(`Verify error: ${result.message}`);
     process.exit(1);
   }
 
   let failed = false;
 
-  // 1. Verify files against lockfile
-  // Scope manifest check to core package skills or skills tracked in lockData
-  const packageSkillsDir = path.join(__dirname, '..', 'skills');
-  const allowedSkills = new Set();
-  if (fs.existsSync(packageSkillsDir)) {
-    for (const name of fs.readdirSync(packageSkillsDir)) {
-      if (fs.statSync(path.join(packageSkillsDir, name)).isDirectory()) {
-        allowedSkills.add(name);
-      }
-    }
+  for (const relFile of result.missing) {
+    console.error(`  missing   .agents/${relFile}`);
+    failed = true;
   }
-  for (const key of Object.keys(lockData)) {
-    const parts = key.split('/');
-    if (parts.length >= 2 && parts[0] === 'skills') {
-      allowedSkills.add(parts[1]);
-    }
+  for (const relFile of result.modified) {
+    console.error(`  modified  .agents/${relFile}`);
+    failed = true;
   }
-  const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
-  for (const [relFile, expectedHash] of Object.entries(lockData)) {
-    if (relFile.startsWith('_') || relFile === 'version') continue;
-    const currentHash = currentManifest[relFile];
-    if (!currentHash) {
-      console.error(`  missing   .agents/${relFile}`);
-      failed = true;
-    } else if (currentHash !== expectedHash) {
-      console.error(`  modified  .agents/${relFile}`);
-      failed = true;
-    }
-  }
-  for (const relFile of Object.keys(currentManifest)) {
-    if (relFile.startsWith('_') || relFile === 'version') continue;
-    if (!lockData[relFile]) {
-      console.error(`  extra     .agents/${relFile}`);
-      failed = true;
-    }
+  for (const relFile of result.extra) {
+    console.error(`  extra     .agents/${relFile}`);
+    failed = true;
   }
 
   // 2. Verify agent links and copies
@@ -813,6 +876,7 @@ function findPythonCommand() {
 
 function doctorCommand(cwd, isJson) {
   const checks = [];
+  const targetSkillsDir = path.join(cwd, '.agents', 'skills');
 
   function addCheck(name, status, message, hint = '') {
     checks.push({ name, status, message, hint });
@@ -863,50 +927,21 @@ function doctorCommand(cwd, isJson) {
   }
 
   // 5. Lock file and verify result
-  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
-  const targetSkillsDir = path.resolve(cwd, '.agents', 'skills');
-  if (!fs.existsSync(lockFilePath)) {
+  const integrityResult = checkSkillsIntegrity(cwd);
+  if (!integrityResult.ok && integrityResult.error === 'NO_LOCK') {
     addCheck('Lock file', 'FAIL', '.agents/build-forge.lock.json not found', 'Run: npx @v1006/build-forge install');
+  } else if (!integrityResult.ok && integrityResult.error === 'INVALID_JSON') {
+    addCheck('Lock file', 'FAIL', 'Invalid JSON in .agents/build-forge.lock.json', 'Run: npx @v1006/build-forge install --force');
+  } else if (!integrityResult.ok) {
+    const total = integrityResult.missing.length + integrityResult.modified.length + integrityResult.extra.length;
+    const parts = [];
+    if (integrityResult.missing.length > 0) parts.push(`${integrityResult.missing.length} missing`);
+    if (integrityResult.modified.length > 0) parts.push(`${integrityResult.modified.length} modified`);
+    if (integrityResult.extra.length > 0) parts.push(`${integrityResult.extra.length} extra`);
+    addCheck('Lock file', 'FAIL', `${total} skill file(s) ${parts.join(', ')}`, 'Run: npx @v1006/build-forge install --force');
   } else {
-    let lockData = null;
-    try {
-      lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
-    } catch (e) {
-      lockData = null;
-    }
-    if (!lockData || typeof lockData !== 'object') {
-      addCheck('Lock file', 'FAIL', 'Invalid JSON in .agents/build-forge.lock.json', 'Run: npx @v1006/build-forge install --force');
-    } else {
-      const packageSkillsDir = path.join(__dirname, '..', 'skills');
-      const allowedSkills = new Set();
-      if (fs.existsSync(packageSkillsDir)) {
-        for (const name of fs.readdirSync(packageSkillsDir)) {
-          if (fs.statSync(path.join(packageSkillsDir, name)).isDirectory()) {
-            allowedSkills.add(name);
-          }
-        }
-      }
-      for (const key of Object.keys(lockData)) {
-        const parts = key.split('/');
-        if (parts.length >= 2 && parts[0] === 'skills') {
-          allowedSkills.add(parts[1]);
-        }
-      }
-      const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
-      let diffCount = 0;
-      for (const [relFile, expectedHash] of Object.entries(lockData)) {
-        if (relFile.startsWith('_') || relFile === 'version') continue;
-        const curHash = currentManifest[relFile];
-        if (!curHash || curHash !== expectedHash) {
-          diffCount++;
-        }
-      }
-      if (diffCount > 0) {
-        addCheck('Lock file', 'FAIL', `${diffCount} skill file(s) modified or missing`, 'Run: npx @v1006/build-forge install --force');
-      } else {
-        addCheck('Lock file', 'OK', `All skills match lock file (${Object.keys(lockData).length} files)`);
-      }
-    }
+    const fileCount = Object.keys(integrityResult.currentManifest).length;
+    addCheck('Lock file', 'OK', `All skills match lock file (${fileCount} files)`);
   }
 
   // 6. Profile validity
@@ -1554,6 +1589,7 @@ function updateCommand(cwd, options = {}) {
       }
     }
     newManifest['_version'] = pkgVersion;
+    newManifest['_installed'] = Array.from(allInstalledPkgSkills).sort();
     fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
     console.log(`Adopt complete: .agents/build-forge.lock.json written with version ${pkgVersion}.`);
     return;
@@ -1570,27 +1606,18 @@ function updateCommand(cwd, options = {}) {
 
   const installedVersion = lockData._version || lockData.version || '0.1.0';
 
-  const allowedSkills = new Set();
-  if (fs.existsSync(packageSkillsDir)) {
-    for (const name of fs.readdirSync(packageSkillsDir)) {
-      if (fs.statSync(path.join(packageSkillsDir, name)).isDirectory()) {
-        allowedSkills.add(name);
-      }
-    }
-  }
-  for (const key of Object.keys(lockData)) {
-    const parts = key.split('/');
-    if (parts.length >= 2 && parts[0] === 'skills') {
-      allowedSkills.add(parts[1]);
-    }
-  }
+  const installedSkills = getInstalledSkills(cwd, lockData);
+  const currentManifest = computeSkillsManifest(targetSkillsDir, installedSkills);
 
-  const currentManifest = computeSkillsManifest(targetSkillsDir, allowedSkills);
-
-  // Check local modifications against lockData
+  // Check local modifications against lockData for installed skills only
   const modifiedSkills = new Map();
   for (const [relFile, expectedHash] of Object.entries(lockData)) {
     if (relFile.startsWith('_') || relFile === 'version') continue;
+    const parts = relFile.split('/');
+    if (parts.length >= 2 && parts[0] === 'skills') {
+      const skillName = parts[1];
+      if (!installedSkills.has(skillName)) continue;
+    }
     const curHash = currentManifest[relFile];
     if (!curHash || curHash !== expectedHash) {
       const skillName = relFile.split('/')[1];
@@ -1763,6 +1790,7 @@ function updateCommand(cwd, options = {}) {
     }
   }
   newManifest['_version'] = pkgVersion;
+  newManifest['_installed'] = Array.from(allInstalledPkgSkills).sort();
   fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
   console.log(`Build Forge: Updated pipeline skills and lockfile to version ${pkgVersion}.`);
 
@@ -1883,10 +1911,66 @@ function addCommand(cwd, skillName) {
       for (const [k, v] of Object.entries(skillManifest)) {
         lockData[k] = v;
       }
+      const installedSet = getInstalledSkills(cwd, lockData);
+      installedSet.add(skillName);
+      lockData._installed = Array.from(installedSet).sort();
       fs.writeFileSync(lockFilePath, JSON.stringify(lockData, null, 2) + '\n', 'utf8');
       console.log(`Updated .agents/build-forge.lock.json with '${skillName}'.`);
     } catch (e) {}
   }
+}
+
+function removeCommand(cwd, skillName, options = {}) {
+  if (!skillName) {
+    console.error('Usage: npx @v1006/build-forge remove <skill-name> [--force]');
+    process.exit(1);
+  }
+  const targetSkillsDir = path.join(cwd, '.agents', 'skills');
+  const skillDir = path.join(targetSkillsDir, skillName);
+  const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
+  const tiersPath = path.join(__dirname, '..', 'tiers.json');
+
+  let tiers = { core: [] };
+  if (fs.existsSync(tiersPath)) {
+    try { tiers = JSON.parse(fs.readFileSync(tiersPath, 'utf8')); } catch (e) {}
+  }
+  const coreSkills = new Set(tiers.core || []);
+
+  let lockData = null;
+  if (fs.existsSync(lockFilePath)) {
+    try {
+      lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+    } catch (e) {}
+  }
+
+  const installedSkills = getInstalledSkills(cwd, lockData);
+  if (!installedSkills.has(skillName) && !fs.existsSync(skillDir)) {
+    console.error(`Skill '${skillName}' is not installed.`);
+    process.exit(1);
+  }
+
+  if (coreSkills.has(skillName) && !options.force) {
+    console.error(`Cannot remove core skill '${skillName}' without --force.`);
+    process.exit(1);
+  }
+
+  if (fs.existsSync(skillDir)) {
+    fs.rmSync(skillDir, { recursive: true, force: true });
+  }
+
+  if (lockData) {
+    const prefix = `skills/${skillName}/`;
+    for (const key of Object.keys(lockData)) {
+      if (key.startsWith(prefix)) {
+        delete lockData[key];
+      }
+    }
+    installedSkills.delete(skillName);
+    lockData._installed = Array.from(installedSkills).sort();
+    fs.writeFileSync(lockFilePath, JSON.stringify(lockData, null, 2) + '\n', 'utf8');
+  }
+
+  console.log(`Removed skill '${skillName}'.`);
 }
 
 function listCommand(cwd) {
@@ -1942,6 +2026,9 @@ function main() {
   } else if (command === 'add') {
     const skillName = positional[1];
     addCommand(cwd, skillName);
+  } else if (command === 'remove') {
+    const skillName = positional[1];
+    removeCommand(cwd, skillName, { force });
   } else if (command === 'list') {
     listCommand(cwd);
   } else if (command === 'help') {
@@ -1959,6 +2046,7 @@ function main() {
     console.log('  update [--dry-run] [--adopt] [--keep-modified <skill>] [--restore <skill>]');
     console.log('  upgrade done <action-id>');
     console.log('  add <skill-name>');
+    console.log('  remove <skill-name> [--force]');
     console.log('  list');
     console.log('  help, --help, -h');
   }
@@ -1984,5 +2072,6 @@ module.exports = {
   updateCommand,
   upgradeCommand,
   addCommand,
+  removeCommand,
   listCommand
 };

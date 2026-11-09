@@ -65,20 +65,32 @@ def verify(root_dir: Path, lock_path: Path = None, target_version: str = None) -
             return 1
 
     skills_dir = root_dir / ".agents" / "skills"
-    allowed_skills = set()
-    for key in lock_data:
-        if key.startswith("_") or key == "version":
-            continue
-        parts = key.split("/")
-        if len(parts) >= 2 and parts[0] == "skills":
-            allowed_skills.add(parts[1])
+    installed_skills = set(lock_data["_installed"]) if isinstance(lock_data.get("_installed"), list) else None
+    if installed_skills is None:
+        lock_skills = {
+            k.split("/")[1]
+            for k in lock_data
+            if k.startswith("skills/") and "/" in k[7:]
+        }
+        if skills_dir.is_dir():
+            installed_skills = {
+                d.name for d in skills_dir.iterdir()
+                if d.is_dir() and d.name != "__pycache__" and d.name in lock_skills
+            }
+        else:
+            installed_skills = set()
 
-    current_manifest = compute_skills_manifest(skills_dir, allowed_skills)
+    current_manifest = compute_skills_manifest(skills_dir, installed_skills)
     failed = False
 
     for rel_file, expected_hash in lock_data.items():
         if rel_file.startswith("_") or rel_file == "version":
             continue
+        parts = rel_file.split("/")
+        if len(parts) >= 2 and parts[0] == "skills":
+            skill_name = parts[1]
+            if skill_name not in installed_skills:
+                continue
         current_hash = current_manifest.get(rel_file)
         if not current_hash:
             print(f"  missing   .agents/{rel_file}", file=sys.stderr)
