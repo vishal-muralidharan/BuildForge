@@ -4,6 +4,8 @@ All notable changes to Build Forge will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-09
+
 ### Security
 - Updated third party skill vetting tool `refs.py vet` in `skills/extend-pipeline`:
   - New three-tier severity model: HIGH (exit code 1) for script extensions, shebang lines, executable permissions, zero-width and bidirectional unicode characters, instruction override phrases, and HTML comments containing instruction-like words or imperative verbs; MEDIUM for in-code install and download commands (`npx`, `npm install`, `pip install`, `curl | sh`), credential commands, outside path escapes, and network calls; LOW for informational prose keywords (`fetch`, `requests`, `token`, `socket`, `secret`, `password`) and placeholder comments (`<!-- e.g. ... -->`).
