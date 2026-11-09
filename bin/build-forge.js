@@ -172,6 +172,83 @@ function checkSkillsIntegrity(cwd) {
   };
 }
 
+function pruneObsoleteSkillFiles(packageSkillDir, targetSkillDir, skillName, oldLockData, workDir) {
+  if (!fs.existsSync(targetSkillDir) || !oldLockData) return [];
+  const pruned = [];
+
+  function walkFiles(dir) {
+    const list = [];
+    if (!fs.existsSync(dir)) return list;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== '__pycache__') {
+          list.push(...walkFiles(full));
+        }
+      } else {
+        if (!entry.name.endsWith('.pyc') && entry.name !== '.DS_Store') {
+          list.push(full);
+        }
+      }
+    }
+    return list;
+  }
+
+  const diskFiles = walkFiles(targetSkillDir);
+  for (const file of diskFiles) {
+    const relSkill = path.relative(targetSkillDir, file).replace(/\\/g, '/');
+    const pkgFile = path.join(packageSkillDir, relSkill);
+    if (!fs.existsSync(pkgFile)) {
+      const lockKey = `skills/${skillName}/${relSkill}`;
+      const oldHash = oldLockData[lockKey];
+      if (oldHash) {
+        const curHash = hashFile(file);
+        if (curHash === oldHash) {
+          try {
+            fs.unlinkSync(file);
+            delete oldLockData[lockKey];
+            pruned.push(lockKey);
+            console.log(`  removed obsolete file: .agents/${lockKey}`);
+          } catch (e) {}
+        } else {
+          // User modified this file before upstream removed it!
+          if (workDir) {
+            fs.mkdirSync(workDir, { recursive: true });
+            const backupName = `removed-${skillName}-${relSkill.replace(/\//g, '_')}`;
+            const backupPath = path.join(workDir, backupName);
+            try {
+              fs.copyFileSync(file, backupPath);
+              console.warn(`  warning: kept modified file removed upstream: .agents/${lockKey} (saved backup to .agents/work/${backupName})`);
+            } catch (e) {}
+          } else {
+            console.warn(`  warning: kept modified file removed upstream: .agents/${lockKey}`);
+          }
+        }
+      }
+      // If !oldHash, file was never in old lock (user-created file) -> keep it!
+    }
+  }
+
+  // Clean up empty directories from bottom to top
+  function cleanEmptyDirs(dir) {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name !== '__pycache__') {
+        const full = path.join(dir, entry.name);
+        cleanEmptyDirs(full);
+      }
+    }
+    if (dir !== targetSkillDir && fs.existsSync(dir) && fs.readdirSync(dir).length === 0) {
+      try {
+        fs.rmdirSync(dir);
+      } catch (e) {}
+    }
+  }
+  cleanEmptyDirs(targetSkillDir);
+
+  return pruned;
+}
+
 function generateSkillPatch(packageSkillDir, targetSkillDir, skillName) {
   let patch = '';
   try {
@@ -336,6 +413,12 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
 
   fs.mkdirSync(targetSkillsDir, { recursive: true });
 
+  const workDir = path.join(cwd, '.agents', 'work');
+  let oldLockData = null;
+  if (fs.existsSync(lockFilePath)) {
+    try { oldLockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8')); } catch (e) {}
+  }
+
   const added = [];
   const kept = [];
   for (const name of fs.readdirSync(packageSkillsDir)) {
@@ -345,6 +428,9 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
     if (fs.existsSync(to) && !force) {
       kept.push(name);
       continue;
+    }
+    if (force && fs.existsSync(to) && oldLockData) {
+      pruneObsoleteSkillFiles(from, to, name, oldLockData, workDir);
     }
     fs.cpSync(from, to, { recursive: true, force: true });
     added.push(name);
@@ -1764,6 +1850,7 @@ function updateCommand(cwd, options = {}) {
     for (const name of differingSkills) {
       const targetSkillDir = path.join(targetSkillsDir, name);
       const pkgSkillDir = path.join(packageSkillsDir, name);
+      pruneObsoleteSkillFiles(pkgSkillDir, targetSkillDir, name, lockData, workDir);
       if (fs.existsSync(targetSkillDir)) {
         const pDiff = generateSkillPatch(pkgSkillDir, targetSkillDir, name);
         if (pDiff) {
