@@ -73,6 +73,7 @@ def check_package(repo_root: Path) -> list:
             cwd=str(repo_root),
             capture_output=True,
             text=True,
+            shell=(sys.platform == "win32"),
         )
         if pack_res.returncode != 0:
             results.append((
