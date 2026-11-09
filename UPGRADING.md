@@ -97,3 +97,4 @@ npx @v1006/build-forge doctor
 ```
 
 Doctor checks Node.js, Python 3, PyYAML, Git, lockfile integrity, profile validity, blueprints, links, and pending upgrade actions.
+
