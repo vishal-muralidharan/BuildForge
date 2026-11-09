@@ -99,7 +99,7 @@ capabilities:               # optional helpers. A disabled slot is skipped by th
 
 external_references: []     # third party skills or docs the USER chose. Example entry:
 #  - name: example-skill
-#    repo: https://github.com/owner/repo
+#    repo: https://example.com/repo/owner/repo
 #    purpose: "what it is for"
 #    used_by: [verify]      # audit, plan, build, verify, deploy, commit, docs, report
 #    status: declared       # declared | installed | rejected

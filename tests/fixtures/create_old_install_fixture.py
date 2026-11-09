@@ -16,6 +16,10 @@ import os
 import shutil
 import subprocess
 import sys
+
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
 from pathlib import Path
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "old-install"
@@ -81,6 +85,22 @@ def generate_old_install_fixture(target_dir: Path = None, init_git: bool = False
         unwanted_dir = target_skills_dir / unwanted
         if unwanted_dir.exists():
             shutil.rmtree(unwanted_dir)
+
+    # Sanitize fixture URLs to only allowed hosts for dev.py fixture check
+    for root_dir, _, files in os.walk(target_skills_dir):
+        for f in files:
+            full = Path(root_dir) / f
+            try:
+                txt = full.read_text(encoding="utf-8")
+                sanitized = (
+                    txt.replace("`https://`", "`https://example.com/`")
+                    .replace("https://ne-mo-app.vercel.app", "https://example.com/nemo")
+                    .replace("https://github.com", "https://example.com/repo")
+                )
+                if sanitized != txt:
+                    full.write_text(sanitized, encoding="utf-8")
+            except Exception:
+                pass
 
     # 2. Compute 0.1.0 lock file before hand edits
     lock_manifest = {}

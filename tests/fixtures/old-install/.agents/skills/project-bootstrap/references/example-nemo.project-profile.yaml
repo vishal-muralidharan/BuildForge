@@ -118,7 +118,7 @@ capabilities:
   deploy:
     enabled: true
     command: npm run deploy
-    verify_url: https://ne-mo-app.vercel.app
+    verify_url: https://example.com/nemo
     on_failure: self-heal
     max_attempts: 3
     reference: ""

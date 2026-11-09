@@ -1483,6 +1483,33 @@ function updateCommand(cwd, options = {}) {
       }
     } catch (e) {}
   }
+
+  // 7. Print migrate plan and command to apply it
+  const profilePath = path.join(cwd, '.agents', 'project-profile.yaml');
+  let migrateScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'migrate_profile.py');
+  if (!fs.existsSync(migrateScript)) {
+    migrateScript = path.join(packageSkillsDir, 'project-bootstrap', 'scripts', 'migrate_profile.py');
+  }
+
+  const python = findPythonCommand();
+  if (fs.existsSync(profilePath) && fs.existsSync(migrateScript) && python) {
+    try {
+      const resPlan = spawnSync(python.cmd, [...python.args, migrateScript, 'plan', '--profile', profilePath, '--root', cwd], {
+        encoding: 'utf8',
+        timeout: 10000
+      });
+      if (resPlan.stdout && resPlan.stdout.includes('Migration plan:')) {
+        console.log('\n--- Profile Migration Plan ---');
+        console.log(resPlan.stdout.trim());
+        console.log('\nTo apply this profile migration, run:');
+        console.log('  python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py apply --apply');
+      } else {
+        console.log('\nProject profile is up to date.');
+      }
+    } catch (e) {
+      // Non-fatal
+    }
+  }
 }
 
 function upgradeCommand(cwd, subcmd, actionId) {

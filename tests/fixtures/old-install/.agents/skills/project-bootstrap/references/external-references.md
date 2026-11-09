@@ -4,7 +4,7 @@ External references are third party skill repos or doc repos the user chose. The
 
 ## Procedure, per repo
 
-1. Confirm the URL starts with `https://` or `git@`. Confirm the user supplied it.
+1. Confirm the URL starts with `https://example.com/` or `git@`. Confirm the user supplied it.
 2. Clone shallow into a temporary folder: `git clone --depth 1 <repo> <tmpdir>`.
 3. List every `SKILL.md` in the clone. Show the user each skill's `name` and `description`.
 4. Ask which skills to install. Installing needs a clear yes.

@@ -4,6 +4,13 @@ All notable changes to Build Forge will be documented in this file.
 
 ## [Unreleased]
 
+### Upgrading
+- Safe, integrity-verified update workflow via `build-forge update`: hash verification against packaged `integrity.json`, pre-update modification guard with `--keep-modified` and `--restore`, core tier skill installation (`project-blueprints`), `--adopt` for adoption without lock files, and upgrade action reporting.
+- Upgrade guide `UPGRADING.md` documenting step by step upgrade workflows across versions, and machine-readable actions in `upgrade-notes.json`.
+- CLI command `upgrade done <action-id>` for recording completed upgrade actions in `.agents/upgrade-state.json`, `add <skill>` for installing optional skills, and `list` for browsing skills by tier.
+- Unstamped convention skill upgrade in `render.py --upgrade-unstamped` upgrading 0.1.0 unstamped files carrying old generator banners to stamped templates while preserving custom blocks and salvaging non-generated lines into `salvaged` blocks.
+- Doctor check reporting pending upgrade actions as warnings.
+
 ### Added
 - Rule pack system in `skills/project-bootstrap/scripts/packs.py` supporting `list`, `show`, `plan`, `apply`, `diff`, and `lint` commands.
 - 9 curated, opt-in rule packs in `skills/project-bootstrap/references/rule-packs/`: `native-controls`, `web-hazards`, `ui-states`, `mobile-web`, `shortcuts`, `a11y-basics`, `motion-basics`, `testing-practices`, and `browser-checks`.

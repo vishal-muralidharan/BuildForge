@@ -23,6 +23,10 @@ import os
 import shutil
 import subprocess
 import sys
+
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
 import tempfile
 import unittest
 from pathlib import Path

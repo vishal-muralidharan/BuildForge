@@ -145,6 +145,7 @@ npx @v1006/build-forge doctor --json
 - Agent links and pointer files
 - AGENTS.md existence
 - Legacy parity status (if ledger exists)
+- Pending upgrade actions from upgrade-notes.json
 
 Prints OK, WARN, or FAIL with 1 fix hint each. Exits with code 1 on any FAIL.
 
@@ -166,11 +167,44 @@ Update installed pipeline skills safely to match the latest package version:
 npx @v1006/build-forge update
 ```
 
-`update` runs `verify` first. If any pipeline skill was modified by hand, it stops immediately, lists the modified files, and aborts.
+`update` compares file hashes against packaged `integrity.json`, not only versions.
+It follows a strict safety order:
+1. **Verification**: If any pipeline skill was modified by hand, it stops and lists the modified files. Pass `--keep-modified <skill>` to keep your edits, or `--restore <skill>` to overwrite with the package version.
+2. **Missing core skills**: Automatically installs missing core tier skills (`project-blueprints`).
+3. **Reinstallation**: Reinstalls differing pipeline skills from the package.
+4. **Lock update**: Writes `.agents/build-forge.lock.json` with updated hashes and version.
+5. **Optional skills**: Lists new optional skills available to add with `npx @v1006/build-forge add <skill>`.
+6. **Upgrade actions**: Displays applicable upgrade actions from `upgrade-notes.json` and links to [UPGRADING.md](UPGRADING.md).
 
-If verify passes, it updates pipeline skills in `.agents/skills` and regenerates the lockfile. Generated files, vendor files, the profile, and blueprints are never touched.
+Flags:
+- `--dry-run`: Preview the update plan without modifying files.
+- `--adopt`: Adopt an existing project without a lock file.
+- `--keep-modified <skill>`: Preserve local edits in the specified pipeline skill.
+- `--restore <skill>`: Overwrite the specified skill (or pass `--restore all`).
 
-If a profile migration is available, `update` displays the migration plan diff and the command to apply it.
+### Managing skills: list and add
+
+View all bundled skills by tier and installation status:
+
+```bash
+npx @v1006/build-forge list
+```
+
+Install an optional skill:
+
+```bash
+npx @v1006/build-forge add <skill-name>
+```
+
+### Recording completed upgrade actions: upgrade
+
+Mark an upgrade action as complete:
+
+```bash
+npx @v1006/build-forge upgrade done <action-id>
+```
+
+See [UPGRADING.md](UPGRADING.md) for step by step upgrade guidance across versions.
 
 ### Migrating the project profile: migrate
 
