@@ -758,7 +758,7 @@ def main():
             disk_text = normalize_lf(dest.read_text(encoding="utf-8"))
             m = STAMP_RE.search(disk_text)
             if not m:
-                refused.append((dest, "unstamped file exists"))
+                # Unstamped files are processed per file and skipped with exit code 3 during --update
                 continue
 
             stamp_hash = m.group(1)
@@ -819,6 +819,14 @@ def main():
 
         if not stamp_m:
             # Unstamped file
+            has_old_banner = bool(OLD_BANNER_RE.search(disk_text))
+            rec_msg = "use --upgrade-unstamped to upgrade" if has_old_banner else "use --migrate-custom to wrap in legacy block"
+
+            if a.update and not a.upgrade_unstamped and not a.migrate_custom and not a.force:
+                skipped.append((dest, f"unstamped file exists; {rec_msg}"))
+                print(f"SKIPPED {rel_label} (unstamped; {rec_msg})")
+                continue
+
             if a.upgrade_unstamped:
                 if not OLD_BANNER_RE.search(disk_text):
                     skipped.append((dest, "unstamped file has no old generator banner"))
@@ -929,8 +937,10 @@ def main():
                 continue
 
             else:
-                skipped.append((dest, "unstamped file exists; use --migrate-custom to wrap in legacy block"))
-                print(f"SKIPPED {rel_label} (unstamped; use --migrate-custom to wrap in legacy block)")
+                has_banner = bool(OLD_BANNER_RE.search(disk_text))
+                rec = "use --upgrade-unstamped to upgrade" if has_banner else "use --migrate-custom to wrap in legacy block"
+                skipped.append((dest, f"unstamped file exists; {rec}"))
+                print(f"SKIPPED {rel_label} (unstamped; {rec})")
                 continue
 
         # Stamped file
@@ -1073,6 +1083,12 @@ def main():
             print(f"    - {rel_posix(s, root)} ({reason})")
     else:
         print("  skipped:   none")
+
+    if refused:
+        sys.exit(1)
+
+    if a.update and skipped:
+        sys.exit(3)
 
 
 if __name__ == "__main__":

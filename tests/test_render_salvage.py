@@ -386,6 +386,47 @@ class TestRenderSalvage(unittest.TestCase):
         for line in hand_lines:
             self.assertIn(line, all_new_text, f"Hand line lost: {line}")
 
+    def test_d7_render_update_per_file_and_exit_code_3_when_skipped(self):
+        """D7: render --update updates stamped files, skips unstamped with code 3, and recommends --upgrade-unstamped."""
+        # 1. First render clean files
+        res_init = self.run_render()
+        self.assertEqual(res_init.returncode, 0)
+
+        # 2. Make one file unstamped with old banner and hand edit
+        rev_file = self.root / ".agents" / "skills" / "review-directory-structure" / "SKILL.md"
+        unstamped_content = (
+            "<!-- Generated from .agents/project-profile.yaml by project-bootstrap. Edit the profile, then re-render. -->\n"
+            "# Review Directory Structure\n"
+            "Hand edit that needs upgrade.\n"
+        )
+        rev_file.write_text(unstamped_content, encoding="utf-8")
+
+        # 3. render --update must update stamped files, skip unstamped with list, recommend --upgrade-unstamped, and exit 3
+        res_up = self.run_render("--update")
+        self.assertEqual(res_up.returncode, 3, f"Expected exit code 3, got {res_up.returncode}. Output:\n{res_up.stdout}\n{res_up.stderr}")
+        combined = res_up.stdout + res_up.stderr
+        self.assertIn("SKIPPED", combined)
+        self.assertIn("review-directory-structure", combined)
+        self.assertIn("--upgrade-unstamped", combined)
+        self.assertNotIn("--migrate-custom", combined)
+
+        # 4. render --upgrade-unstamped --dry-run
+        res_dry = self.run_render("--upgrade-unstamped", "--dry-run")
+        self.assertEqual(res_dry.returncode, 0)
+        self.assertIn("DRY RUN", res_dry.stdout)
+
+        # 5. render --upgrade-unstamped real run
+        res_real = self.run_render("--upgrade-unstamped")
+        self.assertEqual(res_real.returncode, 0)
+        content_after = rev_file.read_text(encoding="utf-8")
+        self.assertIn("Hand edit that needs upgrade.", content_after)
+        self.assertIn("salvaged", content_after)
+
+        # 6. Idempotent on rerun
+        res_idemp = self.run_render("--upgrade-unstamped")
+        self.assertEqual(res_idemp.returncode, 0)
+        self.assertEqual(rev_file.read_text(encoding="utf-8"), content_after)
+
 
 if __name__ == "__main__":
     unittest.main()
