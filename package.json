@@ -17,6 +17,10 @@
   "files": [
     "bin",
     "skills",
+    "integrity.json",
+    "tiers.json",
+    "upgrade-notes.json",
+    "UPGRADING.md",
     "README.md"
   ],
   "keywords": [
