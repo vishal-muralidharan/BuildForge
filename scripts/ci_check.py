@@ -929,6 +929,16 @@ def run_rule_packs_tests(repo_root, errors):
             errors.append(f"Rule packs test failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_update_tests(repo_root, errors):
+    test_script = os.path.join(repo_root, "tests", "test_update.py")
+    if os.path.isfile(test_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_script], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Safe update test failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -996,6 +1006,9 @@ def main():
 
     print("Running rule packs tests...")
     run_rule_packs_tests(repo_root, errors)
+
+    print("Running safe update integration tests...")
+    run_update_tests(repo_root, errors)
 
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)

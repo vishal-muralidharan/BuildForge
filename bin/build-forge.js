@@ -1213,7 +1213,7 @@ function updateCommand(cwd, options = {}) {
 
     const unresolved = [];
     for (const name of differingSkills) {
-      if (!keepModified.has(name) && !restore.has(name)) {
+      if (!keepModified.has(name) && !restore.has(name) && !restore.has('all')) {
         unresolved.push(name);
       }
     }
@@ -1226,7 +1226,7 @@ function updateCommand(cwd, options = {}) {
           console.error(`    - .agents/${f}`);
         }
       }
-      console.error('\nPass --keep-modified <skill> to keep your version, or --restore <skill> to overwrite with package version.');
+      console.error('\nPass --keep-modified <skill> to keep your version, or --restore <skill> (or --restore all) to overwrite with package version.');
       process.exit(1);
     }
 
@@ -1234,13 +1234,22 @@ function updateCommand(cwd, options = {}) {
       console.log('DRY RUN: update --adopt plan:');
       console.log(`  Matching skills: ${matchingSkills.join(', ') || 'none'}`);
       console.log(`  Kept modified:   ${Array.from(keepModified).join(', ') || 'none'}`);
-      console.log(`  Restoring:       ${Array.from(restore).join(', ') || 'none'}`);
+      console.log(`  Restoring:       ${restore.has('all') ? 'all differing skills' : (Array.from(restore).join(', ') || 'none')}`);
       console.log(`  Would write:     .agents/build-forge.lock.json (version ${pkgVersion})`);
       return;
     }
 
     // Apply restore
-    for (const name of restore) {
+    const skillsToRestore = new Set(restore);
+    if (skillsToRestore.has('all')) {
+      skillsToRestore.delete('all');
+      for (const name of differingSkills) {
+        if (!keepModified.has(name)) {
+          skillsToRestore.add(name);
+        }
+      }
+    }
+    for (const name of skillsToRestore) {
       fs.cpSync(path.join(packageSkillsDir, name), path.join(targetSkillsDir, name), { recursive: true, force: true });
       console.log(`  restored skill: ${name}`);
     }
@@ -1306,7 +1315,7 @@ function updateCommand(cwd, options = {}) {
 
   const unapproved = [];
   for (const [skillName, files] of modifiedSkills.entries()) {
-    if (!keepModified.has(skillName) && !restore.has(skillName)) {
+    if (!keepModified.has(skillName) && !restore.has(skillName) && !restore.has('all')) {
       unapproved.push({ skillName, files });
     }
   }
@@ -1338,7 +1347,7 @@ function updateCommand(cwd, options = {}) {
       if (!fs.existsSync(path.join(packageSkillsDir, name))) continue;
       if (keepModified.has(name)) continue;
 
-      if (restore.has(name)) {
+      if (restore.has(name) || restore.has('all')) {
         differingSkills.push(name);
         continue;
       }

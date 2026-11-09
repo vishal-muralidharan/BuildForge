@@ -590,7 +590,7 @@ def build_skills(p, pn):
 
 def render_agents(p, pn, skill_names, root):
     name = g(p, "project.name")
-    sdir = g(p, "docs.skills_dir")
+    sdir = g(p, "docs.skills_dir") or ".agents/skills"
     s = p.get("stack") or {}
     stack = ", ".join(str(v) for k, v in s.items() if v and v != "none" and k in ("framework", "bundler", "styling", "backend", "database"))
     lines = [BANNER.format(profile=pn), "", f"# Agent Guidelines for {name}", "",

@@ -76,8 +76,8 @@ def generate_old_install_fixture(target_dir: Path = None, init_git: bool = False
     if not success or not target_skills_dir.exists():
         build_fallback_skills(target_skills_dir)
 
-    # Ensure unwanted 0.2.0 skills are not in 0.1.0 install
-    for unwanted in ("project-blueprints", "extend-pipeline"):
+    # Ensure unwanted 0.2.0 core skills and optional module skill are omitted
+    for unwanted in ("project-blueprints", "extend-pipeline", "targeted-module-testing"):
         unwanted_dir = target_skills_dir / unwanted
         if unwanted_dir.exists():
             shutil.rmtree(unwanted_dir)
