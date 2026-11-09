@@ -27,13 +27,17 @@ def compute_skills_manifest(skills_dir: Path, allowed_skills: set = None) -> dic
     if not skills_dir.is_dir():
         return manifest
     for skill_path in skills_dir.iterdir():
-        if not skill_path.is_dir():
+        if not skill_path.is_dir() or skill_path.name == "__pycache__":
             continue
         if allowed_skills and skill_path.name not in allowed_skills:
             continue
         for root, dirs, files in os.walk(skill_path):
+            if "__pycache__" in dirs:
+                dirs.remove("__pycache__")
             dirs.sort()
             for f in sorted(files):
+                if f.endswith(".pyc") or f == ".DS_Store":
+                    continue
                 full_path = Path(root) / f
                 rel_path = "skills/" + str(full_path.relative_to(skills_dir)).replace("\\", "/")
                 manifest[rel_path] = hash_file(full_path)

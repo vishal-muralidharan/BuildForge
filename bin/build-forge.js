@@ -59,6 +59,7 @@ function computeSkillsManifest(skillsDir, allowedSkillNames = null) {
   function walk(dir, relPrefix) {
     if (!fs.existsSync(dir)) return;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '__pycache__' || entry.name.endsWith('.pyc') || entry.name === '.DS_Store') continue;
       const full = path.join(dir, entry.name);
       const rel = path.join(relPrefix, entry.name);
       if (entry.isDirectory()) {
@@ -72,7 +73,7 @@ function computeSkillsManifest(skillsDir, allowedSkillNames = null) {
   }
   if (!fs.existsSync(skillsDir)) return manifest;
   for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory() || entry.name === '__pycache__') continue;
     if (allowedSkillNames && !allowedSkillNames.has(entry.name)) continue;
     walk(path.join(skillsDir, entry.name), path.join('skills', entry.name));
   }
