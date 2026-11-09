@@ -63,9 +63,11 @@ Run the security scan before installing:
 python3 .agents/skills/extend-pipeline/scripts/refs.py vet /tmp/ref-inspect
 ```
 
-Show every finding from the scan. Consult `references/vetting.md` to interpret findings. If any high-severity finding exists, explain the risk. Remind the user that a clean scan is not proof of safety.
+Show the scan summary and findings. Findings are categorized into HIGH, MEDIUM, and LOW severities. Approval focuses on reviewing HIGH and MEDIUM findings. LOW findings are informational keyword occurrences in prose. Consult `references/vetting.md` to interpret findings. If any high-severity finding exists, explain the risk. Remind the user that a clean scan is not proof of safety.
 
 ### 4. Require explicit approval
+
+Approval focuses on reviewing HIGH and MEDIUM findings.
 
 Ask the user to type:
 
@@ -81,7 +83,7 @@ Run the add command with the approved parameters:
 python3 .agents/skills/extend-pipeline/scripts/refs.py add --name <name> --source <url> --category <category> --purpose "<purpose>" --used-by <stages> --approved
 ```
 
-Default installation puts files in `.agents/vendor/<name>`. To make the agent discover the skill natively, use `--activation native` to install into `.agents/skills/<name>`.
+The add command prints the vetting summary at approval time. Default installation puts files in `.agents/vendor/<name>`. To make the agent discover the skill natively, use `--activation native` to install into `.agents/skills/<name>`.
 
 This command pins the commit hash in `.agents/references.yaml` and writes file hashes into `.agents/references.lock.json`.
 
