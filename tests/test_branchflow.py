@@ -176,6 +176,40 @@ class TestBranchflow(unittest.TestCase):
         state = json.loads((self.root / ".agents" / "work" / "branch-state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["status"], "ready-for-test")
 
+    def test_06b_changes_requested_then_commit_then_approve(self):
+        """User requests changes on handoff, another commit is added on the same branch, and then approved."""
+        run_bf(["start", "--name", "iterate-test", "--type", "feat", "--root", str(self.root)], self.root)
+        (self.root / "code.py").write_text("v1\n", encoding="utf-8")
+        run_git(["add", "code.py"], self.root)
+        run_git(["commit", "-m", "feat(iter): v1 implementation"], self.root)
+
+        # 1. First handoff -> ready-for-test
+        res1 = run_bf(["handoff", "--json", "--root", str(self.root)], self.root)
+        self.assertEqual(res1.returncode, 0)
+        state1 = json.loads((self.root / ".agents" / "work" / "branch-state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state1["status"], "ready-for-test")
+
+        # 2. User requests changes -> state becomes changes-requested
+        state1["status"] = "changes-requested"
+        (self.root / ".agents" / "work" / "branch-state.json").write_text(json.dumps(state1), encoding="utf-8")
+
+        # 3. Implement requested change on same branch
+        (self.root / "code.py").write_text("v2\n", encoding="utf-8")
+        run_git(["add", "code.py"], self.root)
+        run_git(["commit", "-m", "fix(iter): address user feedback"], self.root)
+
+        # 4. Second handoff -> ready-for-test again with 2 commits
+        res2 = run_bf(["handoff", "--json", "--root", str(self.root)], self.root)
+        self.assertEqual(res2.returncode, 0)
+        data2 = json.loads(res2.stdout)
+        self.assertEqual(len(data2["commits"]), 2)
+
+        # 5. User approves -> merge-local succeeds
+        res_merge = run_bf(["merge-local", "--approved", "--phrase", "yes merge locally", "--root", str(self.root)], self.root)
+        self.assertEqual(res_merge.returncode, 0)
+        state_final = json.loads((self.root / ".agents" / "work" / "branch-state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state_final["status"], "merged")
+
     def test_07_sync_conflict_stops_without_resolving(self):
         """sync on conflicting changes stops cleanly and leaves repository in conflict state."""
         run_bf(["start", "--name", "conflict-task", "--type", "feat", "--root", str(self.root)], self.root)
@@ -386,9 +420,13 @@ class TestBranchflow(unittest.TestCase):
         self.assertGreater(len(data["steps"]), 0)
 
     def test_17_forbidden_git_commands_static_lint(self):
-        """branchflow.py contains no reset --hard, clean, checkout -- ., or push (except none)."""
+        """branchflow.py contains no reset --hard, clean, checkout -- ., or push (except none), with an empty allow list."""
         content = BRANCHFLOW_PY.read_text(encoding="utf-8")
         lines = content.splitlines()
+
+        # Allow list is required to exist and be strictly empty
+        ALLOW_LIST = []
+        self.assertEqual(len(ALLOW_LIST), 0, "Allow list must be strictly empty")
 
         forbidden_patterns = [
             (r"reset\s+--hard", "reset --hard is strictly forbidden"),
@@ -399,6 +437,8 @@ class TestBranchflow(unittest.TestCase):
 
         violations = []
         for line_no, line in enumerate(lines, start=1):
+            if line_no in ALLOW_LIST:
+                continue
             for pat, desc in forbidden_patterns:
                 if re.search(pat, line):
                     violations.append(f"Line {line_no}: {desc} -> {line.strip()}")
