@@ -17,11 +17,12 @@ All maintainer operations run through `scripts/dev.py`:
 
 ## Playbooks
 
-The 4 maintainer playbooks live under `maintainers/skills/`:
+The 5 maintainer playbooks live under `maintainers/skills/`:
 - `author-skill`: create a new skill, configure triggers, and update manifests.
 - `author-extension`: extend runners, check types, analyzers, or profile schemas.
 - `triage-field-report`: diagnose root causes, build failing fixtures, and write fixes.
 - `cut-release`: check release readiness, plan version bump, and print commands.
+- `branch-dev-protocol`: develop on task branches, verify locally, raise pull requests, monitor CI matrix, and sync main.
 
 These playbooks use standard `SKILL.md` frontmatter and neutral phrasing so any coding agent can follow them.
 They are internal playbooks, not product skills, and must never be copied into `.agents/skills`.
