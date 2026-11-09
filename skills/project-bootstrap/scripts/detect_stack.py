@@ -96,7 +96,35 @@ def git_facts(root):
                 scopes[m.group(2)] += 1
     n = len(subjects)
     with_body = sum(1 for b in bodies if b.strip())
+    default_branch = ""
+    try:
+        res_sym = subprocess.run(["git", "-C", str(root), "symbolic-ref", "refs/remotes/origin/HEAD"],
+                                 capture_output=True, text=True, timeout=5)
+        if res_sym.returncode == 0:
+            default_branch = res_sym.stdout.strip().split("/")[-1]
+    except Exception:
+        pass
+    if not default_branch:
+        for candidate in ["main", "master"]:
+            try:
+                res_cand = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", f"refs/heads/{candidate}"],
+                                          capture_output=True, text=True, timeout=5)
+                if res_cand.returncode == 0:
+                    default_branch = candidate
+                    break
+            except Exception:
+                pass
+    if not default_branch:
+        try:
+            res_curr = subprocess.run(["git", "-C", str(root), "branch", "--show-current"],
+                                      capture_output=True, text=True, timeout=5)
+            if res_curr.returncode == 0 and res_curr.stdout.strip():
+                default_branch = res_curr.stdout.strip()
+        except Exception:
+            pass
+
     return {"is_repo": True, "commits_sampled": n,
+            "default_branch": default_branch,
             "conventional_ratio": round(matched / n, 2) if n else 0,
             "types": dict(types.most_common(10)), "scopes": dict(scopes.most_common(15)),
             "commits_with_body_ratio": round(with_body / n, 2) if n else 0}

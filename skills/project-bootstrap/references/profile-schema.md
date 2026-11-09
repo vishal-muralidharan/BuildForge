@@ -27,7 +27,7 @@ File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml
 | `design.*` | mixed | If `enabled` is true, `tokens_file` is required. `enforced_by` names the test or lint rule. |
 | `responsive.*` | mixed | If `enabled`, `min_width` must be below `max_width`. `breakpoints` entries have an integer `from` and a `layout` string. |
 | `data.*` | mixed | `storage`, `schema_source`, `invariants`, `protected`. Protected items need user approval to change. |
-| `git.*` | mixed | `push` is `never`, `ask` or `allowed`. `scopes` is a list of strings or `{name, purpose, paths}` objects. Empty means free scope. |
+| `git.*` | mixed | `push` is `never`, `ask` or `allowed`. `scopes` is a list of strings or `{name, purpose, paths}` objects. Empty means free scope. `workflow` sets opt-in branch workflow options. |
 | `verification.*` | mixed | `zero_warnings`, `browser_checks`, `post_build_report`. |
 | `docs.*` | paths | `skills_dir`, `agents_file`, `repo_map` are required. `spec` is optional and names the product spec file. |
 | `blueprints.*` | mixed | Optional. `enabled`, `dir`, and `areas`. Do not store raw lists of keys or tokens in profile. |
@@ -48,6 +48,18 @@ File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml
    ```
 
 Mixed lists are allowed. `name` must be unique and kebab-case. `purpose` is optional and must be 100 characters or fewer. `paths` is an optional list of file globs used by `suggest_scope.py`.
+
+### Branch workflow (`git.workflow`)
+
+Opt-in configuration for feature and bug fix branch mode:
+- `default_branch`: default branch name (e.g. `main` or `master`, detected from repo).
+- `mode`: `off`, `ask`, or `always` (default `ask`).
+- `branch_format`: branch name template, default `"<type>/<slug>"`. Type must be in `git.types`, slug must be kebab-case, 40 characters or fewer.
+- `sync`: `merge` or `rebase` (default `merge`).
+- `merge_method`: `squash`, `merge`, or `rebase` (default `squash`).
+- `remote`: remote name, default `origin`.
+- `cleanup`: `ask` or `keep` (default `ask`).
+- `worktree`: boolean, default `false`.
 
 ## 2. Rules list
 

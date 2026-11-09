@@ -39,13 +39,16 @@ Pick the workflow matching the request type:
 | Code review or diff audit | `references/workflows/review-changes.md` |
 | Release preparation or version bump | `references/workflows/release-prep.md` |
 | Incident, unwritten convention, or rule gap | `references/workflows/incident-to-rule.md` |
-| Feature or general delivery | Stages 0 to 7 below |
+| Branch workflow and lifecycle | `references/workflows/branch-mode.md` |
+| Feature or general delivery | Stages 0 to 8 below |
+
+All workflows honor branch mode. If `git.workflow.mode` is set, or if the user requests working on a separate branch, follow `references/workflows/branch-mode.md`.
 
 ## Stages and gates
 
 | # | Stage | Skill to use | Gate: do not continue until |
 |---|---|---|---|
-| 0 | Pre-flight | git | Branch is verified and working tree is clean. |
+| 0 | Pre-flight & Branch | git, `branchflow.py` | Branch verified and working tree clean. Unless `git.workflow.mode` is `off` or `always`, ask: "Work on a separate branch?" If yes, run `python3 .agents/skills/feature-delivery/scripts/branchflow.py start --name <slug> --type <type>`. If mode is `always`, start branch without asking. |
 | 1 | Audit & Goal Definition | `audit-and-planning` (phases 1 and 2), `repo-search` | Root cause diagnosed. Protected data identified. Current goal invariants and measurable acceptance criteria written to `.agents/work/CURRENT_GOAL.md` (updated for each task in a series). |
 | 2 | Plan | `audit-and-planning` (phases 3 and 4) | Every step has a target, a verify command, and a commit message. Plan approved if over 5 steps or touching protected items. |
 | 3 | Build step | Area convention skill (`build-ui`, etc.) | The step does 1 thing and follows the rules of its area. |
@@ -56,6 +59,7 @@ Pick the workflow matching the request type:
 | 5a | Goal loop gate | `targeted-module-testing`, step 3b | All acceptance invariants from `CURRENT_GOAL.md` are evaluated. If all pass, proceed to stage 6. If any fail, re-enter loop. |
 | 6 | Deploy (optional) | `targeted-module-testing`, step 4 | Runs only if `capabilities.deploy.enabled` is true. |
 | 7 | Report | `targeted-module-testing`, step 5 | Post-Build Audit written. `CURRENT_GOAL.md` marked completed; advances to next task if in a series. |
+| 8 | Hand off | `branchflow.py`, `targeted-module-testing` | When on a task branch, run `python3 .agents/skills/feature-delivery/scripts/branchflow.py handoff`. Wait for the user to choose: approve, changes requested, park, or abandon. |
 
 Stages 1, 5 and 6 consult references through `due`. A gate reference with a blocking finding stops the stage until the user decides.
 
@@ -68,7 +72,7 @@ After Stage 5 (Full verify), do not assume the task is finished just because tes
 1. Check every acceptance invariant in `.agents/work/CURRENT_GOAL.md`.
 2. Inspect the live behavior, output data, or rendered UI against the goal.
 3. Decision:
-   - **Goal Achieved**: All invariants proven true. Proceed to stage 6 and 7.
+   - **Goal Achieved**: All invariants proven true. Proceed to stage 6, 7 and 8.
    - **Goal Not Achieved**: Identify the gap between current behavior and the desired goal. Add corrective steps to the plan, increment iteration count in `CURRENT_GOAL.md`, and loop back to Stage 3.
    - **Safety Limit**: If the goal is not met after 3 corrective iterations, pause. Present the exact gap, current test status, and options to the user for direction.
 
@@ -115,7 +119,7 @@ When the user provides a series, backlog, or list of goals/tasks:
 
 1. **Initialize the Queue**: In Stage 1 of the first task, record all requested tasks under `## Series Queue` in `CURRENT_GOAL.md`. Set `# Current Goal:` to the first task.
 2. **Active Goal Scope**: `# Current Goal:`, `Acceptance Invariants`, and `Plan Steps` must strictly cover the active task being executed, never mixed across multiple tasks.
-3. **Execute One Goal at a Time**: Run the active goal through Stages 1 to 7 with the Goal Loop. Never mix acceptance invariants or plan steps from multiple tasks into the active section.
+3. **Execute One Goal at a Time**: Run the active goal through Stages 1 to 8 with the Goal Loop. Never mix acceptance invariants or plan steps from multiple tasks into the active section.
 4. **Transition to the Next Goal**:
    - In Stage 7, mark the finished task as `[x]` in `## Series Queue` and record it under `## Completed Goals History`.
    - If pending tasks remain in the series:
@@ -142,7 +146,7 @@ Stop and ask the user when:
 ## New app milestones
 
 1. Read the milestone in `docs.spec`. Use its draft steps as the starting plan. `audit-and-planning` makes them concrete with real paths.
-2. Run stages 0 to 7 through the goal loop.
+2. Run stages 0 to 8 through the goal loop.
 3. When the milestone ships and its acceptance invariants pass, mark it done in the spec. Draft steps for the next milestone and show the user. Do not start without a yes.
 
 ## Final message

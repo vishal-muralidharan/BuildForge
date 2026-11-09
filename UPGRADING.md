@@ -89,6 +89,29 @@ Hand edits outside custom blocks are preserved in a `salvaged` custom block.
 
 ---
 
+## Branch Workflow (Opt-in, No Action Required)
+
+Build Forge 0.2.0 includes an opt-in task branch workflow managed by `branchflow.py`.
+
+Existing projects continue to work on main without any changes. No upgrade action is required.
+
+To enable task branch workflows for a repository, add `git.workflow` to `.agents/project-profile.yaml`:
+
+```yaml
+git:
+  workflow:
+    default_branch: main
+    mode: ask            # off, ask, or always
+    branch_format: "<type>/<slug>"
+    sync: merge          # merge or rebase
+    merge_method: squash # squash, merge, or rebase
+    remote: origin
+    cleanup: ask         # ask or keep
+    worktree: false
+```
+
+---
+
 ## Verifying Your Upgrade
 
 Run the doctor command to verify your installation:

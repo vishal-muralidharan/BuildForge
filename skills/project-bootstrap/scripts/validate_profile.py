@@ -149,6 +149,53 @@ def main():
     if not get(prof, "git.commit_format"):
         errors.append("git.commit_format is required")
 
+    # git.workflow profile configuration
+    wf = get(prof, "git.workflow")
+    if "workflow" in (get(prof, "git") or {}):
+        pass
+    if wf is not None:
+        if not isinstance(wf, dict):
+            errors.append("git.workflow must be a mapping")
+        else:
+            WORKFLOW_KEYS = {"default_branch", "mode", "branch_format", "sync", "merge_method", "remote", "cleanup", "worktree"}
+            if stray(wf, WORKFLOW_KEYS):
+                errors.append(f"git.workflow has unexpected keys {stray(wf, WORKFLOW_KEYS)}")
+
+            d_branch = wf.get("default_branch")
+            if d_branch is not None:
+                if not isinstance(d_branch, str) or not d_branch.strip():
+                    errors.append("git.workflow.default_branch must be a non-empty string")
+
+            mode = wf.get("mode")
+            if mode is not None and mode not in ("off", "ask", "always"):
+                errors.append("git.workflow.mode must be off, ask or always")
+
+            b_format = wf.get("branch_format")
+            if b_format is not None:
+                if not isinstance(b_format, str) or not b_format.strip():
+                    errors.append("git.workflow.branch_format must be a non-empty string")
+
+            sync = wf.get("sync")
+            if sync is not None and sync not in ("rebase", "merge"):
+                errors.append("git.workflow.sync must be rebase or merge")
+
+            m_method = wf.get("merge_method")
+            if m_method is not None and m_method not in ("squash", "merge", "rebase"):
+                errors.append("git.workflow.merge_method must be squash, merge or rebase")
+
+            remote = wf.get("remote")
+            if remote is not None:
+                if not isinstance(remote, str) or not remote.strip():
+                    errors.append("git.workflow.remote must be a non-empty string")
+
+            cleanup = wf.get("cleanup")
+            if cleanup is not None and cleanup not in ("ask", "keep"):
+                errors.append("git.workflow.cleanup must be ask or keep")
+
+            worktree = wf.get("worktree")
+            if worktree is not None and not isinstance(worktree, bool):
+                errors.append("git.workflow.worktree must be a boolean")
+
     scopes = get(prof, "git.scopes")
     if scopes is not None:
         if not isinstance(scopes, list):

@@ -297,7 +297,7 @@ AGENTS.md                       # Generated: Router read by agents
 | `atomic-commits` | Enforces small, single purpose commits with checked messages. | When committing code in a project with a profile, before starting the next unit of work. |
 | `audit-and-planning` | Searches codebase, diagnoses root cause, checks rules, and writes an atomic plan. | Before starting any feature, bug fix or refactor, even for small tasks. |
 | `extend-pipeline` | Extends the pipeline with vetted, pinned third party skills. | When adding external skills, review tools, hosting recipes, or updating references. |
-| `feature-delivery` | Conductor for the build pipeline with gates between all 7 stages. | For every task to add, build, fix, refactor or ship code in a project with a profile. |
+| `feature-delivery` | Conductor for the build pipeline with gates between all 8 stages and opt-in branch mode. | For every task to add, build, fix, refactor or ship code in a project with a profile. |
 | `legal-and-settings-pages` | Adds settings, legal pages, data management, terms consent, and account deletion. | When adding settings, privacy policies, terms, GDPR/CCPA pages, or account deletion. |
 | `product-spec` | Turns rough app ideas into specs with users, core flows, milestones and steps. | At the very start of a new app, or to cut big features into milestones. |
 | `project-blueprints` | Extracts verified facts (data, tokens, UI, layout, auth, config) into queryable blueprints. | When asking what is in this codebase, inspecting schemas or tokens, or regenerating context. |
@@ -340,6 +340,25 @@ stack:
   auth: none
   database: SQLite
   hosting: static
+```
+
+### Branch workflow (opt-in)
+
+Build Forge includes an opt-in task branch workflow managed by `branchflow.py`.
+
+When enabled in `git.workflow`, tasks run on isolated feature branches, guard against commits on the default branch, provide manual testing handoff checklists, and merge or rebase cleanly with typed confirmation phrases.
+
+```yaml
+git:
+  workflow:
+    default_branch: main
+    mode: ask            # off, ask, or always
+    branch_format: "<type>/<slug>"
+    sync: merge          # merge or rebase
+    merge_method: squash # squash, merge, or rebase
+    remote: origin
+    cleanup: ask         # ask or keep
+    worktree: false
 ```
 
 ## Automatic rule checks

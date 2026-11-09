@@ -19,6 +19,12 @@ All notable changes to Build Forge will be documented in this file.
 - Doctor check reporting pending upgrade actions as warnings.
 
 ### Added
+- Opt-in branch workflow configuration under `git.workflow` in project profile (`default_branch`, `mode`, `branch_format`, `sync`, `merge_method`, `remote`, `cleanup`, `worktree`).
+- Task branch workflow tool `skills/feature-delivery/scripts/branchflow.py` supporting `status`, `start`, `guard`, `handoff`, `sync`, `merge-local`, `sync-main`, `park`, `resume`, `abandon`, `cleanup`, and `revert-plan`.
+- Branch workflow reference guide `skills/feature-delivery/references/workflows/branch-mode.md` with state machine documentation and typed confirmation phrases.
+- Branch workflow hooks in `feature-delivery` (Stage 0 branch prompt, Stage 8 handoff), `atomic-commits` (pre-commit guard check), and `targeted-module-testing` (manual Try it checklist).
+- Branch workflow diagnostics in `build-forge doctor` (stale state files, merged uncleaned local branches, missing default branch) and `check_sync.py` (state files referencing missing git branches).
+- Unit and integration test suite `tests/test_branchflow.py` covering all 17 lifecycle scenarios, stacked branches, worktrees, rebase phrase checks, and forbidden command static lints.
 - Rule pack system in `skills/project-bootstrap/scripts/packs.py` supporting `list`, `show`, `plan`, `apply`, `diff`, and `lint` commands.
 - 9 curated, opt-in rule packs in `skills/project-bootstrap/references/rule-packs/`: `native-controls`, `web-hazards`, `ui-states`, `mobile-web`, `shortcuts`, `a11y-basics`, `motion-basics`, `testing-practices`, and `browser-checks`.
 - Rule pack schema validation in `validate_profile.py` supporting `rule_packs` (`[{id, version}]`), `rule.pack` (`<id>@<version>`), `dropped_pack_rules`, `enforced_by_ref: {file, contains}`, and `claim-unverified` warnings with `--strict-claims`.

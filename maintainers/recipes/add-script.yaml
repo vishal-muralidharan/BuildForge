@@ -1,0 +1,15 @@
+name: add-script
+args:
+  - skill
+  - script_name
+touchpoints:
+  - file: skills/{skill}/scripts/{script_name}.py
+    contains: "__main__"
+    why: Script implementation
+  - file: skills/{skill}/SKILL.md
+    contains: "{script_name}.py"
+    why: Named in SKILL.md for skill contracts check
+  - file: tests/test_{script_name}.py
+    contains: "{script_name}"
+    why: Test coverage for script
+

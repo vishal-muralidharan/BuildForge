@@ -81,9 +81,17 @@ python3 .agents/skills/atomic-commits/scripts/check_commit_message.py --profile 
 
 If python3 is not found, use python or py -3.
 
-Fix every error it reports. Warnings are advice.
+Fix every error it reports. Warnings are advice. Branch names and pull request titles use the same commit format as `git.commit_format`.
 
 ### 5. Commit and confirm
+
+When a branch workflow state is active (`.agents/work/branch-state.json`), run the guard check before committing:
+
+```bash
+python3 .agents/skills/feature-delivery/scripts/branchflow.py guard
+```
+
+If this check fails, do not commit. You are on the default branch while a task branch is active. Switch to the task branch first.
 
 ```bash
 git commit -m "<message>"

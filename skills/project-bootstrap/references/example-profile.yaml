@@ -95,6 +95,15 @@ git:
   push: ask
   commit_format: "<type>(<scope>): <subject>"
   single_line: true
+  workflow:
+    default_branch: main
+    mode: ask
+    branch_format: "<type>/<slug>"
+    sync: merge
+    merge_method: squash
+    remote: origin
+    cleanup: ask
+    worktree: false
   scopes:
     - name: entry
       purpose: Journal entry operations and user inputs
