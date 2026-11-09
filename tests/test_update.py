@@ -324,6 +324,163 @@ class TestSafeUpdate(unittest.TestCase):
             if not k.startswith("_") and k != "version":
                 self.assertTrue(k.startswith("skills/"), f"Unexpected key format: {k}")
 
+    def test_10_d1_lock_from_packaged_integrity_and_key_schema_agreement(self):
+        """D1: Lock must always be packaged integrity.json, never disk hashes; kept skill shows modified in verify."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            # Pre-seed a tampered skill
+            tampered_skill = p / ".agents" / "skills" / "repo-search"
+            tampered_skill.mkdir(parents=True, exist_ok=True)
+            (tampered_skill / "SKILL.md").write_text("# Locally modified repo search\n", encoding="utf-8")
+
+            # Run plain install
+            res_inst = run_node(["install"], p)
+            self.assertEqual(res_inst.returncode, 0)
+
+            # Read packaged integrity.json
+            pkg_integrity = json.loads((REPO_ROOT / "integrity.json").read_text(encoding="utf-8"))
+
+            # Read generated lock file
+            lock_file = p / ".agents" / "build-forge.lock.json"
+            self.assertTrue(lock_file.is_file())
+            lock_data = json.loads(lock_file.read_text(encoding="utf-8"))
+
+            # 1. Key schema comparison
+            for k in lock_data:
+                if k.startswith("_") or k == "version":
+                    continue
+                self.assertTrue(k.startswith("skills/"), f"Key does not match schema: {k}")
+                self.assertIn(k, pkg_integrity, f"Key not in package integrity: {k}")
+
+            # 2. Lock MUST contain package hash for tampered file, NOT disk hash
+            tampered_key = "skills/repo-search/SKILL.md"
+            self.assertIn(tampered_key, lock_data)
+            self.assertEqual(
+                lock_data[tampered_key],
+                pkg_integrity[tampered_key],
+                "Lockfile contains disk hash instead of package integrity hash!"
+            )
+
+            # 3. Node verify must flag the kept skill as modified
+            res_node_verify = run_node(["verify"], p)
+            self.assertNotEqual(res_node_verify.returncode, 0, "Node verify did not flag modified skill")
+
+            # 4. verify_integrity.py must flag the kept skill as modified
+            verify_script = REPO_ROOT / "skills" / "project-bootstrap" / "scripts" / "verify_integrity.py"
+            self.assertTrue(verify_script.is_file(), "verify_integrity.py does not exist")
+            res_py_verify = subprocess.run(
+                ["python3", str(verify_script), "--root", str(p)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(res_py_verify.returncode, 1, "verify_integrity.py did not flag modified skill")
+
+    def test_11_d5_install_over_existing_skills_reports_kept_differs_and_points_to_update(self):
+        """D5: install over existing skills says which folders kept, says they differ, and points to update."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            # Create pre-existing differing skill
+            existing_skill = p / ".agents" / "skills" / "atomic-commits"
+            existing_skill.mkdir(parents=True, exist_ok=True)
+            (existing_skill / "SKILL.md").write_text("# Old atomic commits\n", encoding="utf-8")
+
+            res = run_node(["install"], p)
+            self.assertEqual(res.returncode, 0)
+            stdout = res.stdout + res.stderr
+
+            # 1. Says which folders it kept
+            self.assertIn("kept   atomic-commits", stdout)
+
+            # 2. Says they differ from the package
+            self.assertTrue(
+                "differs from package" in stdout or "differ from" in stdout,
+                f"Output did not indicate kept skills differ from package:\n{stdout}"
+            )
+
+            # 3. Points to update
+            self.assertIn("update", stdout)
+            self.assertTrue(
+                "npx @v1006/build-forge update" in stdout or "build-forge update" in stdout,
+                f"Output did not point to build-forge update command:\n{stdout}"
+            )
+
+    def test_12_d6_keep_modified_retains_verify_flag_and_restore_saves_patch(self):
+        """D6: --keep-modified leaves lock at package hash so verify flags it; --restore saves overwritten patch."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            # Install clean project
+            res_inst = run_node(["install"], p)
+            self.assertEqual(res_inst.returncode, 0)
+
+            # Hand-edit a pipeline skill
+            skill_md = p / ".agents" / "skills" / "atomic-commits" / "SKILL.md"
+            self.assertTrue(skill_md.is_file())
+            original_content = skill_md.read_text(encoding="utf-8")
+            edited_content = original_content + "\n## Local Custom Edit\nDon't forget issue number.\n"
+            skill_md.write_text(edited_content, encoding="utf-8")
+
+            # Run update --keep-modified
+            res_km = run_node(["update", "--keep-modified", "atomic-commits"], p)
+            self.assertEqual(res_km.returncode, 0)
+            self.assertEqual(skill_md.read_text(encoding="utf-8"), edited_content)
+
+            # verify MUST still flag atomic-commits as modified
+            res_verify = run_node(["verify"], p)
+            self.assertNotEqual(res_verify.returncode, 0, "verify did not flag kept-modified skill")
+            self.assertIn("modified", res_verify.stderr + res_verify.stdout)
+
+            # diff --patch exports patch
+            res_diff = run_node(["diff", "--patch"], p)
+            self.assertEqual(res_diff.returncode, 0)
+            diff_patch = p / ".agents" / "work" / "atomic-commits.patch"
+            self.assertTrue(diff_patch.is_file(), "diff --patch did not export .agents/work/atomic-commits.patch")
+            self.assertIn("Local Custom Edit", diff_patch.read_text(encoding="utf-8"))
+
+            # Run update --restore atomic-commits
+            res_res = run_node(["update", "--restore", "atomic-commits"], p)
+            self.assertEqual(res_res.returncode, 0)
+
+            # Saved patch must exist in .agents/work/overwritten-atomic-commits.patch
+            saved_patch = p / ".agents" / "work" / "overwritten-atomic-commits.patch"
+            self.assertTrue(saved_patch.is_file(), "update --restore did not write overwritten-<skill>.patch")
+            self.assertIn("Local Custom Edit", saved_patch.read_text(encoding="utf-8"))
+
+            # Content restored
+            self.assertEqual(skill_md.read_text(encoding="utf-8"), original_content)
+
+            # verify now passes
+            res_verify_after = run_node(["verify"], p)
+            self.assertEqual(res_verify_after.returncode, 0)
+
+    def test_13_d9_install_gitignore_handling_and_no_gitignore_flag(self):
+        """D9: install edits .gitignore minimally, idempotently, and respects --no-gitignore."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            gi = p / ".gitignore"
+            initial_content = "node_modules/\n.DS_Store\n"
+            gi.write_text(initial_content, encoding="utf-8")
+
+            # 1. install with --no-gitignore must leave file completely untouched
+            res_no_gi = run_node(["install", "--no-gitignore"], p)
+            self.assertEqual(res_no_gi.returncode, 0)
+            self.assertEqual(gi.read_text(encoding="utf-8"), initial_content, "--no-gitignore did not leave .gitignore untouched")
+            self.assertNotIn("ignore added", res_no_gi.stdout)
+
+            # 2. Plain install adds only .agents/work/ and .agents/vendor/
+            res_plain = run_node(["install"], p)
+            self.assertEqual(res_plain.returncode, 0)
+            after_plain = gi.read_text(encoding="utf-8")
+            self.assertIn(".agents/work/", after_plain)
+            self.assertIn(".agents/vendor/", after_plain)
+            self.assertIn("node_modules/", after_plain)
+            self.assertIn("ignore added", res_plain.stdout)
+
+            # 3. Running again is idempotent
+            res_idemp = run_node(["install"], p)
+            self.assertEqual(res_idemp.returncode, 0)
+            self.assertEqual(gi.read_text(encoding="utf-8"), after_plain, "install is not idempotent on .gitignore")
+
 
 def main():
     unittest.main()

@@ -24,6 +24,8 @@ try:
 except ImportError:
     sys.exit("PyYAML is required: pip install pyyaml")
 
+SUPPORTED_SCHEMA_VERSIONS = (1, 2)
+
 
 def migrate_v1_to_v2(profile: dict, root: Path) -> dict:
     """Migrate profile from schema_version 1 to 2.
@@ -76,8 +78,10 @@ def run_migrations(profile: dict, root: Path) -> tuple:
         fn = MIGRATIONS[cur_ver]
         next_ver = cur_ver + 1
         migrated = fn(migrated, root)
-        applied.append((cur_ver, next_ver))
         cur_ver = migrated.get("schema_version")
+        if cur_ver not in SUPPORTED_SCHEMA_VERSIONS:
+            sys.exit(f"Error: Migration produced unsupported schema_version {cur_ver}. Must be in {SUPPORTED_SCHEMA_VERSIONS}.")
+        applied.append((cur_ver - 1, cur_ver))
 
     return migrated, applied
 

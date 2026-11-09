@@ -99,7 +99,7 @@ Ask once whether the user wants third party skills. If yes, run the extend-pipel
 ## Finish
 
 1. In existing mode, run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status --root <repo_root>`. It must exit 0. Do not finish while status exits 1.
-2. Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root> --strict-paths`. Each unmatched path is removed or marked TODO, and the user is told. It is never left silently. Fix every error. Show the user any remaining TODO.
+2. Run `python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root <repo_root> --strict-paths`. Each unmatched path is removed or marked TODO, and the user is told. It is never left silently. Fix every error. Show the user any remaining TODO. Offline integrity can be verified with `python3 .agents/skills/project-bootstrap/scripts/verify_integrity.py --root <repo_root>`.
 3. Run `python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root <repo_root>`. It never overwrites existing files. If `AGENTS.md` exists it writes `AGENTS.generated.md`. Help the user merge it, then offer to delete the generated copy.
 4. Report in this shape:
 

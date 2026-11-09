@@ -27,6 +27,7 @@ REF_CATEGORIES = {"backend", "database", "security", "deploy", "hosting", "brows
 ENFORCED = {"manual", "test", "lint", "check"}
 STATUS = {"declared", "installed", "rejected"}
 PUSH = {"never", "ask", "allowed"}
+SUPPORTED_SCHEMA_VERSIONS = (1, 2)
 MODES = {"existing", "new"}
 RULE_KEYS = {"id", "area", "text", "enforced_by", "check", "evidence", "exceptions", "pack", "enforced_by_ref"}
 CHECK_TYPES = {"forbid", "require_file", "forbid_file", "root_only", "no_dual_homed_skills"}
@@ -100,8 +101,8 @@ def main():
     if not isinstance(prof, dict):
         sys.exit("ERROR: profile must be a YAML mapping")
 
-    if prof.get("schema_version") not in (1, 2):
-        errors.append("schema_version must be 1 or 2")
+    if prof.get("schema_version") not in SUPPORTED_SCHEMA_VERSIONS:
+        errors.append(f"schema_version must be one of {list(SUPPORTED_SCHEMA_VERSIONS)}")
 
     for path in ("project.name", "project.summary", "stack.language", "stack.framework", "stack.package_manager"):
         if not get(prof, path):

@@ -46,6 +46,7 @@ const AGENTS = [
 ];
 
 const POINTER_CONTENT = 'Read AGENTS.md first and follow it. If AGENTS.md does not exist yet, run the project-bootstrap skill at .agents/skills/project-bootstrap/SKILL.md.\n';
+const SUPPORTED_SCHEMA_VERSIONS = [1, 2];
 
 function hashFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
@@ -78,6 +79,48 @@ function computeSkillsManifest(skillsDir, allowedSkillNames = null) {
   return manifest;
 }
 
+function generateSkillPatch(packageSkillDir, targetSkillDir, skillName) {
+  let patch = '';
+  try {
+    const res = spawnSync('git', ['diff', '--no-index', '--', packageSkillDir, targetSkillDir], {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024
+    });
+    if (res.stdout && res.stdout.length > 0) {
+      patch = res.stdout;
+    }
+  } catch (e) {}
+  if (!patch) {
+    const python = findPythonCommand();
+    if (python) {
+      const pyScript = `
+import difflib, os, sys
+pkg_dir = sys.argv[1]
+target_dir = sys.argv[2]
+skill_name = sys.argv[3]
+diff_lines = []
+for root, _, files in sorted(os.walk(target_dir)):
+    for f in sorted(files):
+        p_target = os.path.join(root, f)
+        rel = os.path.relpath(p_target, target_dir)
+        p_pkg = os.path.join(pkg_dir, rel)
+        if os.path.exists(p_pkg):
+            with open(p_pkg, 'r', errors='ignore') as fp1, open(p_target, 'r', errors='ignore') as fp2:
+                l1 = fp1.readlines()
+                l2 = fp2.readlines()
+                d = list(difflib.unified_diff(l1, l2, fromfile=f"a/.agents/skills/{skill_name}/{rel}", tofile=f"b/.agents/skills/{skill_name}/{rel}"))
+                diff_lines.extend(d)
+sys.stdout.writelines(diff_lines)
+`;
+      try {
+        const res = spawnSync(python.cmd, [...python.args, '-c', pyScript, packageSkillDir, targetSkillDir, skillName], { encoding: 'utf8' });
+        if (res.stdout) patch = res.stdout;
+      } catch (e) {}
+    }
+  }
+  return patch;
+}
+
 function parseArgs(args) {
   let command = 'install';
   const positional = [];
@@ -87,6 +130,8 @@ function parseArgs(args) {
   let dryRun = false;
   let adopt = false;
   let yes = false;
+  let patch = false;
+  let noGitignore = false;
   const keepModified = new Set();
   const restore = new Set();
 
@@ -102,6 +147,10 @@ function parseArgs(args) {
       adopt = true;
     } else if (a === '--yes') {
       yes = true;
+    } else if (a === '--patch') {
+      patch = true;
+    } else if (a === '--no-gitignore') {
+      noGitignore = true;
     } else if (a === '--keep-modified') {
       const next = args[++i];
       if (next) next.split(',').forEach(s => s.trim() && keepModified.add(s.trim()));
@@ -130,7 +179,7 @@ function parseArgs(args) {
     }
   }
 
-  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore };
+  return { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore };
 }
 
 function resolveSelectedAgents(agentsArg, cwd) {
@@ -159,7 +208,18 @@ function resolveSelectedAgents(agentsArg, cwd) {
   return AGENTS.filter(agent => ids.includes(agent.id));
 }
 
-function installCommand(cwd, force, agentsArg) {
+function installCommand(cwd, options = {}, legacyAgentsArg = null) {
+  let force = false;
+  let agentsArg = null;
+  let noGitignore = false;
+  if (typeof options === 'boolean') {
+    force = options;
+    agentsArg = legacyAgentsArg;
+  } else if (options && typeof options === 'object') {
+    force = !!options.force;
+    agentsArg = options.agentsArg || null;
+    noGitignore = !!options.noGitignore;
+  }
   const packageSkillsDir = path.join(__dirname, '..', 'skills');
   const targetSkillsDir = path.join(cwd, '.agents', 'skills');
   const lockFilePath = path.join(cwd, '.agents', 'build-forge.lock.json');
@@ -185,11 +245,21 @@ function installCommand(cwd, force, agentsArg) {
     added.push(name);
   }
 
-  // Write lockfile scoped strictly to package pipeline skills
-  const packageSkills = new Set(
-    fs.readdirSync(packageSkillsDir).filter(name => fs.statSync(path.join(packageSkillsDir, name)).isDirectory())
-  );
-  const manifest = computeSkillsManifest(targetSkillsDir, packageSkills);
+  // Write lockfile scoped strictly to package pipeline skills from packaged integrity.json
+  const integrityPath = path.join(__dirname, '..', 'integrity.json');
+  let integrity = {};
+  if (fs.existsSync(integrityPath)) {
+    try { integrity = JSON.parse(fs.readFileSync(integrityPath, 'utf8')); } catch (e) {}
+  }
+  const manifest = {};
+  const allInstalledPkgSkills = new Set([...added, ...kept]);
+  for (const skillName of allInstalledPkgSkills) {
+    for (const [relFile, hash] of Object.entries(integrity)) {
+      if (relFile.startsWith(`skills/${skillName}/`)) {
+        manifest[relFile] = hash;
+      }
+    }
+  }
   let pkgVersion = '0.1.0';
   try {
     const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
@@ -198,34 +268,78 @@ function installCommand(cwd, force, agentsArg) {
   manifest['_version'] = pkgVersion;
   fs.writeFileSync(lockFilePath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
-  console.log(`Build Forge: ${added.length} skill(s) installed in .agents/skills`);
-  for (const n of added) console.log(`  added  ${n}`);
-  for (const n of kept) console.log(`  kept   ${n} (exists, use --force to overwrite)`);
-  console.log('  lock   .agents/build-forge.lock.json written');
+  const differingKept = [];
+  if (kept.length > 0) {
+    const diskManifest = computeSkillsManifest(targetSkillsDir, new Set(kept));
+    for (const name of kept) {
+      let differs = false;
+      for (const [relFile, hash] of Object.entries(integrity)) {
+        if (relFile.startsWith(`skills/${name}/`)) {
+          if (!diskManifest[relFile] || diskManifest[relFile] !== hash) {
+            differs = true;
+            break;
+          }
+        }
+      }
+      if (!differs) {
+        for (const relFile of Object.keys(diskManifest)) {
+          if (relFile.startsWith(`skills/${name}/`) && !integrity[relFile]) {
+            differs = true;
+            break;
+          }
+        }
+      }
+      if (differs) {
+        differingKept.push(name);
+      }
+    }
+  }
+
+  if (kept.length > 0 && differingKept.length > 0) {
+    console.log(`Build Forge: ${added.length} skill(s) installed, ${kept.length} existing skill(s) kept.`);
+    for (const n of added) console.log(`  added  ${n}`);
+    for (const n of kept) {
+      if (differingKept.includes(n)) {
+        console.log(`  kept   ${n} (differs from package; use --force to overwrite)`);
+      } else {
+        console.log(`  kept   ${n} (exists, use --force to overwrite)`);
+      }
+    }
+    console.log('  lock   .agents/build-forge.lock.json written');
+    console.log(`\nNotice: ${differingKept.length} kept skill(s) differ from the package: ${differingKept.join(', ')}`);
+    console.log('To review and update skills safely, run: npx @v1006/build-forge update');
+  } else {
+    console.log(`Build Forge: ${added.length} skill(s) installed in .agents/skills`);
+    for (const n of added) console.log(`  added  ${n}`);
+    for (const n of kept) console.log(`  kept   ${n} (exists, use --force to overwrite)`);
+    console.log('  lock   .agents/build-forge.lock.json written');
+  }
 
   // Ensure transient work and vendor directories are ignored if .gitignore exists
-  const gitignorePath = path.join(cwd, '.gitignore');
-  if (fs.existsSync(gitignorePath)) {
-    try {
-      let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-      const lines = gitignoreContent.split(/\r?\n/).map(l => l.trim());
-      const toAdd = [];
-      if (!lines.includes('.agents/work/') && !lines.includes('.agents/work')) {
-        toAdd.push('.agents/work/');
-      }
-      if (!lines.includes('.agents/vendor/') && !lines.includes('.agents/vendor')) {
-        toAdd.push('.agents/vendor/');
-      }
-      if (toAdd.length > 0) {
-        if (!gitignoreContent.endsWith('\n') && gitignoreContent.length > 0) {
-          gitignoreContent += '\n';
+  if (!noGitignore) {
+    const gitignorePath = path.join(cwd, '.gitignore');
+    if (fs.existsSync(gitignorePath)) {
+      try {
+        let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+        const lines = gitignoreContent.split(/\r?\n/).map(l => l.trim());
+        const toAdd = [];
+        if (!lines.includes('.agents/work/') && !lines.includes('.agents/work')) {
+          toAdd.push('.agents/work/');
         }
-        gitignoreContent += toAdd.join('\n') + '\n';
-        fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
-        console.log(`  ignore added ${toAdd.join(', ')} to .gitignore`);
+        if (!lines.includes('.agents/vendor/') && !lines.includes('.agents/vendor')) {
+          toAdd.push('.agents/vendor/');
+        }
+        if (toAdd.length > 0) {
+          if (!gitignoreContent.endsWith('\n') && gitignoreContent.length > 0) {
+            gitignoreContent += '\n';
+          }
+          gitignoreContent += toAdd.join('\n') + '\n';
+          fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
+          console.log(`  ignore added ${toAdd.join(', ')} to .gitignore`);
+        }
+      } catch (e) {
+        // Non-fatal if .gitignore is not writable
       }
-    } catch (e) {
-      // Non-fatal if .gitignore is not writable
     }
   }
 
@@ -595,7 +709,8 @@ function statusCommand(cwd) {
   }
 }
 
-function diffCommand(cwd) {
+function diffCommand(cwd, options = {}) {
+  const patch = !!options.patch;
   const packageSkillsDir = path.join(__dirname, '..', 'skills');
   const targetSkillsDir = path.join(cwd, '.agents', 'skills');
 
@@ -610,15 +725,20 @@ function diffCommand(cwd) {
   );
   const currentManifest = computeSkillsManifest(targetSkillsDir, targetSkills);
 
+  const modifiedSkillNames = new Set();
   let diffs = 0;
   for (const [relFile, pkgHash] of Object.entries(pkgManifest)) {
     const curHash = currentManifest[relFile];
     if (!curHash) {
       console.log(`  missing in project: .agents/${relFile}`);
       diffs++;
+      const parts = relFile.split('/');
+      if (parts.length >= 2) modifiedSkillNames.add(parts[1]);
     } else if (curHash !== pkgHash) {
       console.log(`  modified in project: .agents/${relFile}`);
       diffs++;
+      const parts = relFile.split('/');
+      if (parts.length >= 2) modifiedSkillNames.add(parts[1]);
     }
   }
 
@@ -626,6 +746,25 @@ function diffCommand(cwd) {
     if (!pkgManifest[relFile]) {
       console.log(`  extra in project skill: .agents/${relFile}`);
       diffs++;
+      const parts = relFile.split('/');
+      if (parts.length >= 2) modifiedSkillNames.add(parts[1]);
+    }
+  }
+
+  if (patch && modifiedSkillNames.size > 0) {
+    const workDir = path.join(cwd, '.agents', 'work');
+    fs.mkdirSync(workDir, { recursive: true });
+    for (const name of modifiedSkillNames) {
+      const pDiff = generateSkillPatch(
+        path.join(packageSkillsDir, name),
+        path.join(targetSkillsDir, name),
+        name
+      );
+      if (pDiff) {
+        const patchFile = path.join(workDir, `${name}.patch`);
+        fs.writeFileSync(patchFile, pDiff, 'utf8');
+        console.log(`  exported patch: .agents/work/${name}.patch`);
+      }
     }
   }
 
@@ -762,26 +901,37 @@ function doctorCommand(cwd, isJson) {
   if (!fs.existsSync(profilePath)) {
     addCheck('Profile', 'WARN', '.agents/project-profile.yaml not found', 'Run project-bootstrap to create .agents/project-profile.yaml');
   } else {
-    let valScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
-    if (!fs.existsSync(valScript)) {
-      valScript = path.join(__dirname, '..', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
-    }
-    if (python && fs.existsSync(valScript)) {
-      try {
-        const resVal = spawnSync(python.cmd, [...python.args, valScript, '--profile', profilePath, '--root', cwd], {
-          encoding: 'utf8',
-          timeout: 10000
-        });
-        if (resVal.status === 0) {
-          addCheck('Profile', 'OK', '.agents/project-profile.yaml is valid');
-        } else {
-          addCheck('Profile', 'FAIL', 'Profile validation errors found', 'Run: python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .');
-        }
-      } catch (e) {
-        addCheck('Profile', 'FAIL', `Could not run profile validator: ${e.message}`, 'Check Python configuration.');
-      }
+    let schemaVersion = null;
+    try {
+      const pText = fs.readFileSync(profilePath, 'utf8');
+      const m = pText.match(/^schema_version:\s*(\d+)/m);
+      if (m) schemaVersion = parseInt(m[1], 10);
+    } catch (e) {}
+
+    if (schemaVersion !== null && !SUPPORTED_SCHEMA_VERSIONS.includes(schemaVersion)) {
+      addCheck('Profile', 'FAIL', `Unsupported schema_version ${schemaVersion} in profile (supported: ${SUPPORTED_SCHEMA_VERSIONS.join(', ')})`, 'Run: python3 .agents/skills/project-bootstrap/scripts/migrate_profile.py apply --apply');
     } else {
-      addCheck('Profile', 'OK', '.agents/project-profile.yaml exists');
+      let valScript = path.join(cwd, '.agents', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
+      if (!fs.existsSync(valScript)) {
+        valScript = path.join(__dirname, '..', 'skills', 'project-bootstrap', 'scripts', 'validate_profile.py');
+      }
+      if (python && fs.existsSync(valScript)) {
+        try {
+          const resVal = spawnSync(python.cmd, [...python.args, valScript, '--profile', profilePath, '--root', cwd], {
+            encoding: 'utf8',
+            timeout: 10000
+          });
+          if (resVal.status === 0) {
+            addCheck('Profile', 'OK', `.agents/project-profile.yaml is valid (schema_version ${schemaVersion || 2})`);
+          } else {
+            addCheck('Profile', 'FAIL', 'Profile validation errors found', 'Run: python3 .agents/skills/project-bootstrap/scripts/validate_profile.py --profile .agents/project-profile.yaml --root .');
+          }
+        } catch (e) {
+          addCheck('Profile', 'FAIL', `Could not run profile validator: ${e.message}`, 'Check Python configuration.');
+        }
+      } else {
+        addCheck('Profile', 'OK', '.agents/project-profile.yaml exists');
+      }
     }
   }
 
@@ -1249,9 +1399,23 @@ function updateCommand(cwd, options = {}) {
         }
       }
     }
-    for (const name of skillsToRestore) {
-      fs.cpSync(path.join(packageSkillsDir, name), path.join(targetSkillsDir, name), { recursive: true, force: true });
-      console.log(`  restored skill: ${name}`);
+    if (skillsToRestore.length > 0) {
+      const workDir = path.join(cwd, '.agents', 'work');
+      fs.mkdirSync(workDir, { recursive: true });
+      for (const name of skillsToRestore) {
+        const targetSkillDir = path.join(targetSkillsDir, name);
+        const pkgSkillDir = path.join(packageSkillsDir, name);
+        if (fs.existsSync(targetSkillDir)) {
+          const pDiff = generateSkillPatch(pkgSkillDir, targetSkillDir, name);
+          if (pDiff) {
+            const patchFile = path.join(workDir, `overwritten-${name}.patch`);
+            fs.writeFileSync(patchFile, pDiff, 'utf8');
+            console.log(`  saved patch: .agents/work/overwritten-${name}.patch`);
+          }
+        }
+        fs.cpSync(pkgSkillDir, targetSkillDir, { recursive: true, force: true });
+        console.log(`  restored skill: ${name}`);
+      }
     }
 
     // Install missing core tier skills
@@ -1262,11 +1426,18 @@ function updateCommand(cwd, options = {}) {
       }
     }
 
-    // Write lock file
+    // Write lock file from package expected integrity hashes
     const allInstalledPkgSkills = new Set(
       fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
     );
-    const newManifest = computeSkillsManifest(targetSkillsDir, allInstalledPkgSkills);
+    const newManifest = {};
+    for (const skillName of allInstalledPkgSkills) {
+      for (const [relFile, hash] of Object.entries(integrity)) {
+        if (relFile.startsWith(`skills/${skillName}/`)) {
+          newManifest[relFile] = hash;
+        }
+      }
+    }
     newManifest['_version'] = pkgVersion;
     fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
     console.log(`Adopt complete: .agents/build-forge.lock.json written with version ${pkgVersion}.`);
@@ -1435,17 +1606,38 @@ function updateCommand(cwd, options = {}) {
     console.log(`  installed missing core skill: ${coreSkill}`);
   }
 
-  // 2. Reinstall differing pipeline skills
-  for (const name of differingSkills) {
-    fs.cpSync(path.join(packageSkillsDir, name), path.join(targetSkillsDir, name), { recursive: true, force: true });
-    console.log(`  updated skill: ${name}`);
+  // 2. Reinstall differing pipeline skills (saving patch first)
+  if (differingSkills.length > 0) {
+    const workDir = path.join(cwd, '.agents', 'work');
+    fs.mkdirSync(workDir, { recursive: true });
+    for (const name of differingSkills) {
+      const targetSkillDir = path.join(targetSkillsDir, name);
+      const pkgSkillDir = path.join(packageSkillsDir, name);
+      if (fs.existsSync(targetSkillDir)) {
+        const pDiff = generateSkillPatch(pkgSkillDir, targetSkillDir, name);
+        if (pDiff) {
+          const patchFile = path.join(workDir, `overwritten-${name}.patch`);
+          fs.writeFileSync(patchFile, pDiff, 'utf8');
+          console.log(`  saved patch: .agents/work/overwritten-${name}.patch`);
+        }
+      }
+      fs.cpSync(pkgSkillDir, targetSkillDir, { recursive: true, force: true });
+      console.log(`  updated skill: ${name}`);
+    }
   }
 
-  // 3. Update lockfile
+  // 3. Update lockfile: keep package integrity hashes for installed skills
   const allInstalledPkgSkills = new Set(
     fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
   );
-  const newManifest = computeSkillsManifest(targetSkillsDir, allInstalledPkgSkills);
+  const newManifest = {};
+  for (const skillName of allInstalledPkgSkills) {
+    for (const [relFile, hash] of Object.entries(integrity)) {
+      if (relFile.startsWith(`skills/${skillName}/`)) {
+        newManifest[relFile] = hash;
+      }
+    }
+  }
   newManifest['_version'] = pkgVersion;
   fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
   console.log(`Build Forge: Updated pipeline skills and lockfile to version ${pkgVersion}.`);
@@ -1598,11 +1790,11 @@ function listCommand(cwd) {
 
 function main() {
   const args = process.argv.slice(2);
-  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore } = parseArgs(args);
+  const { command, positional, force, agentsArg, json, dryRun, adopt, yes, keepModified, restore, patch, noGitignore } = parseArgs(args);
   const cwd = process.cwd();
 
   if (command === 'install') {
-    installCommand(cwd, force, agentsArg);
+    installCommand(cwd, { force, agentsArg, noGitignore });
   } else if (command === 'link') {
     linkCommand(cwd, agentsArg);
   } else if (command === 'unlink') {
@@ -1612,7 +1804,7 @@ function main() {
   } else if (command === 'status') {
     statusCommand(cwd);
   } else if (command === 'diff') {
-    diffCommand(cwd);
+    diffCommand(cwd, { patch });
   } else if (command === 'doctor') {
     doctorCommand(cwd, json);
   } else if (command === 'outdated') {

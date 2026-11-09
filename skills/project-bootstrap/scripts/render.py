@@ -758,7 +758,7 @@ def main():
             disk_text = normalize_lf(dest.read_text(encoding="utf-8"))
             m = STAMP_RE.search(disk_text)
             if not m:
-                refused.append((dest, "unstamped file exists"))
+                # Unstamped files are processed per file and skipped with exit code 3 during --update
                 continue
 
             stamp_hash = m.group(1)
@@ -819,6 +819,14 @@ def main():
 
         if not stamp_m:
             # Unstamped file
+            has_old_banner = bool(OLD_BANNER_RE.search(disk_text))
+            rec_msg = "use --upgrade-unstamped to upgrade" if has_old_banner else "use --migrate-custom to wrap in legacy block"
+
+            if a.update and not a.upgrade_unstamped and not a.migrate_custom and not a.force:
+                skipped.append((dest, f"unstamped file exists; {rec_msg}"))
+                print(f"SKIPPED {rel_label} (unstamped; {rec_msg})")
+                continue
+
             if a.upgrade_unstamped:
                 if not OLD_BANNER_RE.search(disk_text):
                     skipped.append((dest, "unstamped file has no old generator banner"))
@@ -904,12 +912,17 @@ def main():
                 continue
 
             elif a.force and a.overwrite_unstamped:
-                if a.discard_edits and a.yes_discard:
-                    discarded = disk_text.splitlines()
-                    if discarded:
-                        print(f"DISCARDED {len(discarded)} line(s) from {rel_label}:")
-                        for d in discarded:
-                            print(f"  - {d}")
+                if not (a.discard_edits and a.yes_discard):
+                    refused.append((dest, "overwriting unstamped content requires --discard-edits and --yes-discard"))
+                    print(f"REFUSED {rel_label} (overwriting unstamped content requires --discard-edits and --yes-discard)")
+                    continue
+
+                discarded = disk_text.splitlines()
+                discarded_count = len(discarded)
+                if discarded:
+                    print(f"DISCARDED {discarded_count} line(s) from {rel_label}:")
+                    for d in discarded:
+                        print(f"  - {d}")
                 body_hash = compute_body_hash(raw_tmpl)
                 final_content = stamp_text(raw_tmpl, body_hash)
                 if not a.dry_run:
@@ -929,8 +942,10 @@ def main():
                 continue
 
             else:
-                skipped.append((dest, "unstamped file exists; use --migrate-custom to wrap in legacy block"))
-                print(f"SKIPPED {rel_label} (unstamped; use --migrate-custom to wrap in legacy block)")
+                has_banner = bool(OLD_BANNER_RE.search(disk_text))
+                rec = "use --upgrade-unstamped to upgrade" if has_banner else "use --migrate-custom to wrap in legacy block"
+                skipped.append((dest, f"unstamped file exists; {rec}"))
+                print(f"SKIPPED {rel_label} (unstamped; {rec})")
                 continue
 
         # Stamped file
@@ -1073,6 +1088,12 @@ def main():
             print(f"    - {rel_posix(s, root)} ({reason})")
     else:
         print("  skipped:   none")
+
+    if refused:
+        sys.exit(1)
+
+    if a.update and skipped:
+        sys.exit(3)
 
 
 if __name__ == "__main__":

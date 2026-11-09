@@ -341,11 +341,78 @@ class TestBlueprintsValidation(unittest.TestCase):
         self.assertIn("Do not store lists of keys or tokens", res.stdout + res.stderr)
 
 
+class TestSupportedSchemaVersionsAndMigration(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="bf-test-schema-")
+        self.root = Path(self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_supported_schema_versions_constant_and_migration_pipeline(self):
+        """D2: validator, migrate_profile, and doctor use SUPPORTED_SCHEMA_VERSIONS; every migration targets supported version."""
+        # 1. Check validate_profile exports SUPPORTED_SCHEMA_VERSIONS
+        import importlib.util
+        spec_val = importlib.util.spec_from_file_location("validate_profile", str(VAL_PY))
+        mod_val = importlib.util.module_from_spec(spec_val)
+        spec_val.loader.exec_module(mod_val)
+        self.assertTrue(hasattr(mod_val, "SUPPORTED_SCHEMA_VERSIONS"), "validate_profile missing SUPPORTED_SCHEMA_VERSIONS")
+        self.assertEqual(tuple(mod_val.SUPPORTED_SCHEMA_VERSIONS), (1, 2))
+
+        # 2. Check migrate_profile exports SUPPORTED_SCHEMA_VERSIONS
+        mig_py = REPO_ROOT / "skills" / "project-bootstrap" / "scripts" / "migrate_profile.py"
+        spec_mig = importlib.util.spec_from_file_location("migrate_profile", str(mig_py))
+        mod_mig = importlib.util.module_from_spec(spec_mig)
+        spec_mig.loader.exec_module(mod_mig)
+        self.assertTrue(hasattr(mod_mig, "SUPPORTED_SCHEMA_VERSIONS"), "migrate_profile missing SUPPORTED_SCHEMA_VERSIONS")
+        self.assertEqual(tuple(mod_mig.SUPPORTED_SCHEMA_VERSIONS), (1, 2))
+
+        # 3. Apply every migration to a fixture profile starting at schema_version 1
+        prof_path = self.root / ".agents" / "project-profile.yaml"
+        prof_path.parent.mkdir(parents=True, exist_ok=True)
+        prof_path.write_text(BASE_PROFILE, encoding="utf-8")
+
+        # Run migrate apply --apply
+        res_mig = subprocess.run(
+            [sys.executable, str(mig_py), "apply", "--profile", str(prof_path), "--root", str(self.root), "--apply"],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res_mig.returncode, 0, res_mig.stderr)
+
+        # 4. Resulting profile must be at supported schema version
+        try:
+            import yaml
+            migrated_data = yaml.safe_load(prof_path.read_text(encoding="utf-8"))
+        except ImportError:
+            migrated_data = {}
+        target_v = migrated_data.get("schema_version")
+        self.assertIn(target_v, mod_mig.SUPPORTED_SCHEMA_VERSIONS)
+
+        # 5. Run validator on migrated profile
+        res_val = subprocess.run(
+            [sys.executable, str(VAL_PY), "--profile", str(prof_path), "--root", str(self.root)],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res_val.returncode, 0, f"Validator failed on migrated profile:\n{res_val.stdout}\n{res_val.stderr}")
+
+        # 6. Run doctor on the project and verify profile schema check
+        cli_js = REPO_ROOT / "bin" / "build-forge.js"
+        # Seed minimal lockfile so doctor lock check doesn't fail
+        lock_file = self.root / ".agents" / "build-forge.lock.json"
+        lock_file.write_text(json.dumps({"_version": "0.1.0"}), encoding="utf-8")
+        res_doc = subprocess.run(["node", str(cli_js), "doctor"], cwd=str(self.root), capture_output=True, text=True)
+        self.assertIn("Profile", res_doc.stdout)
+        self.assertNotIn("Unsupported schema_version", res_doc.stdout)
+
+
 def run_all_validation_scope_tests():
     suite = unittest.TestSuite()
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestValidateProfileScopes))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestProfileGlobsAndBootstrap))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestBlueprintsValidation))
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestSupportedSchemaVersionsAndMigration))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     if not result.wasSuccessful():

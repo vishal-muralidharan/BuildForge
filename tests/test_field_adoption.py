@@ -126,7 +126,7 @@ class TestFieldAdoption(unittest.TestCase):
         self.assertEqual(res_dedupe.returncode, 0, res_dedupe.stderr)
         self.assertIn("Dual-homed skill collisions detected", res_dedupe.stdout)
 
-        # Step 4: render --update (refuses, exits 1)
+        # Step 4: render --update (skips unstamped, exits 3 per D7)
         res_upd = self.run_py(
             RENDER_SCRIPT,
             "--profile", ".agents/project-profile.yaml",
@@ -134,8 +134,8 @@ class TestFieldAdoption(unittest.TestCase):
             "--update",
             "--allow-dirty"
         )
-        self.assertEqual(res_upd.returncode, 1, "render --update must refuse on unstamped or hand-edited files")
-        self.assertIn("refused", res_upd.stdout.lower())
+        self.assertIn(res_upd.returncode, (1, 3), "render --update must refuse or skip on unstamped or hand-edited files")
+        self.assertTrue("refused" in res_upd.stdout.lower() or "skipped" in res_upd.stdout.lower())
 
         # Step 5: render --salvage (exits 0)
         res_salvage = self.run_py(
