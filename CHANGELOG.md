@@ -6,6 +6,13 @@ All notable changes to Build Forge will be documented in this file.
 
 ### Upgrading
 - Safe, integrity-verified update workflow via `build-forge update`: hash verification against packaged `integrity.json`, pre-update modification guard with `--keep-modified` and `--restore`, core tier skill installation (`project-blueprints`), `--adopt` for adoption without lock files, and upgrade action reporting.
+- Package integrity lock verification: locks are always generated from packaged `integrity.json` rather than disk files, ensuring kept or tampered skills are accurately reported as modified during verification.
+- Offline integrity script `skills/project-bootstrap/scripts/verify_integrity.py` for headless verification against `build-forge.lock.json`.
+- Per-file `render --update` execution exiting with code 3 when unstamped files are skipped, and recommending `--upgrade-unstamped` for old generator banner files.
+- Safe overwrite protections requiring `--discard-edits` and `--yes-discard` together before overwriting unstamped content, with discarded line counts and dirty tree safety.
+- Pre-overwrite patch archival saving unified diffs to `.agents/work/overwritten-<skill>.patch` on `update --restore`, and patch export via `build-forge diff --patch`.
+- Consistent `SUPPORTED_SCHEMA_VERSIONS` constant across profile validation, migrations, doctor checks, and schema documentation.
+- Non-destructive `.gitignore` configuration supporting `--no-gitignore`.
 - Upgrade guide `UPGRADING.md` documenting step by step upgrade workflows across versions, and machine-readable actions in `upgrade-notes.json`.
 - CLI command `upgrade done <action-id>` for recording completed upgrade actions in `.agents/upgrade-state.json`, `add <skill>` for installing optional skills, and `list` for browsing skills by tier.
 - Unstamped convention skill upgrade in `render.py --upgrade-unstamped` upgrading 0.1.0 unstamped files carrying old generator banners to stamped templates while preserving custom blocks and salvaging non-generated lines into `salvaged` blocks.
