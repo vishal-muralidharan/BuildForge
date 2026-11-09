@@ -939,6 +939,16 @@ def run_update_tests(repo_root, errors):
             errors.append(f"Safe update test failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_vet_tests(repo_root, errors):
+    test_path = os.path.join(repo_root, "tests", "test_vet.py")
+    if os.path.isfile(test_path):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", "-m", "unittest", "tests/test_vet.py"], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Vetting scanner tests failed:\n{res.stderr or res.stdout}".strip())
+
+
 def run_docs_truth_check(repo_root, errors):
     script_path = os.path.join(repo_root, "scripts", "check_docs_truth.py")
     if os.path.isfile(script_path):
@@ -984,6 +994,9 @@ def main():
 
     print("Running references system tests...")
     run_references_tests(repo_root, errors)
+
+    print("Running vetting scanner tests...")
+    run_vet_tests(repo_root, errors)
 
     print("Running legacy parity importer fixture tests...")
     run_legacy_parity_fixture_tests(repo_root, errors)

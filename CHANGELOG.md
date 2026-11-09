@@ -4,6 +4,14 @@ All notable changes to Build Forge will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+- Updated third party skill vetting tool `refs.py vet` in `skills/extend-pipeline`:
+  - New three-tier severity model: HIGH (exit code 1) for script extensions, shebang lines, executable permissions, zero-width and bidirectional unicode characters, instruction override phrases, and HTML comments containing instruction-like words or imperative verbs; MEDIUM for in-code install and download commands (`npx`, `npm install`, `pip install`, `curl | sh`), credential commands, outside path escapes, and network calls; LOW for informational prose keywords (`fetch`, `requests`, `token`, `socket`, `secret`, `password`) and placeholder comments (`<!-- e.g. ... -->`).
+  - Output formatting prints summary counts per file, every HIGH and MEDIUM finding in full, and LOW findings collapsed into 1 count per file by default, with `--all` to expand and `--json` for machine-readable output.
+  - Exact 1-based line numbers matching file lines.
+  - Markdown-aware scanner distinguishing frontmatter, fenced code blocks, inline code, and prose.
+  - Vetting summary printed at approval time during `refs.py add`, emphasizing review of HIGH and MEDIUM findings.
+
 ### Upgrading
 - Safe, integrity-verified update workflow via `build-forge update`: hash verification against packaged `integrity.json`, pre-update modification guard with `--keep-modified` and `--restore`, core tier skill installation (`project-blueprints`), `--adopt` for adoption without lock files, and upgrade action reporting.
 - Package integrity lock verification: locks are always generated from packaged `integrity.json` rather than disk files, ensuring kept or tampered skills are accurately reported as modified during verification.

@@ -2,7 +2,7 @@
   {
     "version": "0.2.0",
     "since": "0.1.0",
-    "notes": "Build Forge 0.2.0 introduces project blueprints, curated rule packs, integrity-verified updates, and opt-in local branch workflows. Branch workflows are opt-in via git.workflow in project-profile.yaml; no action is required for existing projects.",
+    "notes": "Build Forge 0.2.0 introduces project blueprints, curated rule packs, integrity-verified updates, and opt-in local branch workflows. Branch workflows are opt-in via git.workflow in project-profile.yaml; no action is required for existing projects. Vetting scan output now separates findings into HIGH, MEDIUM, and LOW severities with reduced prose noise.",
     "actions": [
       {
         "id": "profile-migrate",

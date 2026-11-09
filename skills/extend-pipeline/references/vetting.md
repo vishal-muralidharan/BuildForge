@@ -40,10 +40,15 @@ The `vet` command checks for 9 categories of risks:
 The scanner reports findings grouped by file and severity:
 
 - **HIGH severity:**
-  Indicates an active threat vector (for example, network calls, hidden unicode, or prompt injection). The `vet` command exits with code 1 if any high-severity finding is present. Do not install skills with high findings unless you have personally verified every line of code.
+  Indicates an active threat vector (script files by extension, shebang lines, executable permissions, zero-width or bidirectional unicode, instruction overrides, or HTML comments containing instruction words). The `vet` command exits with code 1 if any high-severity finding is present. Do not install skills with high findings unless you have personally verified every line of code.
 
 - **MEDIUM severity:**
-  Indicates items that require human review, such as HTML comments or informational script listings.
+  Indicates items that require human review, such as installation commands in code blocks, credential commands, paths outside the project boundary, or network calls inside code blocks.
+
+- **LOW severity (informational):**
+  Indicates informational findings such as prose keyword occurrences or placeholder HTML comments starting with `e.g.`. In standard output, LOW findings are collapsed into a count per file; use `--all` to display every finding in full.
+
+Exit code is 1 only when a HIGH finding exists. If only MEDIUM and LOW findings exist, the scanner exits with 0.
 
 ## Safety limit
 
