@@ -14,6 +14,9 @@ Checks:
   8. Custom blocks do not exceed line limits.
   9. Orphan custom blocks in .agents/custom-orphans.md.
   10. Project rule runner version against package runner.
+  11. Blueprint drift check.
+  12. Check enforcement claims.
+  13. Branch workflow state file validity.
 
 Exit 1 on errors. Warnings are advice. Needs PyYAML (pip install pyyaml).
 """
@@ -345,6 +348,20 @@ def main():
                         pass
             if not (has_check or has_ref or is_design_covered):
                 warnings.append(f"claim-unverified: rule {rid} claims {enforced} enforcement without check or enforced_by_ref")
+
+    # 13. Check branch workflow state file
+    state_file = root / ".agents" / "work" / "branch-state.json"
+    if state_file.is_file():
+        try:
+            sdata = json.loads(state_file.read_text(encoding="utf-8"))
+            sbranch = sdata.get("branch")
+            if sbranch and (root / ".git").exists():
+                res_b = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", f"refs/heads/{sbranch}"],
+                                       capture_output=True, text=True)
+                if res_b.returncode != 0:
+                    warnings.append(f"branch state file records branch '{sbranch}' which no longer exists in git")
+        except Exception:
+            warnings.append("corrupted branch state file in .agents/work/branch-state.json")
 
     for w in sorted(set(warnings)):
         print(f"WARN  {w}")

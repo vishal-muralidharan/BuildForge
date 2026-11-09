@@ -1183,6 +1183,101 @@ function doctorCommand(cwd, isJson) {
     }
   }
 
+  // 16. Branch workflow (stale state, merged uncleaned branches, missing default branch)
+  if (fs.existsSync(path.join(cwd, '.git'))) {
+    // A. Default branch
+    let defBranch = 'main';
+    if (fs.existsSync(profilePath)) {
+      try {
+        const pText = fs.readFileSync(profilePath, 'utf8');
+        const m = pText.match(/^\s*default_branch:\s*([a-zA-Z0-9_.-]+)/m);
+        if (m) {
+          defBranch = m[1].trim();
+        }
+      } catch (e) {}
+    }
+    const resDefChk = spawnSync('git', ['rev-parse', '--verify', `refs/heads/${defBranch}`], {
+      cwd, encoding: 'utf8', timeout: 5000
+    });
+    if (resDefChk.status !== 0) {
+      const resRemChk = spawnSync('git', ['rev-parse', '--verify', `refs/remotes/origin/${defBranch}`], {
+        cwd, encoding: 'utf8', timeout: 5000
+      });
+      if (resRemChk.status !== 0) {
+        addCheck(
+          'Default branch',
+          'WARN',
+          `Default branch '${defBranch}' does not exist locally or on remote`,
+          'Set git.workflow.default_branch in .agents/project-profile.yaml to your active branch'
+        );
+      } else {
+        addCheck('Default branch', 'OK', `Default branch '${defBranch}' verified on remote`);
+      }
+    } else {
+      addCheck('Default branch', 'OK', `Default branch '${defBranch}' verified`);
+    }
+
+    // B. Stale state files
+    const bStatePath = path.join(cwd, '.agents', 'work', 'branch-state.json');
+    if (fs.existsSync(bStatePath)) {
+      let bState = null;
+      try { bState = JSON.parse(fs.readFileSync(bStatePath, 'utf8')); } catch (e) {}
+      if (!bState || typeof bState !== 'object') {
+        addCheck(
+          'Branch state',
+          'WARN',
+          'Corrupted branch state file in .agents/work/branch-state.json',
+          'Delete .agents/work/branch-state.json or run branchflow cleanup'
+        );
+      } else if (bState.branch) {
+        const resBranchChk = spawnSync('git', ['rev-parse', '--verify', `refs/heads/${bState.branch}`], {
+          cwd, encoding: 'utf8', timeout: 5000
+        });
+        if (resBranchChk.status !== 0) {
+          addCheck(
+            'Branch state',
+            'WARN',
+            `Stale branch state file: branch '${bState.branch}' no longer exists in git`,
+            'Run: python3 .agents/skills/feature-delivery/scripts/branchflow.py cleanup or remove .agents/work/branch-state.json'
+          );
+        } else if (bState.status === 'cleaned' || bState.status === 'abandoned') {
+          addCheck(
+            'Branch state',
+            'WARN',
+            `Inactive branch state file (status: ${bState.status})`,
+            'Remove .agents/work/branch-state.json'
+          );
+        } else {
+          addCheck('Branch state', 'OK', `Active task branch '${bState.branch}' (${bState.status})`);
+        }
+      }
+    } else {
+      addCheck('Branch state', 'OK', 'No active or stale branch state file');
+    }
+
+    // C. Merged but uncleaned local branches
+    try {
+      const resMerged = spawnSync('git', ['branch', '--merged', defBranch], {
+        cwd, encoding: 'utf8', timeout: 5000
+      });
+      if (resMerged.status === 0) {
+        const mergedLines = (resMerged.stdout || '').split('\n')
+          .map(l => l.replace('*', '').trim())
+          .filter(b => b && b !== defBranch && b !== 'main' && b !== 'master' && !b.startsWith('(HEAD'));
+        if (mergedLines.length > 0) {
+          addCheck(
+            'Merged branches',
+            'WARN',
+            `${mergedLines.length} merged local branch(es) not cleaned up: ${mergedLines.join(', ')}`,
+            'Run: git branch -d <branch> or python3 .agents/skills/feature-delivery/scripts/branchflow.py cleanup'
+          );
+        } else {
+          addCheck('Merged branches', 'OK', 'No uncleaned merged branches');
+        }
+      }
+    } catch (e) {}
+  }
+
   const okCount = checks.filter(c => c.status === 'OK').length;
   const warnCount = checks.filter(c => c.status === 'WARN').length;
   const failCount = checks.filter(c => c.status === 'FAIL').length;

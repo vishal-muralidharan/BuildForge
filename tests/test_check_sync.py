@@ -299,6 +299,27 @@ Here is an architectural metrics table:
         errs_comment = check_source(good_with_comment)
         self.assertEqual(len(errs_comment), 0)
 
+    def test_08_branch_state_file_warning(self):
+        """check_sync warns when branch-state.json records a branch that no longer exists in git."""
+        import json
+        import yaml
+        # Write base profile
+        self.profile_path.write_text(yaml.dump(self.base_profile), encoding="utf-8")
+
+        # Initialize a git repo inside self.root
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(self.root), check=True)
+        (self.root / "README.md").write_text("test", encoding="utf-8")
+        subprocess.run(["git", "add", "README.md"], cwd=str(self.root), check=True)
+        subprocess.run(["git", "commit", "-m", "chore: init"], cwd=str(self.root), check=True)
+
+        # Write branch-state.json with a non-existent branch
+        (self.root / ".agents" / "work").mkdir(parents=True, exist_ok=True)
+        state_data = {"branch": "feat/ghost-branch", "status": "started"}
+        (self.root / ".agents" / "work" / "branch-state.json").write_text(json.dumps(state_data), encoding="utf-8")
+
+        res = self.run_check_sync()
+        self.assertIn("branch state file records branch 'feat/ghost-branch' which no longer exists", res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
