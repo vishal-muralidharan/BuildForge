@@ -324,6 +324,58 @@ class TestSafeUpdate(unittest.TestCase):
             if not k.startswith("_") and k != "version":
                 self.assertTrue(k.startswith("skills/"), f"Unexpected key format: {k}")
 
+    def test_10_d1_lock_from_packaged_integrity_and_key_schema_agreement(self):
+        """D1: Lock must always be packaged integrity.json, never disk hashes; kept skill shows modified in verify."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            # Pre-seed a tampered skill
+            tampered_skill = p / ".agents" / "skills" / "repo-search"
+            tampered_skill.mkdir(parents=True, exist_ok=True)
+            (tampered_skill / "SKILL.md").write_text("# Locally modified repo search\n", encoding="utf-8")
+
+            # Run plain install
+            res_inst = run_node(["install"], p)
+            self.assertEqual(res_inst.returncode, 0)
+
+            # Read packaged integrity.json
+            pkg_integrity = json.loads((REPO_ROOT / "integrity.json").read_text(encoding="utf-8"))
+
+            # Read generated lock file
+            lock_file = p / ".agents" / "build-forge.lock.json"
+            self.assertTrue(lock_file.is_file())
+            lock_data = json.loads(lock_file.read_text(encoding="utf-8"))
+
+            # 1. Key schema comparison
+            for k in lock_data:
+                if k.startswith("_") or k == "version":
+                    continue
+                self.assertTrue(k.startswith("skills/"), f"Key does not match schema: {k}")
+                self.assertIn(k, pkg_integrity, f"Key not in package integrity: {k}")
+
+            # 2. Lock MUST contain package hash for tampered file, NOT disk hash
+            tampered_key = "skills/repo-search/SKILL.md"
+            self.assertIn(tampered_key, lock_data)
+            self.assertEqual(
+                lock_data[tampered_key],
+                pkg_integrity[tampered_key],
+                "Lockfile contains disk hash instead of package integrity hash!"
+            )
+
+            # 3. Node verify must flag the kept skill as modified
+            res_node_verify = run_node(["verify"], p)
+            self.assertNotEqual(res_node_verify.returncode, 0, "Node verify did not flag modified skill")
+
+            # 4. verify_integrity.py must flag the kept skill as modified
+            verify_script = REPO_ROOT / "skills" / "project-bootstrap" / "scripts" / "verify_integrity.py"
+            self.assertTrue(verify_script.is_file(), "verify_integrity.py does not exist")
+            res_py_verify = subprocess.run(
+                ["python3", str(verify_script), "--root", str(p)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(res_py_verify.returncode, 1, "verify_integrity.py did not flag modified skill")
+
 
 def main():
     unittest.main()

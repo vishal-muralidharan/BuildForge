@@ -185,11 +185,21 @@ function installCommand(cwd, force, agentsArg) {
     added.push(name);
   }
 
-  // Write lockfile scoped strictly to package pipeline skills
-  const packageSkills = new Set(
-    fs.readdirSync(packageSkillsDir).filter(name => fs.statSync(path.join(packageSkillsDir, name)).isDirectory())
-  );
-  const manifest = computeSkillsManifest(targetSkillsDir, packageSkills);
+  // Write lockfile scoped strictly to package pipeline skills from packaged integrity.json
+  const integrityPath = path.join(__dirname, '..', 'integrity.json');
+  let integrity = {};
+  if (fs.existsSync(integrityPath)) {
+    try { integrity = JSON.parse(fs.readFileSync(integrityPath, 'utf8')); } catch (e) {}
+  }
+  const manifest = {};
+  const allInstalledPkgSkills = new Set([...added, ...kept]);
+  for (const skillName of allInstalledPkgSkills) {
+    for (const [relFile, hash] of Object.entries(integrity)) {
+      if (relFile.startsWith(`skills/${skillName}/`)) {
+        manifest[relFile] = hash;
+      }
+    }
+  }
   let pkgVersion = '0.1.0';
   try {
     const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
@@ -1262,11 +1272,18 @@ function updateCommand(cwd, options = {}) {
       }
     }
 
-    // Write lock file
+    // Write lock file from package expected integrity hashes
     const allInstalledPkgSkills = new Set(
       fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
     );
-    const newManifest = computeSkillsManifest(targetSkillsDir, allInstalledPkgSkills);
+    const newManifest = {};
+    for (const skillName of allInstalledPkgSkills) {
+      for (const [relFile, hash] of Object.entries(integrity)) {
+        if (relFile.startsWith(`skills/${skillName}/`)) {
+          newManifest[relFile] = hash;
+        }
+      }
+    }
     newManifest['_version'] = pkgVersion;
     fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
     console.log(`Adopt complete: .agents/build-forge.lock.json written with version ${pkgVersion}.`);

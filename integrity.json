@@ -59,6 +59,7 @@
   "skills/project-bootstrap/scripts/packs.py": "430549e6fe53feef780253b6f055db94f838560e168c049c28b0bb3bde4abd02",
   "skills/project-bootstrap/scripts/render.py": "c9dca46916b05e81e26774775c52f03fdbb0aac03a28a7657fd5955fe4d81d5d",
   "skills/project-bootstrap/scripts/validate_profile.py": "f5c992944e208114490517209e4002392656c56c3eda3661a6a1ae63cb136ab5",
+  "skills/project-bootstrap/scripts/verify_integrity.py": "339f43e05a660efd1fa2bb5871a59e29baf34123fdf29faa90c60715afe9efee",
   "skills/repo-search/SKILL.md": "3bb91666a623b91e3dc78c07302b633010013936d65f17ff54ef60b5994300cf",
   "skills/rules-to-tests/SKILL.md": "03dc967a3745d8c3e4136626e6bd4c36bafc59c39925226f3f48e165e8891639",
   "skills/rules-to-tests/assets/packs/web-hazards.yaml": "17b411b4f9efc8df50992c72ee4d07bcf40a7a9fbf5c7832ffd8c92490bf8099",
