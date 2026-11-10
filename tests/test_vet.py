@@ -319,5 +319,65 @@ class TestVettingScanner(unittest.TestCase):
         self.assertIn("Approval focuses on reviewing HIGH and MEDIUM findings.", res.stdout)
 
 
+class TestRefsVerifyVendorInGit(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="bf-test-refs-verify-"))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_verify_warns_when_vendor_in_git_false(self):
+        agents_dir = self.tmp / ".agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        ref_yaml = agents_dir / "references.yaml"
+        ref_yaml.write_text(
+            "schema_version: 1\n"
+            "vendor_in_git: false\n"
+            "references:\n"
+            "  - name: test-skill\n"
+            "    status: installed\n"
+            "    path: .agents/vendor/test-skill\n",
+            encoding="utf-8"
+        )
+        lock_json = agents_dir / "references.lock.json"
+        lock_json.write_text(
+            json.dumps({"test-skill": {"files": {"SKILL.md": "abc"}}}) + "\n",
+            encoding="utf-8"
+        )
+        res = subprocess.run(
+            [sys.executable, str(REFS_PY), "verify", "--root", str(self.tmp)],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0, f"Expected 0 but failed:\n{res.stdout}\n{res.stderr}")
+        self.assertIn("WARN: Installed directory not found for 'test-skill'", res.stdout)
+
+    def test_verify_fails_when_vendor_in_git_true(self):
+        agents_dir = self.tmp / ".agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        ref_yaml = agents_dir / "references.yaml"
+        ref_yaml.write_text(
+            "schema_version: 1\n"
+            "vendor_in_git: true\n"
+            "references:\n"
+            "  - name: test-skill\n"
+            "    status: installed\n"
+            "    path: .agents/vendor/test-skill\n",
+            encoding="utf-8"
+        )
+        lock_json = agents_dir / "references.lock.json"
+        lock_json.write_text(
+            json.dumps({"test-skill": {"files": {"SKILL.md": "abc"}}}) + "\n",
+            encoding="utf-8"
+        )
+        res = subprocess.run(
+            [sys.executable, str(REFS_PY), "verify", "--root", str(self.tmp)],
+            capture_output=True,
+            text=True
+        )
+        self.assertNotEqual(res.returncode, 0, "Expected error when vendor_in_git is true")
+        self.assertIn("ERROR: Installed directory not found for 'test-skill'", res.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
