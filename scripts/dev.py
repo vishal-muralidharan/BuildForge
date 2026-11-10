@@ -175,27 +175,29 @@ def cmd_check(args, repo_root: Path) -> None:
         print(f"{'check_commits':<20} {'[SKIP]':<10} Shallow clone detected")
         results.append(("check_commits", "SKIP", "Shallow clone detected"))
     else:
-        if check_history_py.is_file():
-            tools.append(("check_history", check_history_py, ["--ref", "HEAD"]))
-        if check_commits_py.is_file():
-            rev_origin = subprocess.run(
-                ["git", "rev-parse", "--verify", "origin/main"],
-                cwd=str(repo_root),
-                capture_output=True,
-                text=True,
-            )
-            base_ref = "origin/main" if rev_origin.returncode == 0 else "main"
-            rev_base = subprocess.run(
-                ["git", "rev-parse", "--verify", base_ref],
-                cwd=str(repo_root),
-                capture_output=True,
-                text=True,
-            )
-            if rev_base.returncode == 0:
+        rev_origin = subprocess.run(
+            ["git", "rev-parse", "--verify", "origin/main"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        base_ref = "origin/main" if rev_origin.returncode == 0 else "main"
+        rev_base = subprocess.run(
+            ["git", "rev-parse", "--verify", base_ref],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        if rev_base.returncode == 0:
+            if check_history_py.is_file():
+                tools.append(("check_history", check_history_py, ["--ref", base_ref]))
+            if check_commits_py.is_file():
                 tools.append(("check_commits", check_commits_py, ["--base", base_ref, "--head", "HEAD"]))
-            else:
-                print(f"{'check_commits':<20} {'[SKIP]':<10} Base ref {base_ref} not available")
-                results.append(("check_commits", "SKIP", f"Base ref {base_ref} not available"))
+        else:
+            print(f"{'check_history':<20} {'[SKIP]':<10} Base ref {base_ref} not available")
+            results.append(("check_history", "SKIP", f"Base ref {base_ref} not available"))
+            print(f"{'check_commits':<20} {'[SKIP]':<10} Base ref {base_ref} not available")
+            results.append(("check_commits", "SKIP", f"Base ref {base_ref} not available"))
 
     any_failed = False
     for label, script_path, extra_args in tools:
