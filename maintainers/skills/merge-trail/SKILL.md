@@ -29,6 +29,13 @@ gh pr create --base main --head <branch-name> --title "<type>(<scope>): <subject
 ```
 
 ### 2. Wait for Green CI
+Run local commit lint and history checks before pushing:
+```bash
+python3 scripts/check_commits.py --base origin/main --head HEAD
+python3 scripts/check_history.py --ref main
+python3 scripts/dev.py repo-settings
+```
+
 Monitor checks until all pass:
 ```bash
 gh pr checks <number> --watch
