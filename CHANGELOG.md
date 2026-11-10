@@ -4,6 +4,13 @@ All notable changes to Build Forge will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Merge trail policy and maintainer playbook `maintainers/skills/merge-trail/SKILL.md` enforcing merge commits on `main`.
+- First-parent git history checker `scripts/check_history.py` and baseline file `maintainers/history-baseline.txt`.
+- Conventional commit message validator `scripts/check_commits.py`.
+- Git merge trail viewer `scripts/dev.py trail` and repository settings auditor `scripts/dev.py repo-settings`.
+- GitHub Actions CI workflow jobs `commit-lint` and `history` enforcing commit messages on pull requests and merge trail on `main`.
+
 ## [0.2.0] - 2026-11-09
 
 ### Security
