@@ -110,13 +110,20 @@ def validate_commit(commit: dict) -> list:
     return errors
 
 
+def get_repo_root() -> Path:
+    cwd = Path.cwd()
+    if (cwd / ".git").exists():
+        return cwd
+    return Path(__file__).resolve().parent.parent
+
+
 def main():
     parser = argparse.ArgumentParser(description="Check conventional commit messages in git range.")
     parser.add_argument("--base", required=True, help="Base git reference")
     parser.add_argument("--head", required=True, help="Head git reference")
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = get_repo_root()
 
     if is_shallow(repo_root):
         print("Notice: shallow repository detected, skipping commit check.")

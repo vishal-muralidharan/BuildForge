@@ -29,6 +29,9 @@ except ImportError:
 
 
 def get_repo_root() -> Path:
+    cwd = Path.cwd()
+    if (cwd / ".git").exists():
+        return cwd
     return Path(__file__).resolve().parent.parent
 
 

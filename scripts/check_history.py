@@ -113,6 +113,13 @@ def check_history(commits: list, baseline_prefixes: set, ref: str) -> bool:
     return True
 
 
+def get_repo_root() -> Path:
+    cwd = Path.cwd()
+    if (cwd / ".git").exists():
+        return cwd
+    return Path(__file__).resolve().parent.parent
+
+
 def main():
     parser = argparse.ArgumentParser(description="Check first-parent history against merge policy.")
     parser.add_argument("--ref", default="main", help="Git ref to check (default: main)")
@@ -120,13 +127,13 @@ def main():
     parser.add_argument("--init-baseline", action="store_true", help="Initialize baseline from existing commits")
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = get_repo_root()
 
     if is_shallow(repo_root):
         print("Notice: shallow repository detected, skipping history check.")
         sys.exit(0)
 
-    baseline_path = repo_root / args.baseline
+    baseline_path = Path(args.baseline) if Path(args.baseline).is_absolute() else repo_root / args.baseline
     commits = get_first_parent_commits(repo_root, args.ref)
 
     if args.init_baseline:
