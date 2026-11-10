@@ -38,7 +38,7 @@ try:
 except ImportError:
     sys.exit("PyYAML is required: pip install pyyaml")
 
-IGNORE = {"node_modules", "dist", "build", ".git", ".next", ".nuxt", "coverage", ".venv",
+IGNORE = {".agents", "node_modules", "dist", "build", ".git", ".next", ".nuxt", "coverage", ".venv",
           "venv", "__pycache__", ".turbo", ".vercel", ".netlify", "target", "out"}
 
 CONVENTION_SKILLS = {

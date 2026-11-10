@@ -322,6 +322,15 @@ Here is an architectural metrics table:
         res = self.run_check_sync()
         self.assertIn("branch state file records branch 'feat/ghost-branch' which no longer exists", res.stdout)
 
+    def test_09_agents_folder_ignored_in_layer_coverage(self):
+        """check_sync ignores .agents folder when scanning for uncovered folders under layer '.'."""
+        import yaml
+        prof = dict(self.base_profile)
+        prof["structure"] = {"layers": [{"name": "root", "path": "."}]}
+        self.profile_path.write_text(yaml.dump(prof), encoding="utf-8")
+        res = self.run_check_sync()
+        self.assertNotIn("folder has files but no layer in the profile: .agents", res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
