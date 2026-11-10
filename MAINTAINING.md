@@ -26,9 +26,35 @@ Follow these steps to publish a new release:
 4. Run `python3 scripts/dev.py check` to ensure all checks pass.
 5. Run `python3 scripts/check_package.py` to verify package contents and clean-room installation.
 6. Run `npm pack --dry-run` and inspect the packaged file list (assert `maintainers/` and `scripts/` are excluded).
-7. Commit the version bump, integrity manifest, and doc updates.
-8. Create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
+7. Commit the version bump, integrity manifest, and doc updates on a task branch. Open a pull request and merge it with a merge commit (`gh pr merge <number> --merge`). A release tag always points at a merge commit on `main`. Never squash or rebase merge.
+8. Switch to `main`, run `git pull --ff-only`, and create and push a git tag `v<version>` (for example, `git tag v0.2.0 && git push origin v0.2.0`).
 9. In GitHub Actions, approve the deployment to the "release" environment so `publish.yml` executes.
+
+## Merge policy
+
+Build Forge enforces a strict merge trail policy to preserve a clear git history:
+
+1. Every change reaches `main` only through a pull request, merged with a merge commit (GitHub "Create a merge commit", or `gh pr merge <number> --merge`). Never squash. Never rebase and merge.
+2. Never push to `main` directly.
+3. One branch per task, named `<type>/<slug>`.
+4. Every commit on a branch is a meaningful unit with a conventional commit subject. No `WIP`, `fixup!`, `squash!`, or "address review" commits. Fix the last unpushed commit with `git commit --amend`. After a push, add new commits with real subjects.
+5. Never merge `main` into a feature branch. If a branch falls behind `main`, ask the maintainer. Agents never rebase or force push.
+6. Keep GitHub's default merge commit message so the trail reads like the existing history.
+7. Dependabot PRs follow the same rules.
+8. History on `main` is never rewritten. Direct commits that predate this policy are listed in `maintainers/history-baseline.txt` with the reason.
+9. A release tag always points at a merge commit on `main`.
+
+### Repository settings
+
+Maintainers must configure GitHub repository settings to enforce this policy:
+- **Merge commits**: On (allowed).
+- **Squash merging**: Off (disabled).
+- **Rebase merging**: Off (disabled).
+- **Require linear history**: Off (disabled so merge commits are permitted).
+- **Enforce on administrators**: On (admin bypass off).
+- **Required status checks**: `CI` and `commit-lint` (note: `commit-lint` becomes a required check after it has run once).
+
+Run `python3 scripts/dev.py repo-settings` to audit live repository settings against these requirements.
 
 ## How to change a skill
 
