@@ -16,6 +16,7 @@ Rules:
 """
 import argparse
 import difflib
+import re
 import sys
 from pathlib import Path
 
@@ -93,42 +94,66 @@ def format_diff(orig_text: str, new_text: str, from_label: str, to_label: str) -
     return "".join(diff)
 
 
+def migrate_text_v1_to_v2(raw_text: str) -> str:
+    lines = raw_text.splitlines(keepends=True)
+    new_lines = []
+    has_schema_version = False
+    has_blueprints = False
+
+    for line in lines:
+        stripped = line.strip()
+        if re.match(r"^schema_version:\s*1\b", stripped):
+            new_line = re.sub(r"^(schema_version:\s*)1\b", r"\g<1>2", line)
+            new_lines.append(new_line)
+            has_schema_version = True
+        else:
+            if re.match(r"^blueprints:\s*", stripped):
+                has_blueprints = True
+            new_lines.append(line)
+
+    if not has_schema_version and not any(re.match(r"^schema_version:\s*", l.strip()) for l in lines):
+        new_lines.insert(0, "schema_version: 2\n")
+
+    result = "".join(new_lines)
+    if not has_blueprints:
+        if not result.endswith("\n"):
+            result += "\n"
+        result += "\nblueprints: {}\n"
+
+    return result
+
+
 def cmd_plan(profile_path: Path, root: Path) -> bool:
     data, raw_text = load_profile(profile_path)
     orig_ver = data.get("schema_version", 1)
-    migrated, applied = run_migrations(data, root)
 
-    if not applied:
-        print(f"Profile is up to date (schema_version {orig_ver}). No migrations needed.")
-        return False
+    if orig_ver == 1:
+        new_text = migrate_text_v1_to_v2(raw_text)
+        target_ver = 2
+        print(f"Migration plan: schema_version {orig_ver} -> {target_ver} (1 step(s))\n")
+        diff_output = format_diff(
+            raw_text,
+            new_text,
+            f"{profile_path.name} (schema_version {orig_ver})",
+            f"{profile_path.name} (schema_version {target_ver})"
+        )
+        if diff_output:
+            print(diff_output)
+        else:
+            print("No textual changes generated.")
+        return True
 
-    new_yaml = yaml.safe_dump(migrated, sort_keys=False, allow_unicode=True)
-    target_ver = migrated.get("schema_version")
-    print(f"Migration plan: schema_version {orig_ver} -> {target_ver} ({len(applied)} step(s))\n")
-
-    diff_output = format_diff(
-        raw_text,
-        new_yaml,
-        f"{profile_path.name} (schema_version {orig_ver})",
-        f"{profile_path.name} (schema_version {target_ver})"
-    )
-    if diff_output:
-        print(diff_output)
-    else:
-        print("No textual changes generated.")
-    return True
+    print(f"Profile is up to date (schema_version {orig_ver}). No migrations needed.")
+    return False
 
 
 def cmd_apply(profile_path: Path, root: Path, do_apply: bool):
     data, raw_text = load_profile(profile_path)
     orig_ver = data.get("schema_version", 1)
-    migrated, applied = run_migrations(data, root)
 
-    if not applied:
+    if orig_ver != 1:
         print(f"Profile is up to date (schema_version {orig_ver}). No migrations needed.")
         return
-
-    target_ver = migrated.get("schema_version")
 
     if not do_apply:
         cmd_plan(profile_path, root)
@@ -136,9 +161,9 @@ def cmd_apply(profile_path: Path, root: Path, do_apply: bool):
         print(f"To apply this migration, run: python3 {Path(__file__).as_posix()} apply --apply")
         return
 
-    new_yaml = yaml.safe_dump(migrated, sort_keys=False, allow_unicode=True)
-    profile_path.write_text(new_yaml, encoding="utf-8")
-    print(f"Successfully migrated {profile_path.name}: schema_version {orig_ver} -> {target_ver}.")
+    new_text = migrate_text_v1_to_v2(raw_text)
+    profile_path.write_text(new_text, encoding="utf-8")
+    print(f"Successfully migrated {profile_path.name}: schema_version {orig_ver} -> 2.")
 
 
 def main():
