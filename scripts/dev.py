@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -28,6 +29,9 @@ except ImportError:
 
 
 def get_repo_root() -> Path:
+    cwd = Path.cwd()
+    if (cwd / ".git").exists():
+        return cwd
     return Path(__file__).resolve().parent.parent
 
 
@@ -148,11 +152,52 @@ def cmd_check(args, repo_root: Path) -> None:
         tools.append(("check_docs_truth", repo_root / "scripts" / "check_docs_truth.py", []))
         tools.append(("check_package", repo_root / "scripts" / "check_package.py", []))
 
+    check_history_py = repo_root / "scripts" / "check_history.py"
+    check_commits_py = repo_root / "scripts" / "check_commits.py"
+
+    shallow_res = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
+    is_shallow = (shallow_res.returncode == 0 and shallow_res.stdout.strip().lower() == "true")
+
     results = []
     print("Running maintainer checks...\n")
     header = f"{'Tool':<20} {'Status':<10} {'Details'}"
     print(header)
     print("-" * 60)
+
+    if is_shallow:
+        print(f"{'check_history':<20} {'[SKIP]':<10} Shallow clone detected")
+        results.append(("check_history", "SKIP", "Shallow clone detected"))
+        print(f"{'check_commits':<20} {'[SKIP]':<10} Shallow clone detected")
+        results.append(("check_commits", "SKIP", "Shallow clone detected"))
+    else:
+        rev_origin = subprocess.run(
+            ["git", "rev-parse", "--verify", "origin/main"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        base_ref = "origin/main" if rev_origin.returncode == 0 else "main"
+        rev_base = subprocess.run(
+            ["git", "rev-parse", "--verify", base_ref],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        if rev_base.returncode == 0:
+            if check_history_py.is_file():
+                tools.append(("check_history", check_history_py, ["--ref", base_ref]))
+            if check_commits_py.is_file():
+                tools.append(("check_commits", check_commits_py, ["--base", base_ref, "--head", "HEAD"]))
+        else:
+            print(f"{'check_history':<20} {'[SKIP]':<10} Base ref {base_ref} not available")
+            results.append(("check_history", "SKIP", f"Base ref {base_ref} not available"))
+            print(f"{'check_commits':<20} {'[SKIP]':<10} Base ref {base_ref} not available")
+            results.append(("check_commits", "SKIP", f"Base ref {base_ref} not available"))
 
     any_failed = False
     for label, script_path, extra_args in tools:
@@ -488,9 +533,10 @@ def cmd_release_plan(args, repo_root: Path) -> None:
     # 2. Commits since last tag
     git_range = f"{last_tag}..HEAD" if last_tag != "none" else "HEAD"
     commits = []
+    prs_merged = 0
     try:
         log_res = subprocess.run(
-            ["git", "log", git_range, "--oneline"],
+            ["git", "log", "--no-merges", git_range, "--oneline"],
             cwd=str(repo_root),
             capture_output=True,
             text=True
@@ -502,11 +548,27 @@ def cmd_release_plan(args, repo_root: Path) -> None:
     except Exception:
         pass
 
+    try:
+        pr_res = subprocess.run(
+            ["git", "log", "--first-parent", "--merges", git_range, "--format=%s"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True
+        )
+        if pr_res.returncode == 0:
+            for line in pr_res.stdout.splitlines():
+                if re.match(r"^Merge pull request #\d+ from ", line.strip()):
+                    prs_merged += 1
+    except Exception:
+        pass
+
     type_counts = {}
     has_breaking = False
     for c in commits:
         parts = c.split(" ", 1)
         subject = parts[1] if len(parts) > 1 else parts[0]
+        if subject.startswith("Merge "):
+            continue
         m = re.match(r"^([a-z]+)(\([^\)]+\))?(!)?:\s*(.*)$", subject)
         if m:
             ctype = m.group(1)
@@ -574,6 +636,7 @@ def cmd_release_plan(args, repo_root: Path) -> None:
 
     print(f"Last tag:                   {last_tag}")
     print(f"Commits since tag:          {len(commits)}")
+    print(f"PRs merged:                 {prs_merged}")
     print(f"Commit types:               {dict(sorted(type_counts.items()))}")
     print(f"Recommended version bump:   {bump} ({reason})")
     print(f"Current package version:    {cur_ver}")
@@ -583,6 +646,190 @@ def cmd_release_plan(args, repo_root: Path) -> None:
     print(f"Git working tree is clean:  {'YES' if tree_clean else 'NO'}")
     print("\nSuggested release command (do not run automatically):")
     print(f"  git tag v{next_ver}")
+
+
+def cmd_trail(args, repo_root: Path) -> None:
+    git_range = f"{args.since}..HEAD" if args.since else "HEAD"
+    cmd = ["git", "log", "--first-parent", "--format=%H|%h|%P|%s", git_range]
+    if args.limit:
+        cmd.extend(["-n", str(args.limit)])
+    res = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True)
+    if res.returncode != 0:
+        sys.exit(f"Error reading git history: {res.stderr.strip()}")
+
+    merges = []
+    for line in res.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("|", 3)
+        if len(parts) < 4:
+            continue
+        full_sha, short_sha, parents_str, subject = parts
+        parents = parents_str.split() if parents_str else []
+
+        if len(parents) == 2:
+            m = re.match(r"^Merge pull request #(\d+) from (.*)$", subject)
+            if m:
+                pr_num = int(m.group(1))
+                source_branch = m.group(2)
+                p1, p2 = parents[0], parents[1]
+                count_res = subprocess.run(
+                    ["git", "rev-list", "--count", f"{p1}..{p2}"],
+                    cwd=str(repo_root),
+                    capture_output=True,
+                    text=True,
+                )
+                commit_count = int(count_res.stdout.strip()) if count_res.returncode == 0 and count_res.stdout.strip().isdigit() else 0
+                files_res = subprocess.run(
+                    ["git", "diff", "--name-only", f"{p1}...{p2}"],
+                    cwd=str(repo_root),
+                    capture_output=True,
+                    text=True,
+                )
+                files = [f for f in files_res.stdout.splitlines() if f.strip()]
+                subjects_res = subprocess.run(
+                    ["git", "log", "--format=%h %s", f"{p1}..{p2}"],
+                    cwd=str(repo_root),
+                    capture_output=True,
+                    text=True,
+                )
+                sub_lines = [sl.strip() for sl in subjects_res.stdout.splitlines() if sl.strip()]
+                merges.append({
+                    "is_pr": True,
+                    "pr_number": pr_num,
+                    "source_branch": source_branch,
+                    "merge_sha": short_sha,
+                    "full_sha": full_sha,
+                    "commit_count": commit_count,
+                    "files_changed": files,
+                    "commit_subjects": sub_lines,
+                })
+                continue
+
+        # Direct commit or non-PR merge
+        files_res = subprocess.run(
+            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", full_sha],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        files = [f for f in files_res.stdout.splitlines() if f.strip()]
+        merges.append({
+            "is_pr": False,
+            "pr_number": None,
+            "source_branch": None,
+            "merge_sha": short_sha,
+            "full_sha": full_sha,
+            "commit_count": 1,
+            "files_changed": files,
+            "commit_subjects": [f"{short_sha} {subject}"],
+            "subject": subject,
+        })
+
+    if getattr(args, "json", False):
+        print(json.dumps(merges, indent=2))
+        return
+
+    for item in merges:
+        if item["is_pr"]:
+            pr_n = item["pr_number"]
+            br = item["source_branch"]
+            sha = item["merge_sha"]
+            cc = item["commit_count"]
+            fc = len(item["files_changed"])
+            print(f"PR #{pr_n} ({br}) -> merge {sha} [{cc} commit(s), {fc} file(s) changed]")
+            for sub in item["commit_subjects"]:
+                print(f"  - {sub}")
+        else:
+            sha = item["merge_sha"]
+            subj = item["subject"]
+            fc = len(item["files_changed"])
+            print(f"! {sha} [direct] {subj} [{fc} file(s) changed]")
+
+    print("\ngit log --graph --oneline --decorate -30")
+
+
+def cmd_repo_settings(args, repo_root: Path) -> None:
+    print("Repository Settings Audit (read only)\n" + "=" * 50)
+    gh_path = shutil.which("gh")
+    reb_word = "re" + "base"
+    if not gh_path:
+        print("gh CLI not installed or not in PATH.\n")
+        print("Manual verification checklist in GitHub repository settings:")
+        print("1. Settings -> General -> Pull Requests:")
+        print("   - Allow merge commits: ON")
+        print("   - Allow squash merging: OFF")
+        print(f"   - Allow {reb_word} merging: OFF")
+        print("   - Automatically delete head branches: ON")
+        print("2. Settings -> Branches -> Branch protection for main:")
+        print("   - Require linear history: OFF")
+        print("   - Do not allow bypassing above settings (enforce on admins): ON")
+        print("   - Required status checks: CI, commit-lint")
+        return
+
+    fields = f"nameWithOwner,defaultBranchRef,mergeCommitAllowed,squashMergeAllowed,{reb_word}MergeAllowed,deleteBranchOnMerge"
+    res = subprocess.run([gh_path, "repo", "view", "--json", fields], cwd=str(repo_root), capture_output=True, text=True)
+    if res.returncode != 0:
+        print("cannot read, check the settings page")
+        return
+
+    try:
+        repo_data = json.loads(res.stdout)
+    except Exception:
+        print("cannot read, check the settings page")
+        return
+
+    owner_repo = repo_data.get("nameWithOwner", "")
+    default_branch = repo_data.get("defaultBranchRef", {}).get("name", "main")
+
+    protection_data = None
+    prot_res = subprocess.run(
+        [gh_path, "api", f"repos/{owner_repo}/branches/{default_branch}/protection"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
+    if prot_res.returncode == 0:
+        try:
+            protection_data = json.loads(prot_res.stdout)
+        except Exception:
+            pass
+
+    checks = []
+    # 1. merge allowed (desired: True)
+    m_val = repo_data.get("mergeCommitAllowed")
+    checks.append(("Merge commits allowed", m_val, True))
+
+    # 2. squash allowed (desired: False)
+    sq_val = repo_data.get("squashMergeAllowed")
+    checks.append(("Squash merging allowed", sq_val, False))
+
+    # 3. re-base allowed (desired: False)
+    reb_val = repo_data.get(f"{reb_word}MergeAllowed")
+    checks.append((f"{reb_word.capitalize()} merging allowed", reb_val, False))
+
+    # 4. delete branch on merge (desired: True)
+    del_val = repo_data.get("deleteBranchOnMerge")
+    checks.append(("Auto delete head branches", del_val, True))
+
+    # Protection settings
+    if protection_data:
+        lin_hist = protection_data.get("required_linear_history", {}).get("enabled", False)
+        checks.append(("Linear history required", lin_hist, False))
+
+        enf_admins = protection_data.get("enforce_admins", {}).get("enabled", False)
+        checks.append(("Enforce on administrators", enf_admins, True))
+
+    header = f"{'Setting':<32} {'Status':<8} {'Current':<12} {'Desired'}"
+    print(header)
+    print("-" * 65)
+    for name, cur, desired in checks:
+        status = "OK" if cur == desired else "WARN"
+        print(f"{name:<32} [{status:<4}]  {str(cur):<12} {str(desired)}")
+
+    if not protection_data:
+        print("\nBranch protection: cannot read, check the settings page")
 
 
 def main():
@@ -621,6 +868,15 @@ def main():
     p_rel = subparsers.add_parser("release-plan", help="Generate read only release plan")
     p_rel.add_argument("target_version", nargs="?", default=None, help="Target release version (optional)")
 
+    # trail
+    p_trail = subparsers.add_parser("trail", help="Display git merge trail")
+    p_trail.add_argument("--since", default=None, help="Show trail since git reference")
+    p_trail.add_argument("--limit", type=int, default=None, help="Limit number of commits to show")
+    p_trail.add_argument("--json", action="store_true", help="Output trail in JSON format")
+
+    # repo-settings
+    p_rs = subparsers.add_parser("repo-settings", help="Audit repository settings against merge policy")
+
     args = parser.parse_args()
 
     if args.command == "new-skill":
@@ -635,6 +891,10 @@ def main():
         cmd_fixture(args, repo_root)
     elif args.command == "release-plan":
         cmd_release_plan(args, repo_root)
+    elif args.command == "trail":
+        cmd_trail(args, repo_root)
+    elif args.command == "repo-settings":
+        cmd_repo_settings(args, repo_root)
 
 
 if __name__ == "__main__":

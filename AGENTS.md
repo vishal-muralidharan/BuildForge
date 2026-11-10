@@ -15,3 +15,8 @@ These playbooks are not product skills and are never packaged.
 The rule about not following product skills stays.
 Edits to skills/ still need explicit approval in the prompt.
 Run `python3 scripts/dev.py check` before finishing.
+
+Hard rules for maintainer tasks:
+- Never run `gh pr merge` with `--squash` or `--rebase`. Always merge with `--merge`.
+- Never push to `main` directly.
+- Never merge `main` into a feature branch.

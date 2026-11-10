@@ -1,6 +1,6 @@
 ---
 name: branch-dev-protocol
-description: "Maintainer playbook for feature branch development, local verification, pull request creation, CI matrix monitoring, squash merging, and main branch synchronization."
+description: "Maintainer playbook for feature branch development, local verification, pull request creation, CI matrix monitoring, merge commit merging, and main branch synchronization."
 ---
 
 # Branch Development Playbook
@@ -16,7 +16,7 @@ All changes in the Build Forge repository follow a structured branch lifecycle:
 4. Run full repository verification suites before pushing.
 5. Push to GitHub and open a pull request via `gh`.
 6. Watch GitHub Actions CI matrix across Ubuntu, macOS, and Windows.
-7. Squash and merge into `main` after all checks pass.
+7. Merge into `main` with a merge commit after all checks pass.
 8. Switch to `main`, fast-forward pull, and clean up the local branch.
 
 ## Steps
@@ -84,12 +84,14 @@ If checks fail:
 - Remember: test repositories created during unit tests must configure `git config user.name` and `git config user.email` because runner environments lack global git user configuration.
 - Address the failure on the branch, commit, push, and watch checks again.
 
-### 6. Squash merge and sync main
-Once all CI checks pass:
+### 6. Merge with a merge commit and sync main
+Once all CI checks pass, merge with a merge commit:
 ```bash
-gh pr merge <pr-number> --squash
+gh pr merge <pr-number> --merge
 git switch main
 git pull --ff-only
 git branch -d <branch-name>
 ```
+
+Never use `--squash` or `--rebase`. Squash merging flattens atomic commits into one and destroys history. See `maintainers/skills/merge-trail/SKILL.md` for full policy details.
 

@@ -1,0 +1,166 @@
+d626c7a before merge policy: feat(product-spec): add product spec and milestone planning skill
+88ab460 before merge policy: feat(project-bootstrap): add project profile and guidance skill
+fcb235d before merge policy: feat(scaffold-app): add green skeleton app scaffolding skill
+84b74d9 before merge policy: feat(rules-to-tests): add automated rule enforcement skill
+2c9c3ee before merge policy: feat(audit-and-planning): add audit and atomic planning skill
+7e648d0 before merge policy: feat(repo-search): add read-only discovery and repo map skill
+a3d5229 before merge policy: feat(atomic-commits): add atomic commits and validation skill
+f26a7d4 before merge policy: feat(feature-delivery): add 7-stage gated pipeline conductor skill
+2504b51 before merge policy: feat(targeted-module-testing): add verification and reporting skill
+b120b7e before merge policy: feat(sync-skills-and-docs): add documentation and profile sync skill
+3a7c382 before merge policy: feat(legal-and-settings-pages): add legal and settings pages skill
+17003ed before merge policy: feat(cli): add installation script for npm distribution
+2fe4a3f before merge policy: chore(pkg): add npm package manifest for build-forge
+8a2fe0f before merge policy: docs(readme): add build forge pipeline guide and documentation
+1db73b6 before merge policy: docs(license): add build forge license
+db171e3 before merge policy: chore(pkg): add license repository bugs and homepage metadata
+51b4cfa before merge policy: docs(readme): add adaptation guide and license summary sections
+7ebabe8 before merge policy: docs(meta): add security policy and changelog for 0.1.0
+640922b before merge policy: refactor: move package files out of .agents to repo root
+958e99d before merge policy: docs(agents): add repository agent rules and claude pointer
+aaba826 before merge policy: chore(claude): configure edit denial permissions in settings.json
+aa02e61 before merge policy: test(ci): add ci check script and smoke tests
+96f346f before merge policy: ci: add github actions ci workflow
+07990aa before merge policy: ci: add automated npm release workflow with provenance
+16903fa before merge policy: docs: write the full readme
+c02522e before merge policy: docs: add maintainer guide
+694dbda before merge policy: chore(git): add gitattributes for line endings and linguist attributes
+4741c3b before merge policy: chore: add editorconfig configuration
+feeaa44 before merge policy: ci: configure nvmrc and node-version-file in workflows
+afff200 before merge policy: ci: harden ci workflow with test matrix and status gate
+6035b11 before merge policy: ci: configure dependabot for github actions updates
+e42659b before merge policy: docs(community): add contributing guide and issue templates
+c3fc5e3 before merge policy: docs(agents): add pointer files for copilot and gemini
+b50a6bb before merge policy: docs(maintain): add semantic versioning policy to maintainer guide
+5c269fa before merge policy: docs(readme): add ci status badge and contributing guide link
+3beadf0 before merge policy: refactor(atomic-commits): conform skill to specification and neutral phrasing
+705c9af before merge policy: refactor(audit-and-planning): conform skill to specification and neutral phrasing
+6c9e709 before merge policy: refactor(feature-delivery): conform skill to specification and neutral phrasing
+1a9a424 before merge policy: refactor(legal-and-settings-pages): conform skill to specification and neutral phrasing
+f887ba0 before merge policy: refactor(product-spec): conform skill to specification and neutral phrasing
+da493ca before merge policy: refactor(project-bootstrap): conform skill to specification and neutral phrasing
+80c4093 before merge policy: refactor(repo-search): conform skill to specification and neutral phrasing
+c1915d3 before merge policy: refactor(rules-to-tests): conform skill to specification and neutral phrasing
+e14937b before merge policy: refactor(scaffold-app): conform skill to specification and neutral phrasing
+ad6ad71 before merge policy: refactor(sync-skills-and-docs): conform skill to specification and neutral phrasing
+0fb8975 before merge policy: refactor(targeted-module-testing): conform skill to specification and neutral phrasing
+5301f87 before merge policy: feat(cli): add link and unlink commands for multi-agent support
+6ba21b1 before merge policy: feat(bootstrap): add agent linking instructions to rendered output
+0f64c3b before merge policy: docs: add agent compatibility matrix and verification guide
+20a4b9d before merge policy: docs: update readme and maintainer guide with agent commands
+e22afd7 before merge policy: refactor(project-bootstrap): replace placeholder path with project relative path
+6775c74 before merge policy: fix(cli): skip user custom skills during copy comparison in verify
+26ac771 before merge policy: test(ci): add agent skills conformance and link tests
+83d8e65 before merge policy: docs(changelog): document multi-agent support and skill updates
+5d9985e before merge policy: feat(ci): add ALLOWED_SKILLS allowlist guard and fixture tests
+022d409 before merge policy: docs(changelog): record removal of third-party skills under Unreleased Fixed
+9c70092 before merge policy: fix(cli): scope skills manifest to core package skills in install and verify
+4a47fc3 before merge policy: feat(cli): add status and diff commands to build-forge CLI
+45ed4af before merge policy: feat(pipeline): add goal-oriented verification loop and state tracking
+9d45bf4 before merge policy: feat(audit-and-planning): define measurable goal invariants before task planning
+1752e4f before merge policy: feat(testing): add goal acceptance verification to targeted module testing
+22058f6 before merge policy: docs: document goal loop and new CLI commands in README and CHANGELOG
+796958e before merge policy: feat(cli): auto-ignore .agents/work/ and .agents/vendor/ in .gitignore during install
+db338ff before merge policy: test(ci): add smoke test coverage for status, diff, and gitignore auto-ignore
+692c1b2 before merge policy: docs(maintain): remove stale make_integrity.py references from release guide
+fb94d33 before merge policy: feat(rules-to-tests): provide ready-to-use GitHub Actions workflow template
+19c9e52 before merge policy: feat(scripts): add make_integrity.py to generate integrity.json manifest
+2260d5b before merge policy: test(ci): verify skills tree against integrity.json in CI checks
+152b255 before merge policy: docs(maintain): restore make_integrity.py step in maintainer release guide
+543d83c before merge policy: docs(changelog): record make_integrity, gitignore auto-ignore, and integrity checks
+a67a960 before merge policy: feat(bootstrap): add legacy_import.py for legacy rule parity
+33b57e1 before merge policy: feat(bootstrap): integrate legacy parity workflow into project-bootstrap
+f71f0d1 before merge policy: feat(bootstrap): reconcile derivable legacy statements against blueprints
+d2fd312 before merge policy: test(bootstrap): add legacy parity import fixture and integration tests
+ecd01e1 before merge policy: docs: document legacy parity importer in README and CHANGELOG
+f8ed52f before merge policy: feat(feature-delivery): add task workflow references for fix, review, and release
+d1b1cdc before merge policy: feat(feature-delivery): add task router table to SKILL.md
+9396146 before merge policy: feat(feature-delivery): expand description triggers for fix, review, and release
+7e3145f before merge policy: test(ci): verify task workflow references exist and are linked in feature-delivery
+3ffb839 before merge policy: docs: update changelog and integrity manifest for feature-delivery workflows
+8e83bb5 before merge policy: feat(scripts): add budget.py to measure skill token and load sizes
+380a4f1 before merge policy: feat(scripts): add load_plan.py to measure feature-delivery stage load costs
+07fbc01 before merge policy: feat(cli): add doctor command to diagnose project health and dependencies
+a4bfc94 before merge policy: feat(cli): add outdated command to compare installed version against npm
+1a2de63 before merge policy: feat(bootstrap): add migrate_profile.py framework for schema migrations
+a803e95 before merge policy: feat(cli): add update command with pre-verification and migration plan
+0ed32d8 before merge policy: test(cli): add lifecycle integration tests for doctor, update, and migrate
+5655dfb before merge policy: docs: document lifecycle commands and migration authoring guide
+696f40e before merge policy: chore: synchronize integrity manifest hashes
+ba54987 before merge policy: test(evals): add fixtures for evaluation harness
+0d428ee before merge policy: test(evals): add 9 evaluation scenarios with task, setup, and expect
+919beaf before merge policy: feat(evals): add grade.py evaluation grader and scorecard
+404ae40 before merge policy: docs(evals): add evaluation harness guide and runbook
+79a8ffe before merge policy: test(evals): add integration tests for grader across all 9 scenarios
+b577625 before merge policy: docs(changelog): record evaluation harness additions in unreleased section
+7736e2e before merge policy: style(evals): format test fixtures with clean trailing newlines
+b2269b8 before merge policy: style(evals): format scenario files with clean trailing newlines
+62aff80 before merge policy: docs(evals): format README.md with clean trailing newline
+0c36893 before merge policy: fix(ci): resolve cross-platform subprocess and git remote handling for Windows and Linux
+738137a before merge policy: chore(repo): add .gitignore ignoring local agent skills and build artifacts
+bb0cd60 before merge policy: docs: document CI failure history and cross-platform prevention guidelines
+284d82c before merge policy: fix(ci): support cross-platform test discovery on Windows runners
+5a60862 before merge policy: feat(bootstrap): preserve custom blocks and stamp generated files in render.py
+0154da7 before merge policy: feat(sync): detect unblocked edits, orphans, and oversize blocks in check_sync.py
+0ca6495 before merge policy: docs: update sync guidance and references to use render --update
+6cc4b7b before merge policy: test(render): add comprehensive tests for custom blocks, stamps, and limits
+c387d20 before merge policy: docs: document custom notes in generated skills and record in changelog
+0d42cc7 before merge policy: feat(commits): add suggest_scope.py and support object scopes in commit checks and render
+a8811ad before merge policy: test(bootstrap): validate scope objects and add negative schema tests
+618eb4d before merge policy: test(commits): add CI tests for suggest_scope.py
+4627ee0 before merge policy: docs: document self-explaining commit scopes and update changelog
+8fcf818 before merge policy: feat(extend-pipeline): detect collisions and add safe dedupe command for external references
+784c456 before merge policy: feat(rules-to-tests): add no_dual_homed_skills machine check and runner version
+212b670 before merge policy: feat(bootstrap): classify third party skills and enhance parity ledger in legacy import
+9c0193c before merge policy: feat(cli): add dual-home, orphan vendor, and runner version checks in doctor and update
+df679e9 before merge policy: test(evals): add scenario 10 and dual-home onboarding regression test suite
+67f3efd before merge policy: docs: document reference deduplication and dual-home troubleshooting
+f110663 before merge policy: test: format trailing newlines across test fixtures and scenario 10
+129db4b before merge policy: docs(evals): document scenario 10 and update harness documentation to 10 scenarios
+18ff777 before merge policy: fix(ci): anchor ignore patterns and track dual-home onboarding fixture files
+a9c38dd before merge policy: test(windows): normalize path separators in render custom blocks test runner
+ce77c62 before merge policy: fix(scripts): emit POSIX paths across render tools and codify cross-platform rules in native skills
+cc715d4 before merge policy: docs(changelog): record cross-platform path and ignore pattern fixes
+cce06eb before merge policy: fix(sync): parse markdown sections with mdscan and fix prefix stripping
+f6775bb before merge policy: test(sync): add regression tests for glob normalization and markdown parsing
+9264d8c before merge policy: chore(ci): enforce python AST linting and document check_sync troubleshooting
+7b844b7 before merge policy: feat(bootstrap): replace project example with pocketlog and enforce glob validation
+9068313 before merge policy: test(bootstrap): add tests for glob validation and pocketlog example
+b7dfee3 before merge policy: docs(bootstrap): document path strictness and update changelog
+3f3f50d before merge policy: feat(ci): add skill contracts verification tool and allowlist
+95a565f before merge policy: docs(skills): update atomic-commits, rules-to-tests, and bootstrap skill text
+cf044a9 before merge policy: chore(ci): wire skill contracts check into ci suite with regression tests
+128d99a before merge policy: feat(blueprints): add project-blueprints skill, analyzers, and blueprint cli
+8f09372 before merge policy: feat(profile): support blueprints section and rule evidence validation
+2e51dd4 before merge policy: feat(hooks): integrate blueprint hooks across pipeline skills and render
+3d7064a before merge policy: test(blueprints): add integration test suite and fixtures for project blueprints
+dba5c32 before merge policy: docs(blueprints): document blueprints in readme and changelog
+483373b before merge policy: feat(blueprints): add init, adopt, link-check, and drift lifecycle commands
+98685f3 before merge policy: feat(hooks): integrate blueprint init, drift, and adopt hooks
+1d5c114 before merge policy: test(blueprints): add test suite for blueprint init, adopt, link-check, and drift
+971f369 before merge policy: docs(blueprints): document blueprint lifecycle commands and update integrity
+cd5ca36 before merge policy: feat(render): implement content salvage, migration, and safeguards
+e2c0f36 before merge policy: chore(blueprints): normalize template trailing newlines and update integrity
+4fcdb63 before merge policy: feat(legacy-import): add volume guard, status grouping, and blueprint contract routing
+04b5017 before merge policy: feat(field-adoption): add 10-step sequence integration test, scenario 11 eval, and troubleshooting docs
+a7acc59 before merge policy: fix(render): enforce strict LF line endings on Windows and disable autocrlf in test git repos
+c3f67f0 before merge policy: fix(feature-delivery): rotate CURRENT_GOAL across series of tasks and add series queue
+c548f93 before merge policy: feat(maintainers): merge maintainer toolkit branch
+a1be02b before merge policy: feat(blueprints): merge form controls ui analyzer branch
+799d589 before merge policy: feat(rules): merge hazard sweep and rule gaps branch
+2cbd699 before merge policy: style(rules): format trailing newlines in incident-to-rule workflow and hazard sweep script
+0c832dc before merge policy: feat(maintainers): support optional target version in dev.py release-plan
+f2674fa before merge policy: feat(packs): implement rule pack system and 9 curated packs
+aee550e before merge policy: feat(update): implement integrity-based update, upgrade actions, and render upgrade-unstamped
+9a9f7db before merge policy: test(fixture): add historical old install fixture generator
+42c47e9 before merge policy: test(update): add comprehensive test suite for safe update workflow
+e1caba9 before merge policy: docs(update): document upgrade workflow, add UPGRADING.md, and update doctor check
+f46599c before merge policy: style: format trailing newlines in UPGRADING.md and upgrade-notes.json
+3029ec8 before merge policy: fix(verify): ignore transient __pycache__, .pyc, and .DS_Store in skills manifests
+de4ee13 before merge policy: feat(branchflow): add opt-in local branch workflow and diagnostics (#8)
+634ad41 before merge policy: docs(maintainers): add branch-dev-protocol playbook and documentation
+9509c54 before merge policy: chore(release): bump version to 0.2.0
+5832082 before merge policy: fix(package): include required distribution files (#9)
+5613426 before merge policy: test(packaging): add permanent clean-room package check and docs truth verifier (#10)
+ade4d4c before merge policy: fix(vet): overhaul third party vetting tool severity model and scanner (#11)
+9248caf before merge policy: fix(cli): support help flags and add 0.2.0 changelog release heading (#12)

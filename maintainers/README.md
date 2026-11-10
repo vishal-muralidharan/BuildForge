@@ -14,15 +14,25 @@ All maintainer operations run through `scripts/dev.py`:
 - `python3 scripts/dev.py recipe list | show <name> | verify <name> --arg key=value`
 - `python3 scripts/dev.py fixture new <name> | check`
 - `python3 scripts/dev.py release-plan`
+- `python3 scripts/dev.py trail [--since REF] [--limit N] [--json]`
+- `python3 scripts/dev.py repo-settings`
+
+## Hard Rules
+
+Hard rules for any AI agent or maintainer working here:
+- Never run `gh pr merge` with `--squash` or `--rebase`. Always merge with `--merge`.
+- Never push to `main` directly.
+- Never merge `main` into a feature branch.
 
 ## Playbooks
 
-The 5 maintainer playbooks live under `maintainers/skills/`:
+The 6 maintainer playbooks live under `maintainers/skills/`:
 - `author-skill`: create a new skill, configure triggers, and update manifests.
 - `author-extension`: extend runners, check types, analyzers, or profile schemas.
 - `triage-field-report`: diagnose root causes, build failing fixtures, and write fixes.
 - `cut-release`: check release readiness, plan version bump, and print commands.
 - `branch-dev-protocol`: develop on task branches, verify locally, raise pull requests, monitor CI matrix, and sync main.
+- `merge-trail`: open PRs, merge with merge commits, view the trail, and preserve history.
 
 These playbooks use standard `SKILL.md` frontmatter and neutral phrasing so any coding agent can follow them.
 They are internal playbooks, not product skills, and must never be copied into `.agents/skills`.
