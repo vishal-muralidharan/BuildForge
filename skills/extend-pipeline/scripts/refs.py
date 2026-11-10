@@ -997,6 +997,9 @@ def cmd_verify(args):
 
         target_dir = root_path / r.get("path", "")
         if not target_dir.is_dir():
+            if not ref_data.get("vendor_in_git", False) and str(r.get("path", "")).startswith(".agents/vendor/"):
+                print(f"WARN: Installed directory not found for '{name}': {target_dir} (run: python3 .agents/skills/extend-pipeline/scripts/refs.py restore)")
+                continue
             print(f"ERROR: Installed directory not found for '{name}': {target_dir}")
             failed = True
             continue

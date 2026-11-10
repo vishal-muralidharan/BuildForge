@@ -463,12 +463,77 @@ class TestSupportedSchemaVersionsAndMigration(unittest.TestCase):
         self.assertNotIn("Unsupported schema_version", res_doc.stdout)
 
 
+class TestReferencesVendorInGitValidation(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="bf-test-ref-val-"))
+        self.profile = self.tmp / ".agents" / "project-profile.yaml"
+        self.profile.parent.mkdir(parents=True, exist_ok=True)
+        self.profile.write_text(BASE_PROFILE, encoding="utf-8")
+        (self.tmp / "src").mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_missing_vendor_path_warns_when_vendor_in_git_false(self):
+        ref_yaml = self.tmp / ".agents" / "references.yaml"
+        ref_content = (
+            "schema_version: 1\n"
+            "vendor_in_git: false\n"
+            "references:\n"
+            "  - name: test-skill\n"
+            "    kind: skill\n"
+            "    category: other\n"
+            "    status: installed\n"
+            "    path: .agents/vendor/test-skill\n"
+            "    pinned_commit: abcdef123456\n"
+            "    approved: true\n"
+            "    mode: advisory\n"
+            "    activation: pipeline-only\n"
+            "    used_by: [verify]\n"
+        )
+        ref_yaml.write_text(ref_content, encoding="utf-8")
+        res = subprocess.run(
+            [sys.executable, str(VAL_PY), "--profile", str(self.profile), "--root", str(self.tmp), "--strict-paths"],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0, f"Expected 0 but failed:\n{res.stdout}\n{res.stderr}")
+        self.assertIn("references[0].path not found (run refs.py restore)", res.stdout)
+
+    def test_missing_vendor_path_errors_when_vendor_in_git_true(self):
+        ref_yaml = self.tmp / ".agents" / "references.yaml"
+        ref_content = (
+            "schema_version: 1\n"
+            "vendor_in_git: true\n"
+            "references:\n"
+            "  - name: test-skill\n"
+            "    kind: skill\n"
+            "    category: other\n"
+            "    status: installed\n"
+            "    path: .agents/vendor/test-skill\n"
+            "    pinned_commit: abcdef123456\n"
+            "    approved: true\n"
+            "    mode: advisory\n"
+            "    activation: pipeline-only\n"
+            "    used_by: [verify]\n"
+        )
+        ref_yaml.write_text(ref_content, encoding="utf-8")
+        res = subprocess.run(
+            [sys.executable, str(VAL_PY), "--profile", str(self.profile), "--root", str(self.tmp), "--strict-paths"],
+            capture_output=True,
+            text=True
+        )
+        self.assertNotEqual(res.returncode, 0, "Expected error when vendor_in_git is true")
+        self.assertIn("references[0].path not found: .agents/vendor/test-skill", res.stdout)
+
+
 def run_all_validation_scope_tests():
     suite = unittest.TestSuite()
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestValidateProfileScopes))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestProfileGlobsAndBootstrap))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestBlueprintsValidation))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestSupportedSchemaVersionsAndMigration))
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(TestReferencesVendorInGitValidation))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     if not result.wasSuccessful():

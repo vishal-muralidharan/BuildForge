@@ -111,6 +111,10 @@ All notable changes to Build Forge will be documented in this file.
 - Unified integrity verification logic between `build-forge verify` and `build-forge doctor` using shared `checkSkillsIntegrity` to ensure consistent reporting of missing, modified, and extra files.
 - Saved patch headers in `build-forge diff --patch` and `update --restore` use portable relative paths (`a/<path>`, `b/<path>`) compatible with `git apply`, and patches are skipped for unmodified upstream upgrades.
 - Profile migration in `migrate_profile.py` uses line-based editing instead of `yaml.safe_dump`, preserving comments, quoting, indentation, line wrapping, and key order when bumping schema version to 2 and adding `blueprints`.
+- Doctor blueprint check accepts "All blueprints are up to date." as clean status instead of reporting a false warning.
+- Profile path validation in `validate_profile.py` and reference checking in `refs.py` warn instead of failing when referenced vendor paths are missing and `vendor_in_git` is false.
+- Fresh install initializes `.agents/upgrade-state.json` with all current upgrade actions completed, and `update --dry-run` reports clean status when no updates are pending.
+- Drift check `check_sync.py` ignores `.agents` directory during layer coverage scans.
 - Reference collision detection and deduplication tool `refs.py dedupe` in `skills/extend-pipeline/scripts/refs.py` resolving dual-homed references between `.agents/vendor` and `.agents/skills`.
 - Machine check `no_dual_homed_skills` in `run_rule_checks.py` with `RUNNER_VERSION = 1` and validation schema support.
 - Dual-home, orphan vendor folder, and rule runner version diagnostic checks in `bin/build-forge.js doctor`.

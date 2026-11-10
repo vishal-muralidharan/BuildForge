@@ -24,8 +24,12 @@ def compute_manifest(repo_root):
         return manifest
 
     for root, dirs, files in os.walk(skills_dir):
+        if "__pycache__" in dirs:
+            dirs.remove("__pycache__")
         dirs.sort()
         for f in sorted(files):
+            if f.endswith(".pyc") or f == ".DS_Store":
+                continue
             file_path = os.path.join(root, f)
             rel_path = os.path.relpath(file_path, repo_root).replace("\\", "/")
             manifest[rel_path] = hash_file(file_path)

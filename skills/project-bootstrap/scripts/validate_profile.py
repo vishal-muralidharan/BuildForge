@@ -301,7 +301,10 @@ def main():
                             if not (norm_path.startswith(".agents/vendor/") or norm_path.startswith(".agents/skills/")):
                                 errors.append(f"references[{idx}].path '{rpath}' must be inside .agents/vendor or .agents/skills")
                             elif a.root and not (root_path / rpath).exists():
-                                errors.append(f"references[{idx}].path not found: {rpath}")
+                                if rdata.get("vendor_in_git", False) is False and norm_path.startswith(".agents/vendor/"):
+                                    warnings.append(f"references[{idx}].path not found (run refs.py restore): {rpath}")
+                                else:
+                                    errors.append(f"references[{idx}].path not found: {rpath}")
                         if not entry.get("pinned_commit") or entry.get("pinned_commit") == "unknown":
                             errors.append(f"references[{idx}].pinned_commit is required when installed")
                         if entry.get("approved") is not True:

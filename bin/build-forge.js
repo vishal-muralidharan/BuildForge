@@ -535,6 +535,22 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
     console.log('  lock   .agents/build-forge.lock.json written');
   }
 
+  // On fresh install, mark all upgrade actions for current and prior versions as completed
+  const upgradeNotesPath = path.join(__dirname, '..', 'upgrade-notes.json');
+  const upgradeStatePath = path.join(cwd, '.agents', 'upgrade-state.json');
+  if (!oldLockData && fs.existsSync(upgradeNotesPath) && !fs.existsSync(upgradeStatePath)) {
+    try {
+      const notes = JSON.parse(fs.readFileSync(upgradeNotesPath, 'utf8'));
+      const completed = [];
+      for (const entry of notes) {
+        for (const action of entry.actions || []) {
+          completed.push(action.id);
+        }
+      }
+      fs.writeFileSync(upgradeStatePath, JSON.stringify({ completed }, null, 2) + '\n', 'utf8');
+    } catch (e) {}
+  }
+
   // Ensure transient work and vendor directories are ignored if .gitignore exists
   if (!noGitignore) {
     const gitignorePath = path.join(cwd, '.gitignore');
@@ -1143,7 +1159,7 @@ function doctorCommand(cwd, isJson) {
           encoding: 'utf8',
           timeout: 10000
         });
-        if (resBp.status === 0 && (!resBp.stdout || resBp.stdout.trim() === '')) {
+        if (resBp.status === 0 && !resBp.stdout.includes('Stale blueprint areas') && (resBp.stdout.includes('All blueprints are up to date.') || resBp.stdout.trim() === '')) {
           addCheck('Blueprints', 'OK', 'Blueprints are up to date');
         } else {
           addCheck('Blueprints', 'WARN', 'Blueprints are stale', 'Run: python3 .agents/skills/project-blueprints/scripts/blueprint.py extract');
@@ -1836,6 +1852,18 @@ function updateCommand(cwd, options = {}) {
 
   if (dryRun) {
     console.log(`DRY RUN: update plan for Build Forge ${pkgVersion}:`);
+    const hasPendingChanges = (
+      keepModified.size > 0 ||
+      restore.size > 0 ||
+      missingCore.length > 0 ||
+      differingSkills.length > 0 ||
+      availableNonCore.length > 0 ||
+      pendingUpgradeActions.length > 0 ||
+      unapproved.length > 0
+    );
+    if (!hasPendingChanges) {
+      console.log('  All pipeline skills and upgrade actions are up to date. Nothing to do.');
+    }
     if (keepModified.size > 0) {
       console.log(`  Keeping modified skill(s): ${Array.from(keepModified).join(', ')}`);
     }

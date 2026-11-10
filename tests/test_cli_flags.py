@@ -61,6 +61,45 @@ class TestCLIFlags(unittest.TestCase):
         self.assertIn("installed in .agents/skills", res.stdout)
         self.assertTrue((self.temp_dir / ".agents" / "skills").is_dir())
 
+    def test_fresh_install_initializes_upgrade_state(self):
+        """Fresh install creates upgrade-state.json marking all current actions as completed."""
+        subprocess.run(["git", "init"], cwd=str(self.temp_dir), capture_output=True)
+        res_inst = subprocess.run(
+            ["node", str(CLI_PATH), "install"],
+            cwd=str(self.temp_dir),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res_inst.returncode, 0)
+        state_file = self.temp_dir / ".agents" / "upgrade-state.json"
+        self.assertTrue(state_file.is_file())
+        res_doc = subprocess.run(
+            ["node", str(CLI_PATH), "doctor"],
+            cwd=str(self.temp_dir),
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn("Upgrade actions: All upgrade actions completed", res_doc.stdout)
+
+    def test_update_dry_run_reports_clean_when_up_to_date(self):
+        """update --dry-run prints up to date message and exits 0 on fresh install."""
+        subprocess.run(["git", "init"], cwd=str(self.temp_dir), capture_output=True)
+        res_inst = subprocess.run(
+            ["node", str(CLI_PATH), "install"],
+            cwd=str(self.temp_dir),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res_inst.returncode, 0)
+        res_update = subprocess.run(
+            ["node", str(CLI_PATH), "update", "--dry-run"],
+            cwd=str(self.temp_dir),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res_update.returncode, 0)
+        self.assertIn("All pipeline skills and upgrade actions are up to date. Nothing to do.", res_update.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

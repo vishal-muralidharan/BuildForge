@@ -138,6 +138,19 @@ class TestDoctorAndVerifyAgreeB5(unittest.TestCase):
         self.assertEqual(lock_check["status"], "FAIL")
         self.assertIn("extra", lock_check["message"])
 
+    def test_05_doctor_blueprints_up_to_date(self):
+        """Doctor reports Blueprints OK when blueprint.py stale reports up to date."""
+        bp_py = self.tmp / ".agents" / "skills" / "project-blueprints" / "scripts" / "blueprint.py"
+        subprocess.run(["python3", str(bp_py), "init", "--root", str(self.tmp)], capture_output=True, check=True)
+        subprocess.run(["python3", str(bp_py), "extract", "--root", str(self.tmp)], capture_output=True, check=True)
+
+        res_d = subprocess.run(["node", str(CLI_PATH), "doctor", "--json"], cwd=str(self.tmp), capture_output=True, text=True)
+        self.assertEqual(res_d.returncode, 0)
+        doc = json.loads(res_d.stdout)
+        bp_check = next(c for c in doc["checks"] if c["name"] == "Blueprints")
+        self.assertEqual(bp_check["status"], "OK")
+        self.assertIn("up to date", bp_check["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

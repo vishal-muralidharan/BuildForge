@@ -5,7 +5,7 @@
   "skills/audit-and-planning/SKILL.md": "698a3dff18547efeb34cfe50a5a7a9907231813026c0a6907ddad5afdfc38ab1",
   "skills/extend-pipeline/SKILL.md": "198b566cd57b08bf984e12c8e12342e29c9f1196d96e0c933254663535d5fd2c",
   "skills/extend-pipeline/references/vetting.md": "9e67952765ec04e770d4baef10c402fa10f45b64eb2e36c59a317197320ab1d9",
-  "skills/extend-pipeline/scripts/refs.py": "4217eb6e9296d1e2accbe8ffe3595610c04c122967dcfb4108d6767af6dccf06",
+  "skills/extend-pipeline/scripts/refs.py": "73e8da017971410bc96d0e6d830da9932cc521d999faaa25837bb2c9a1fcb88d",
   "skills/feature-delivery/SKILL.md": "c1d9029763b468a2090a45b3a9a146bc43eff6c819d4d0bf4aa07c4bad09e734",
   "skills/feature-delivery/references/workflows/branch-mode.md": "e6bba834b719504b45bfc6ee072e4875865a7827e0c6b18137b33bf42b9ae93f",
   "skills/feature-delivery/references/workflows/fix-bug.md": "421c71fa152f886a3d42494a67c60856c94554eb3db3ef882ba37b20da75edf7",
@@ -60,7 +60,7 @@
   "skills/project-bootstrap/scripts/migrate_profile.py": "c00668912743bfd4836086643f48e10bc96d50877715fc8d62a39248a41caf7b",
   "skills/project-bootstrap/scripts/packs.py": "430549e6fe53feef780253b6f055db94f838560e168c049c28b0bb3bde4abd02",
   "skills/project-bootstrap/scripts/render.py": "49f8eb815ebe37daba89817cf6ef31c3c744f9c78fba38e0a9b741f63b47aeb7",
-  "skills/project-bootstrap/scripts/validate_profile.py": "85b88da5b0e4df9d4d485db659daadcb5c81602e3b07195ac4904b049388c702",
+  "skills/project-bootstrap/scripts/validate_profile.py": "e2999ecb6eee1cd3e7c39caaafbab343879a1d1fdb3bbc7c090df274fb195be2",
   "skills/project-bootstrap/scripts/verify_integrity.py": "287b3de7b8a13c63e41d79fdd974c9a1575160a0031e18168c23151cd2727291",
   "skills/repo-search/SKILL.md": "3bb91666a623b91e3dc78c07302b633010013936d65f17ff54ef60b5994300cf",
   "skills/rules-to-tests/SKILL.md": "03dc967a3745d8c3e4136626e6bd4c36bafc59c39925226f3f48e165e8891639",
@@ -73,7 +73,7 @@
   "skills/scaffold-app/references/stack-recipes.md": "526e4f0cbcfcab7711d825fe5c720d789cc9ea71446de30411657e52e6fdcb8e",
   "skills/scaffold-app/scripts/ensure_check_script.py": "822773ff5fd0a13cb522f8f5dbb50a92c68937331e98c75e243a24304320b5bc",
   "skills/sync-skills-and-docs/SKILL.md": "9290968237abc5cc16d89b0f14376b447c7ff0a1d74be3f28ccce9751e70c836",
-  "skills/sync-skills-and-docs/scripts/check_sync.py": "03cfdaeb6b5e871ac09a869b194b54c1a3e48feba2465a8c2c4ddf63bf0bd947",
+  "skills/sync-skills-and-docs/scripts/check_sync.py": "d6ea0d1d4dbde997e39755143a26bc11e48155331da20ad88548a0903aacfc90",
   "skills/sync-skills-and-docs/scripts/mdscan.py": "71cf8a614fb06d7b0478addefd28a0a62aa4432c5d4775235ff2c47ec47a99b3",
   "skills/targeted-module-testing/SKILL.md": "ba7b925034beffbf3245f925d5764a2679d446da7f50ff2a951ed69489e34bb2"
 }
