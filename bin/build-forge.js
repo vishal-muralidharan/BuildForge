@@ -1143,7 +1143,7 @@ function doctorCommand(cwd, isJson) {
           encoding: 'utf8',
           timeout: 10000
         });
-        if (resBp.status === 0 && (!resBp.stdout || resBp.stdout.trim() === '')) {
+        if (resBp.status === 0 && !resBp.stdout.includes('Stale blueprint areas') && (resBp.stdout.includes('All blueprints are up to date.') || resBp.stdout.trim() === '')) {
           addCheck('Blueprints', 'OK', 'Blueprints are up to date');
         } else {
           addCheck('Blueprints', 'WARN', 'Blueprints are stale', 'Run: python3 .agents/skills/project-blueprints/scripts/blueprint.py extract');
