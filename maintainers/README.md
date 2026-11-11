@@ -37,6 +37,12 @@ The 6 maintainer playbooks live under `maintainers/skills/`:
 These playbooks use standard `SKILL.md` frontmatter and neutral phrasing so any coding agent can follow them.
 They are internal playbooks, not product skills, and must never be copied into `.agents/skills`.
 
+## Rollout and Adoption
+
+When adopting Build Forge in existing projects:
+- `legacy_import.py inventory` and `status` are read only by default and print the ledger to the terminal.
+- Pass `--write` only when the user asks for a ledger file (`.agents/legacy-parity.md`).
+
 ## Recipes
 
 Repeatable change recipes live under `maintainers/recipes/`:

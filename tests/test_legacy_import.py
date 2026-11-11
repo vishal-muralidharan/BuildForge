@@ -107,7 +107,7 @@ def run_legacy_import_tests(repo_root: str = None) -> None:
 
         # Step A: Run inventory
         res_inv = subprocess.run(
-            [sys.executable, script_path, "inventory", "--root", str(tmp)],
+            [sys.executable, script_path, "inventory", "--write", "--root", str(tmp)],
             capture_output=True, text=True
         )
         assert res_inv.returncode == 0, f"inventory failed: {res_inv.stderr}"
@@ -261,9 +261,63 @@ def run_legacy_import_tests(repo_root: str = None) -> None:
             )
 
 
+def test_legacy_import_readonly_by_default(repo_root: str = None) -> None:
+    if repo_root is None:
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    script_path = os.path.join(
+        repo_root, "skills", "project-bootstrap", "scripts", "legacy_import.py"
+    )
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp = Path(tmp_str)
+        subprocess.run(["git", "init"], cwd=str(tmp), check=True, capture_output=True)
+        agents_md = tmp / "AGENTS.md"
+        agents_md.write_text(
+            "# Rules\n- Always use kebab-case for CSS file names.\n",
+            encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "AGENTS.md"], cwd=str(tmp), check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=str(tmp), check=True, capture_output=True)
+
+        # 1. Inventory in a fixture project with agent files leaves git status empty
+        res_inv = subprocess.run(
+            [sys.executable, script_path, "inventory", "--root", str(tmp)],
+            capture_output=True,
+            text=True
+        )
+        assert res_inv.returncode == 0, f"inventory failed: {res_inv.stderr}"
+        assert not (tmp / ".agents" / "legacy-parity.md").exists(), "ledger file was created when read-only expected"
+        st = subprocess.run(["git", "status", "--porcelain"], cwd=str(tmp), capture_output=True, text=True)
+        assert st.stdout.strip() == "", f"git status not clean after read-only inventory: {st.stdout}"
+        assert "Legacy Parity Ledger" in res_inv.stdout, "expected ledger printed to terminal"
+
+        # 2. Status exits 1 for pending items without writing
+        res_stat = subprocess.run(
+            [sys.executable, script_path, "status", "--root", str(tmp)],
+            capture_output=True,
+            text=True
+        )
+        assert res_stat.returncode == 1, f"status should exit 1 for pending items, got {res_stat.returncode}"
+        assert not (tmp / ".agents" / "legacy-parity.md").exists(), "ledger file was created by status"
+        st_after = subprocess.run(["git", "status", "--porcelain"], cwd=str(tmp), capture_output=True, text=True)
+        assert st_after.stdout.strip() == "", f"git status not clean after read-only status: {st_after.stdout}"
+
+        # 3. --write creates the file
+        res_inv_write = subprocess.run(
+            [sys.executable, script_path, "inventory", "--write", "--root", str(tmp)],
+            capture_output=True,
+            text=True
+        )
+        assert res_inv_write.returncode == 0, f"inventory --write failed: {res_inv_write.stderr}"
+        ledger_file = tmp / ".agents" / "legacy-parity.md"
+        assert ledger_file.is_file(), "ledger file was not created with --write"
+        assert "Ledger written to" in res_inv_write.stdout
+
+
 def main():
     print("Running legacy parity importer integration tests...")
     run_legacy_import_tests()
+    test_legacy_import_readonly_by_default()
     print("All legacy parity importer tests passed successfully.")
 
 

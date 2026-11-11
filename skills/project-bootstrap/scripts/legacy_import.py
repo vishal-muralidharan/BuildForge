@@ -940,8 +940,7 @@ def read_ledger_decision_sources(ledger_path: Path) -> list:
     return decision_sources
 
 
-def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = None, decision_sources: list = None, source_counts: dict = None):
-    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+def format_ledger(statements: list, skipped_sources: list = None, decision_sources: list = None, source_counts: dict = None, existing_content: str = "") -> str:
     cov_pct, cov_count, rel_count = calculate_coverage(statements)
 
     counts_status = {"pending": 0, "covered": 0, "accepted": 0, "dropped": 0, "routed": 0}
@@ -956,13 +955,6 @@ def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = No
         counts_status[st] = counts_status.get(st, 0) + 1
         cl = s.get("class", "note")
         counts_class[cl] = counts_class.get(cl, 0) + 1
-
-    existing_content = ""
-    if ledger_path.is_file():
-        try:
-            existing_content = ledger_path.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            pass
 
     lines = [
         "# Legacy Parity Ledger",
@@ -1065,7 +1057,19 @@ def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = No
         row = f"| {s['id']} | {s['file']}:{s['line']} | {s['class']} | {s['proposed_destination']} | {s['status']} | {escape_table_cell(details)} | {source_class} |"
         lines.append(row)
 
-    write_text_lf(ledger_path, "\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+def write_ledger(ledger_path: Path, statements: list, skipped_sources: list = None, decision_sources: list = None, source_counts: dict = None):
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_content = ""
+    if ledger_path.is_file():
+        try:
+            existing_content = ledger_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            pass
+    content = format_ledger(statements, skipped_sources, decision_sources, source_counts, existing_content)
+    write_text_lf(ledger_path, content)
 
 
 def read_ledger(ledger_path: Path) -> list:
@@ -1121,7 +1125,7 @@ def read_ledger(ledger_path: Path) -> list:
     return statements
 
 
-def cmd_inventory(root: Path, include_skipped: bool = False):
+def collect_inventory_statements(root: Path, include_skipped: bool = False):
     active_files, skipped_sources, decision_sources, source_counts = find_and_classify_sources(root, include_skipped=include_skipped)
     profile_data, profile_rules = load_profile_rules(root)
     blueprints = load_blueprints(root)
@@ -1155,14 +1159,35 @@ def cmd_inventory(root: Path, include_skipped: bool = False):
         })
         counter += 1
 
+    return classified_statements, active_files, skipped_sources, decision_sources, source_counts
+
+
+def cmd_inventory(root: Path, include_skipped: bool = False, write: bool = False):
+    classified_statements, active_files, skipped_sources, decision_sources, source_counts = collect_inventory_statements(
+        root, include_skipped=include_skipped
+    )
+
     ledger_path = root / ".agents" / "legacy-parity.md"
-    write_ledger(
-        ledger_path,
+    existing_content = ""
+    if ledger_path.is_file():
+        try:
+            existing_content = ledger_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            pass
+
+    ledger_text = format_ledger(
         classified_statements,
         skipped_sources=skipped_sources,
         decision_sources=decision_sources,
-        source_counts=source_counts
+        source_counts=source_counts,
+        existing_content=existing_content
     )
+
+    if write:
+        ledger_path.parent.mkdir(parents=True, exist_ok=True)
+        write_text_lf(ledger_path, ledger_text)
+    else:
+        print(ledger_text)
 
     cov_pct, cov_count, rel_count = calculate_coverage(classified_statements)
     counts_class = {}
@@ -1182,7 +1207,8 @@ def cmd_inventory(root: Path, include_skipped: bool = False):
         for ds in decision_sources:
             print(f"  - {ds['path']} ({ds['class']}): {ds['signals']}")
             print(f"    Proposed action: {ds['proposed_action']}")
-    print(f"\nLedger written to {ledger_path.relative_to(root).as_posix()}.")
+    if write:
+        print(f"\nLedger written to {ledger_path.relative_to(root).as_posix()}.")
 
 
 def resolve_blueprint_area_for_statement(stmt: dict) -> str:
@@ -1305,10 +1331,11 @@ def route_statement_to_blueprint(root: Path, stmt: dict):
 
 def cmd_batch(root: Path, area: str, limit: int):
     ledger_path = root / ".agents" / "legacy-parity.md"
-    if not ledger_path.is_file():
-        sys.exit("Error: .agents/legacy-parity.md does not exist. Run inventory first.")
+    if ledger_path.is_file():
+        statements = read_ledger(ledger_path)
+    else:
+        statements, _, _, _, _ = collect_inventory_statements(root)
 
-    statements = read_ledger(ledger_path)
     target_area = area.lower().strip()
 
     pending = []
@@ -1480,12 +1507,16 @@ def cmd_apply(root: Path, accept_ids: list, drop_ids: list, route_ids: list, rou
     print(f"Coverage is now {cov_pct}% ({cov_count}/{rel_count} rule-candidate and derivable statements covered or accepted).")
 
 
-def cmd_status(root: Path):
+def cmd_status(root: Path, write: bool = False):
     ledger_path = root / ".agents" / "legacy-parity.md"
-    if not ledger_path.is_file():
-        sys.exit("Error: .agents/legacy-parity.md does not exist. Run inventory first.")
-
-    statements = read_ledger(ledger_path)
+    decision_sources = []
+    skipped_sources = []
+    source_counts = {}
+    if ledger_path.is_file():
+        statements = read_ledger(ledger_path)
+        decision_sources = read_ledger_decision_sources(ledger_path)
+    else:
+        statements, active_files, skipped_sources, decision_sources, source_counts = collect_inventory_statements(root)
 
     # Re-check pending derivable statements against blueprints if present
     blueprints = load_blueprints(root)
@@ -1527,8 +1558,15 @@ def cmd_status(root: Path):
                             s["reason"] = f"matched blueprint ui component {cm}"
                             updated = True
                             break
-        if updated:
+        if updated and write:
             write_ledger(ledger_path, statements)
+
+    if write and not ledger_path.is_file():
+        write_ledger(ledger_path, statements, skipped_sources=skipped_sources, decision_sources=decision_sources, source_counts=source_counts)
+
+    # Print ledger to the terminal when read-only
+    if not write:
+        print(format_ledger(statements, skipped_sources=skipped_sources, decision_sources=decision_sources, source_counts=source_counts))
 
     counts = {"pending": 0, "covered": 0, "accepted": 0, "dropped": 0, "routed": 0}
     pending_by_folder_and_class = {}
@@ -1561,7 +1599,6 @@ def cmd_status(root: Path):
                 elif s_class in ("derivable-data", "derivable-tokens", "derivable-ui", "derivable-layout"):
                     pending_local_derivable_count += 1
 
-    decision_sources = read_ledger_decision_sources(ledger_path)
     cov_pct, cov_count, rel_count = calculate_coverage(statements)
 
     print("Legacy Parity Status:")
@@ -1607,6 +1644,7 @@ def main():
 
     p_inv = sub.add_parser("inventory", help="Inventory legacy statements into ledger.")
     p_inv.add_argument("--include-skipped", action="store_true", help="Include skipped sources in inventory statements.")
+    p_inv.add_argument("--write", action="store_true", help="Write .agents/legacy-parity.md file (read-only by default).")
     p_inv.add_argument("--root", default=".", help="Project root directory.")
 
     p_batch = sub.add_parser("batch", help="Print pending statements for an area.")
@@ -1624,13 +1662,14 @@ def main():
     p_apply.add_argument("--root", default=".", help="Project root directory.")
 
     p_status = sub.add_parser("status", help="Check parity status and exit 1 if blocking items are pending.")
+    p_status.add_argument("--write", action="store_true", help="Update .agents/legacy-parity.md file (read-only by default).")
     p_status.add_argument("--root", default=".", help="Project root directory.")
 
     args = ap.parse_args()
     root = Path(args.root).resolve()
 
     if args.command == "inventory":
-        cmd_inventory(root, include_skipped=args.include_skipped)
+        cmd_inventory(root, include_skipped=args.include_skipped, write=args.write)
     elif args.command == "batch":
         cmd_batch(root, args.area, args.limit)
     elif args.command == "apply":
@@ -1639,7 +1678,7 @@ def main():
         route_ids = [x.strip() for x in args.route.split(",") if x.strip()]
         cmd_apply(root, accept_ids, drop_ids, route_ids, args.route_class, args.yes, args.reason)
     elif args.command == "status":
-        cmd_status(root)
+        cmd_status(root, write=args.write)
 
 
 if __name__ == "__main__":

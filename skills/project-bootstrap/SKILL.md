@@ -28,7 +28,8 @@ Derive every value from detect_stack output and the real file tree. Do not copy 
 
 1. Run legacy inventory and reconcile third-party skills:
    Check `.agents/build-forge.lock.json` and `.agents/references.yaml`. Run `python3 .agents/skills/project-bootstrap/scripts/legacy_import.py inventory --root <repo_root>`.
-   This inventories statements from existing agent instruction files and legacy skills into `.agents/legacy-parity.md`.
+   Pass `--write` only when the user asks for a ledger file.
+   This inventories statements from existing agent instruction files and legacy skills into terminal output, or into `.agents/legacy-parity.md` when `--write` is passed.
    If there are `likely-third-party` or `modified-fork` skills, show them from the "Needs a decision" table and prompt the user before rule extraction: register as reference (`refs.py add`) or keep as project rule. If `vendor-dup` collisions exist, propose `refs.py dedupe`. Never delete or move legacy files.
 2. Read the discovery JSON and the legacy parity ledger. Also read `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, and any agent instruction files when they exist. They hold rules the code cannot show.
 3. Copy `assets/project-profile.template.yaml` to `.agents/project-profile.yaml`. Fill only what the evidence supports.

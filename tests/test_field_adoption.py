@@ -108,7 +108,7 @@ class TestFieldAdoption(unittest.TestCase):
         self.assertIn("src/legacy_nonexistent", res_v.stdout + res_v.stderr)
 
         # Step 2: legacy inventory (exits 0)
-        res_inv = self.run_py(LEGACY_SCRIPT, "inventory", "--root", ".")
+        res_inv = self.run_py(LEGACY_SCRIPT, "inventory", "--write", "--root", ".")
         self.assertEqual(res_inv.returncode, 0, res_inv.stderr)
         ledger_path = self.root / ".agents" / "legacy-parity.md"
         self.assertTrue(ledger_path.is_file())

@@ -47,6 +47,13 @@ const AGENTS = [
 
 const POINTER_CONTENT = 'Read AGENTS.md first and follow it. If AGENTS.md does not exist yet, run the project-bootstrap skill at .agents/skills/project-bootstrap/SKILL.md.\n';
 const SUPPORTED_SCHEMA_VERSIONS = [1, 2];
+const BUILD_FORGE_GENERATED_FILES = [
+  'AGENTS.md',
+  'AGENTS.generated.md',
+  '.agents/repo-map.md',
+  '.agents/custom-orphans.md',
+  '.agents/legacy-parity.md',
+];
 
 function hashFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');

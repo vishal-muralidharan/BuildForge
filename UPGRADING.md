@@ -37,6 +37,8 @@ For skills that differ from the package, pass `--keep-modified <skill>` or `--re
 
 Build Forge 0.2.0 introduces project blueprints, curated rule packs, and integrity-verified updates.
 
+Note on legacy parity: `legacy_import.py inventory` and `status` are read-only by default and print the ledger to the terminal. Pass `--write` only when the user asks for a ledger file (`.agents/legacy-parity.md`).
+
 Follow these 5 steps after running `update`:
 
 ### Step 1: Migrate Project Profile (profile-migrate)
