@@ -309,7 +309,7 @@ class TestSafeUpdate(unittest.TestCase):
         self.assertIn("[WARN] Upgrade actions:", res_doc.stdout)
 
         # Mark all actions as done
-        for act in ("profile-migrate", "blueprints-init", "rule-packs", "migrate-external-refs", "upgrade-unstamped"):
+        for act in ("profile-migrate", "blueprints-init", "rule-packs", "migrate-external-refs", "upgrade-unstamped", "legacy-parity-write"):
             res_done = run_node(["upgrade", "done", act], self.project_dir)
             self.assertEqual(res_done.returncode, 0, f"upgrade done failed for {act}: {res_done.stderr}")
 
