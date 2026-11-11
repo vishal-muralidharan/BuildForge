@@ -45,6 +45,13 @@
         "command": "python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status --write --root .",
         "risk": "low",
         "optional": true
+      },
+      {
+        "id": "agents-gitignore-caches",
+        "title": "Run update to add .agents/.gitignore and stop caches from being committed",
+        "command": "npx @v1006/build-forge update",
+        "risk": "low",
+        "optional": true
       }
     ]
   }

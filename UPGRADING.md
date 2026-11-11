@@ -39,6 +39,9 @@ Build Forge 0.2.0 introduces project blueprints, curated rule packs, and integri
 
 Note on legacy parity: `legacy_import.py inventory` and `status` are read-only by default and print the ledger to the terminal. Pass `--write` only when the user asks for a ledger file (`.agents/legacy-parity.md`).
 
+Running `npx @v1006/build-forge update` adds `.agents/.gitignore` to ignore Python bytecode caches and cleans untracked caches in replaced skills.
+If `npx @v1006/build-forge doctor` warns about tracked cache files, untrack them with `git rm --cached <paths>`.
+
 Follow these 5 steps after running `update`:
 
 ### Step 1: Migrate Project Profile (profile-migrate)
