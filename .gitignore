@@ -1,8 +1,9 @@
 # Dependencies
 node_modules/
 
-# Local agent skills and configuration used in this repository
-/.agents/
+# Local agent work and vendor directories (installed skills and profile are tracked)
+.agents/work/
+.agents/vendor/
 /.claude/
 /.gemini/
 

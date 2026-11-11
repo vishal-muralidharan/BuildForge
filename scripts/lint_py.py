@@ -20,6 +20,7 @@ IGNORE_DIRS = {
     "__pycache__",
     "dist",
     "build",
+    ".agents",
 }
 
 
