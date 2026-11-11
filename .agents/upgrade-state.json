@@ -1,0 +1,10 @@
+{
+  "completed": [
+    "profile-migrate",
+    "blueprints-init",
+    "rule-packs",
+    "migrate-external-refs",
+    "upgrade-unstamped",
+    "legacy-parity-write"
+  ]
+}
