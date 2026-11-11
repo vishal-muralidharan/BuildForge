@@ -60,7 +60,7 @@
   "skills/project-bootstrap/scripts/legacy_import.py": "bbcefa74a6e29e5ba46dde6efc56eaab272d52b958a0582bd296e31fdbcb48f5",
   "skills/project-bootstrap/scripts/migrate_profile.py": "c00668912743bfd4836086643f48e10bc96d50877715fc8d62a39248a41caf7b",
   "skills/project-bootstrap/scripts/packs.py": "430549e6fe53feef780253b6f055db94f838560e168c049c28b0bb3bde4abd02",
-  "skills/project-bootstrap/scripts/render.py": "1287e987c9cec456abca5582ccc55ebfba809ce3036e6a3578a96059f059a434",
+  "skills/project-bootstrap/scripts/render.py": "b3e9a40a25b5b2a8c38501096bcd9c5cb589599629f00f3baaa4b39831fef6ea",
   "skills/project-bootstrap/scripts/validate_profile.py": "e2999ecb6eee1cd3e7c39caaafbab343879a1d1fdb3bbc7c090df274fb195be2",
   "skills/project-bootstrap/scripts/verify_integrity.py": "287b3de7b8a13c63e41d79fdd974c9a1575160a0031e18168c23151cd2727291",
   "skills/repo-search/SKILL.md": "3bb91666a623b91e3dc78c07302b633010013936d65f17ff54ef60b5994300cf",

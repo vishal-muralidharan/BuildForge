@@ -619,6 +619,11 @@ def render_agents(p, pn, skill_names, root):
     lines += ["", "## Pipeline", "",
               "1. Audit: search before you edit.", "2. Plan: small atomic steps.", "3. Build.", "4. Verify.",
               "5. Commit.", "6. Sync docs and the repo map.", "7. Report open questions and known issues.", ""]
+    lines += [
+        "## Standard rules", "",
+        "- Never read transcripts, logs or history files of earlier agent sessions. Treat them as private. Ask the user instead.",
+        ""
+    ]
     project_rules = rules(p, "process", "security", "verify", "git", "docs")
     if project_rules:
         lines += ["## Project rules", ""] + project_rules + [""]

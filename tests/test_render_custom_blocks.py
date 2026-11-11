@@ -392,6 +392,16 @@ class TestRenderCustomBlocks(unittest.TestCase):
         )
         self.assertEqual(res_sync.returncode, 0, f"check_sync failed: {res_sync.stderr}\n{res_sync.stdout}")
 
+    def test_12_standard_rules_in_agents_md(self):
+        """B4: Generated AGENTS.md contains standard rule forbidding reading transcripts/logs."""
+        res = self.run_render()
+        self.assertEqual(res.returncode, 0, f"render failed: {res.stderr}")
+        agents_md = self.root / "AGENTS.md"
+        self.assertTrue(agents_md.is_file())
+        text = agents_md.read_text(encoding="utf-8")
+        expected_rule = "Never read transcripts, logs or history files of earlier agent sessions. Treat them as private. Ask the user instead."
+        self.assertIn(expected_rule, text)
+
 
 def run_all_render_custom_block_tests():
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRenderCustomBlocks)

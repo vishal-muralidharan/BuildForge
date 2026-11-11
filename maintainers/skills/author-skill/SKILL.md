@@ -14,6 +14,9 @@ If a capability shares existing triggers or belongs to an existing domain, add a
 ## Approval Rule
 Edits to `skills/` require explicit maintainer approval in the prompt before any file is created or changed.
 
+## Privacy Rule
+Never read transcripts, logs or history files of earlier agent sessions. Treat them as private. Ask the user instead.
+
 ## Steps
 
 1. **Scaffold the skill**
