@@ -292,7 +292,7 @@ class TestRulePacks(unittest.TestCase):
         self.write_fixture_profile(prof_violating, violating_dir)
 
         runner_cmd = [sys.executable, "-B", str(RUNNER_PY), "--profile", ".agents/project-profile.yaml", "--root", str(violating_dir)]
-        res_fail = subprocess.run(runner_cmd, capture_output=True, text=True)
+        res_fail = subprocess.run(runner_cmd, capture_output=True, text=True, cwd=str(violating_dir))
         self.assertEqual(res_fail.returncode, 1, "Expected run_rule_checks to fail on violating fixture")
         self.assertIn("ui-no-native-selects", res_fail.stdout)
         self.assertIn("Hint: Use the themed Select primitive", res_fail.stdout)
@@ -310,7 +310,7 @@ class TestRulePacks(unittest.TestCase):
         self.write_fixture_profile(prof_clean, clean_dir)
 
         runner_cmd_clean = [sys.executable, "-B", str(RUNNER_PY), "--profile", ".agents/project-profile.yaml", "--root", str(clean_dir)]
-        res_pass = subprocess.run(runner_cmd_clean, capture_output=True, text=True)
+        res_pass = subprocess.run(runner_cmd_clean, capture_output=True, text=True, cwd=str(clean_dir))
         self.assertEqual(res_pass.returncode, 0, f"Expected run_rule_checks to pass on clean fixture:\n{res_pass.stdout}")
 
     def test_packs_apply_works_on_fixture_repo(self):

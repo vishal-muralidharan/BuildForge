@@ -1,0 +1,210 @@
+# Project profile. The single source of truth for the build pipeline.
+schema_version: 1
+
+project:
+  name: "Build Forge"
+  summary: "Tooling and workflow skills for agentic software delivery pipelines."
+  mode: existing
+  platforms: [cli]
+
+stack:
+  language: "javascript and python"
+  framework: none
+  bundler: none
+  styling: none
+  router: none
+  state: none
+  package_manager: npm
+  test_runner: "python scripts/ci_check.py"
+  linter: "python scripts/lint_py.py"
+  backend: none
+  auth: none
+  database: none
+  hosting: none
+
+commands:
+  install: ""
+  dev: ""
+  lint: "python3 scripts/lint_py.py"
+  test: "python3 scripts/ci_check.py"
+  build: "python3 scripts/check_package.py"
+  check: "python3 scripts/dev.py check"
+  test_single: "python3 -m unittest {path}"
+  deploy: ""
+
+structure:
+  layers:
+    - path: bin
+      purpose: "The CLI"
+    - path: skills
+      purpose: "The product, 1 folder per skill"
+    - path: scripts
+      purpose: "Repo tools"
+    - path: tests
+      purpose: "Fixtures and tests"
+    - path: maintainers
+      purpose: "Playbooks and recipes"
+    - path: .github
+      purpose: "CI and templates"
+    - path: .agents
+      purpose: "Installed copies and project profile"
+  root_allowed:
+    - .agents
+    - .claude
+    - .editorconfig
+    - .gitattributes
+    - .github
+    - .gitignore
+    - .nvmrc
+    - AGENTS.md
+    - CHANGELOG.md
+    - CLAUDE.md
+    - COMPATIBILITY.md
+    - CONTRIBUTING.md
+    - GEMINI.md
+    - LICENSE
+    - MAINTAINING.md
+    - README.md
+    - SECURITY.md
+    - UPGRADING.md
+    - bin
+    - integrity.json
+    - maintainers
+    - package.json
+    - scripts
+    - skills
+    - tests
+    - tiers.json
+    - upgrade-notes.json
+  tests: tests-dir
+
+naming:
+  - item: "skill folders"
+    style: "kebab-case"
+    example: "atomic-commits"
+  - item: "skill file"
+    style: "exact"
+    example: "SKILL.md"
+  - item: "python scripts"
+    style: "snake_case"
+    example: "ci_check.py"
+  - item: "the CLI file"
+    style: "exact"
+    example: "build-forge.js"
+  - item: "test files"
+    style: "snake_case"
+    example: "test_dogfood.py"
+
+design:
+  enabled: false
+  tokens_file: ""
+  component_dirs: []
+  enforced_by: ""
+
+responsive:
+  enabled: false
+  min_width: 320
+  max_width: 2560
+  touch_target_px: 44
+  breakpoints: []
+
+data:
+  storage: "JSON and Markdown files"
+  schema_source: ""
+  invariants:
+    - "integrity.json keys equal the files under skills/"
+    - "the lock file key names are identical in integrity.json, the lock, bin/build-forge.js and verify_integrity.py"
+    - "every skills/ folder is in exactly 1 tier in tiers.json"
+  protected:
+    - "package.json version"
+    - "integrity.json format"
+    - "the lock file format"
+    - "profile schema_version and SUPPORTED_SCHEMA_VERSIONS"
+    - "skill names"
+    - "tiers.json"
+
+git:
+  commit_format: "<type>(<scope>): <subject>"
+  single_line: true
+  types: [feat, fix, docs, test, chore, refactor, ci, style]
+  scopes:
+    - name: cli
+      purpose: "Build Forge CLI commands and flag parsing in bin/build-forge.js"
+      paths: ["bin/build-forge.js"]
+    - name: bootstrap
+      purpose: "Project bootstrap skill and profile onboarding tools"
+      paths: ["skills/project-bootstrap/**"]
+    - name: maintainers
+      purpose: "Maintainer kit, playbooks, recipes, and developer tooling"
+      paths: ["maintainers/**"]
+    - name: ci
+      purpose: "Continuous integration workflows, scripts, and quality gates"
+      paths: [".github/**", "scripts/ci_check.py"]
+    - name: changelog
+      purpose: "Changelog and release notes documentation"
+      paths: ["CHANGELOG.md"]
+    - name: evals
+      purpose: "Evaluation grader, benchmark scenarios, and test fixtures"
+      paths: ["tests/evals/**"]
+    - name: blueprints
+      purpose: "Project blueprints extraction, drift detection, and analyzers"
+      paths: ["skills/project-blueprints/**"]
+    - name: feature-delivery
+      purpose: "Feature delivery workflow skill and lifecycle branch management"
+      paths: ["skills/feature-delivery/**"]
+    - name: render
+      purpose: "Guidance rendering, custom block preservation, and template expansion"
+      paths: ["skills/project-bootstrap/scripts/render.py"]
+    - name: update
+      purpose: "Package update command, upgrade actions, and state tracking"
+      paths: ["bin/build-forge.js", "upgrade-notes.json"]
+    - name: agents
+      purpose: "Agent guidelines, instructions, and dogfood pipeline integration"
+      paths: [".agents/**", "AGENTS.md"]
+    - name: sync
+      purpose: "Skill and documentation sync verification tools"
+      paths: ["skills/sync-skills-and-docs/**"]
+    - name: packs
+      purpose: "Pre-authored rule packs, planning, and migration utilities"
+      paths: ["skills/project-bootstrap/scripts/packs.py"]
+    - name: scripts
+      purpose: "Internal repository maintenance and verification scripts"
+      paths: ["scripts/**"]
+    - name: rules-to-tests
+      purpose: "Rules to tests skill, check runners, and enforcement patterns"
+      paths: ["skills/rules-to-tests/**"]
+  push: never
+  stage: granular
+  workflow:
+    default_branch: main
+    mode: ask
+    branch_format: "<type>/<slug>"
+    sync: merge
+    merge_method: merge
+    remote: origin
+    cleanup: ask
+    worktree: false
+
+verification:
+  zero_warnings: true
+  browser_checks: []
+  post_build_report: true
+
+capabilities:
+  deploy:
+    enabled: false
+  blueprints:
+    enabled: true
+
+blueprints:
+  enabled: true
+
+rules: []
+
+docs:
+  readme: README.md
+  agents_file: AGENTS.md
+  skills_dir: .agents/skills
+  repo_map: .agents/repo-map.md
+  spec: ""
+
