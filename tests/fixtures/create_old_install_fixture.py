@@ -62,7 +62,11 @@ def build_fallback_skills(dest_skills_dir: Path) -> None:
     dest_skills_dir.mkdir(parents=True, exist_ok=True)
     for entry in src_skills.iterdir():
         if entry.is_dir() and entry.name not in excluded:
-            shutil.copytree(entry, dest_skills_dir / entry.name)
+            shutil.copytree(
+                entry,
+                dest_skills_dir / entry.name,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
 
 
 def generate_old_install_fixture(target_dir: Path = None, init_git: bool = False) -> Path:
@@ -104,8 +108,12 @@ def generate_old_install_fixture(target_dir: Path = None, init_git: bool = False
 
     # 2. Compute 0.1.0 lock file before hand edits
     lock_manifest = {}
-    for root_dir, _, files in os.walk(target_skills_dir):
+    for root_dir, dirs, files in os.walk(target_skills_dir):
+        if "__pycache__" in dirs:
+            dirs.remove("__pycache__")
         for f in files:
+            if f.endswith(".pyc") or f == ".DS_Store":
+                continue
             full = Path(root_dir) / f
             rel = full.relative_to(agents_dir).as_posix()
             lock_manifest[rel] = compute_sha256(full)

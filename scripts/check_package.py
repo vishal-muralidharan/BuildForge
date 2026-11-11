@@ -24,6 +24,22 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
+_orig_run = subprocess.run
+
+
+def _run_subprocess(*args, **kwargs):
+    env = kwargs.get("env")
+    if env is None:
+        env = os.environ.copy()
+    else:
+        env = env.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    kwargs["env"] = env
+    return _orig_run(*args, **kwargs)
+
+
+subprocess.run = _run_subprocess
+
 FORBIDDEN_PREFIXES = ("maintainers/", "scripts/", "tests/", "fixtures/")
 
 
@@ -205,6 +221,9 @@ def check_package(repo_root: Path) -> list:
                     if part.startswith(".") and part != ".":
                         forbidden_found.append(rel_item)
                         break
+                # Check python bytecode caches anywhere in path
+                if "__pycache__" in Path(rel_item).parts or rel_item.endswith(".pyc"):
+                    forbidden_found.append(rel_item)
 
         if forbidden_found:
             results.append((

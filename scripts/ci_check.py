@@ -34,6 +34,22 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
+_orig_run = subprocess.run
+
+
+def _run_subprocess(*args, **kwargs):
+    env = kwargs.get("env")
+    if env is None:
+        env = os.environ.copy()
+    else:
+        env = env.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    kwargs["env"] = env
+    return _orig_run(*args, **kwargs)
+
+
+subprocess.run = _run_subprocess
+
 try:
     import yaml
 except ImportError:
@@ -80,6 +96,8 @@ def check_skills(skills_dir, errors):
         return
 
     for item in sorted(os.listdir(skills_dir)):
+        if item == "__pycache__":
+            continue
         skill_dir = os.path.join(skills_dir, item)
         if not os.path.isdir(skill_dir):
             continue
@@ -153,7 +171,11 @@ def check_skills(skills_dir, errors):
 
 def check_skill_placeholders(skills_dir, errors):
     for root, dirs, files in os.walk(skills_dir):
+        if "__pycache__" in dirs:
+            dirs.remove("__pycache__")
         for f in files:
+            if f.endswith(".pyc"):
+                continue
             file_path = os.path.join(root, f)
             try:
                 with open(file_path, "r", encoding="utf-8") as fh:
@@ -169,8 +191,10 @@ def check_skill_placeholders(skills_dir, errors):
 def check_python_files(repo_root, errors):
     with tempfile.TemporaryDirectory() as tmp:
         for root, dirs, files in os.walk(repo_root):
-            dirs[:] = [d for d in dirs if d not in {".git", "node_modules"}]
+            dirs[:] = [d for d in dirs if d not in {".git", "node_modules", "__pycache__"}]
             for f in files:
+                if f.endswith(".pyc"):
+                    continue
                 if f.endswith(".py"):
                     file_path = os.path.join(root, f)
                     cfile = os.path.join(tmp, f"{hash(file_path)}.pyc")
@@ -181,19 +205,35 @@ def check_python_files(repo_root, errors):
 
 
 def check_no_cache_or_pyc(repo_root, errors):
-    for root, dirs, files in os.walk(repo_root):
-        dirs[:] = [d for d in dirs if d != ".git"]
-        if "__pycache__" in dirs:
-            errors.append(f"Rule 5 failure: Tree contains '__pycache__' directory at '{os.path.join(root, '__pycache__')}'.")
-        for f in files:
-            if f.endswith(".pyc"):
-                errors.append(f"Rule 5 failure: Tree contains '.pyc' file at '{os.path.join(root, f)}'.")
+    git_dir = os.path.join(repo_root, ".git")
+    if not os.path.exists(git_dir):
+        return
+    res = subprocess.run(
+        ["git", "ls-files"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode != 0:
+        errors.append(f"Rule 5 failure: git ls-files failed: {res.stderr.strip()}")
+        return
+    for line in res.stdout.splitlines():
+        rel = line.strip().replace("\\", "/")
+        parts = rel.split("/")
+        if "__pycache__" in parts:
+            errors.append(f"Rule 5 failure: Tracked file in '__pycache__' directory at '{rel}'.")
+        elif rel.endswith(".pyc"):
+            errors.append(f"Rule 5 failure: Tracked '.pyc' file at '{rel}'.")
 
 
 def check_dashes(skills_dir, errors):
     dashes = {"\u2014": "em dash (\u2014)", "\u2013": "en dash (\u2013)"}
     for root, dirs, files in os.walk(skills_dir):
+        if "__pycache__" in dirs:
+            dirs.remove("__pycache__")
         for f in files:
+            if f.endswith(".pyc"):
+                continue
             file_path = os.path.join(root, f)
             try:
                 with open(file_path, "r", encoding="utf-8") as fh:
@@ -263,8 +303,12 @@ def check_integrity_manifest(repo_root, errors):
     actual = {}
     if os.path.isdir(skills_dir):
         for root, dirs, files in os.walk(skills_dir):
+            if "__pycache__" in dirs:
+                dirs.remove("__pycache__")
             dirs.sort()
             for file_name in sorted(files):
+                if file_name.endswith(".pyc") or file_name == ".DS_Store":
+                    continue
                 full_path = os.path.join(root, file_name)
                 rel_path = os.path.relpath(full_path, repo_root).replace("\\", "/")
                 try:
@@ -503,6 +547,8 @@ def check_allowlist_skills(skills_dir, errors):
     """Sub-check: skills/ folders against ALLOWED_SKILLS."""
     if os.path.isdir(skills_dir):
         for item in sorted(os.listdir(skills_dir)):
+            if item == "__pycache__":
+                continue
             if os.path.isdir(os.path.join(skills_dir, item)) and item not in ALLOWED_SKILLS:
                 errors.append(
                     f"Allowlist failure: skills/{item} is not in ALLOWED_SKILLS. "
@@ -969,6 +1015,19 @@ def run_docs_truth_check(repo_root, errors):
             errors.append(f"Docs truth check failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_pycache_tolerance_tests(repo_root, errors):
+    if os.environ.get("_BF_PYCACHE_TESTING") == "1":
+        return
+    test_script = os.path.join(repo_root, "tests", "test_pycache_tolerance.py")
+    if os.path.isfile(test_script):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        env["_BF_PYCACHE_TESTING"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_script], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Pycache tolerance tests failed:\n{res.stderr or res.stdout}".strip())
+
+
 def run_package_clean_room_check(repo_root, errors):
     script_path = os.path.join(repo_root, "scripts", "check_package.py")
     if os.path.isfile(script_path):
@@ -1065,6 +1124,9 @@ def main():
 
     print("Running docs truth checks...")
     run_docs_truth_check(repo_root, errors)
+
+    print("Running pycache tolerance tests...")
+    run_pycache_tolerance_tests(repo_root, errors)
 
     print("Running package clean-room checks...")
     run_package_clean_room_check(repo_root, errors)
