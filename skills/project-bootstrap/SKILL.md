@@ -18,7 +18,7 @@ Scripts live in this skill's `scripts/` folder. Run them with the full path to t
 
 ## Step 0: Pick the mode
 
-1. If `.agents/project-profile.yaml` exists, use **update mode**. Run discovery again, compare with the profile, and show the user each difference. Never change a rule silently.
+1. If `.agents/project-profile.yaml` exists, use **update mode**. Run discovery again, compare with the profile, and show the user each difference. Never change a rule silently. Run the preservation check (`python3 .agents/skills/project-bootstrap/scripts/check_preservation.py --root <repo_root> --base <base_ref> --head HEAD`) to verify that all non-generated rules from before the update are preserved.
 2. Otherwise run `python3 .agents/skills/project-bootstrap/scripts/detect_stack.py <repo_root>`. Read `suggested_mode`.
 3. If the user says this is a new app, or discovery finds no manifest and fewer than 3 source files, use **new mode**. If the repo has code, use **existing mode**. When unsure, ask in 1 question.
 
