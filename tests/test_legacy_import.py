@@ -271,6 +271,9 @@ def test_legacy_import_readonly_by_default(repo_root: str = None) -> None:
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp = Path(tmp_str)
         subprocess.run(["git", "init"], cwd=str(tmp), check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(tmp), check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(tmp), check=True, capture_output=True)
+        subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=str(tmp), check=True, capture_output=True)
         agents_md = tmp / "AGENTS.md"
         agents_md.write_text(
             "# Rules\n- Always use kebab-case for CSS file names.\n",
