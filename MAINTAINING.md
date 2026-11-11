@@ -4,6 +4,8 @@ This guide covers publishing, skill changes, testing, and repository settings fo
 
 The rules in [AGENTS.md](AGENTS.md) apply to all work in this repository.
 
+This repository uses its own installed pipeline skills in `.agents/skills/`. For all development tasks, follow the pipeline skills (`audit-and-planning`, `feature-delivery`, `targeted-module-testing`, `atomic-commits`, `sync-skills-and-docs`). Never edit skills directly in `.agents/skills/`; always edit in `skills/` with maintainer approval and run `python3 scripts/dev.py dogfood sync`.
+
 ## Maintainer toolkit (`scripts/dev.py`)
 
 Maintainer tasks use `scripts/dev.py`:
@@ -62,8 +64,9 @@ Run `python3 scripts/dev.py repo-settings` to audit live repository settings aga
 2. Read the playbook at `maintainers/skills/author-skill/SKILL.md`.
 3. Make approved modifications.
 4. Regenerate `integrity.json` by running `python3 scripts/make_integrity.py`.
-5. Add an entry describing the changes in [CHANGELOG.md](CHANGELOG.md).
-6. Verify changes with `python3 scripts/dev.py check`.
+5. Sync installed dogfood skills: `python3 scripts/dev.py dogfood sync`.
+6. Add an entry describing the changes in [CHANGELOG.md](CHANGELOG.md).
+7. Verify changes with `python3 scripts/dev.py check` and `python3 scripts/dev.py dogfood check`.
 
 ## How to test locally
 

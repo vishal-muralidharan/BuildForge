@@ -165,6 +165,7 @@ def cmd_check(args, repo_root: Path) -> None:
         ("budget", repo_root / "scripts" / "budget.py", []),
         ("trigger_check", repo_root / "scripts" / "trigger_check.py", []),
         ("ci_check", repo_root / "scripts" / "ci_check.py", ["--fast"] if args.fast else []),
+        ("dogfood", repo_root / "scripts" / "dogfood.py", ["check"]),
         ("make_integrity", repo_root / "scripts" / "make_integrity.py", ["--check"]),
     ]
     if not args.fast:
@@ -855,6 +856,16 @@ def cmd_repo_settings(args, repo_root: Path) -> None:
         print("\nBranch protection: cannot read, check the settings page")
 
 
+def cmd_dogfood(args, repo_root: Path) -> None:
+    dogfood_py = repo_root / "scripts" / "dogfood.py"
+    cmd = [sys.executable, str(dogfood_py), args.dogfood_action]
+    if getattr(args, "json", False):
+        cmd.append("--json")
+    res = subprocess.run(cmd, cwd=str(repo_root))
+    if res.returncode != 0:
+        sys.exit(res.returncode)
+
+
 def main():
     repo_root = get_repo_root()
     parser = argparse.ArgumentParser(description="Build Forge Maintainer Developer Toolkit")
@@ -900,6 +911,14 @@ def main():
     # repo-settings
     p_rs = subparsers.add_parser("repo-settings", help="Audit repository settings against merge policy")
 
+    # dogfood
+    p_dogfood = subparsers.add_parser("dogfood", help="Build Forge dogfooding tools")
+    df_subparsers = p_dogfood.add_subparsers(dest="dogfood_action", required=True)
+    p_df_status = df_subparsers.add_parser("status", help="Show dogfood adoption and drift status")
+    p_df_status.add_argument("--json", action="store_true", help="Output as JSON")
+    df_subparsers.add_parser("check", help="Check installed skills against source skills")
+    df_subparsers.add_parser("sync", help="Sync installed skills to match source skills")
+
     args = parser.parse_args()
 
     if args.command == "new-skill":
@@ -918,6 +937,8 @@ def main():
         cmd_trail(args, repo_root)
     elif args.command == "repo-settings":
         cmd_repo_settings(args, repo_root)
+    elif args.command == "dogfood":
+        cmd_dogfood(args, repo_root)
 
 
 if __name__ == "__main__":

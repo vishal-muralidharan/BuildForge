@@ -24,6 +24,23 @@ Hard rules for any AI agent or maintainer working here:
 - Never push to `main` directly.
 - Never merge `main` into a feature branch.
 
+## Task Router
+
+When working on this repository, route tasks through the installed pipeline skills under `.agents/skills/`:
+
+| Maintainer Operation | Pipeline Skill | Playbook / Script |
+|---|---|---|
+| Complete task lifecycle | `.agents/skills/feature-delivery` | `maintainers/skills/branch-dev-protocol` |
+| Author a new skill | `.agents/skills/feature-delivery` | `maintainers/skills/author-skill` |
+| Author an extension or runner | `.agents/skills/rules-to-tests` | `maintainers/skills/author-extension` |
+| Audit and planning | `.agents/skills/audit-and-planning` | `maintainers/skills/triage-field-report` |
+| Find codebase facts | `.agents/skills/repo-search` | `scripts/dev.py impact` |
+| Blueprints maintenance | `.agents/skills/project-blueprints` | `scripts/dev.py check` |
+| Sync docs and dogfood | `.agents/skills/sync-skills-and-docs` | `scripts/dev.py dogfood sync` |
+| Verification | `.agents/skills/targeted-module-testing` | `scripts/dev.py check` |
+| Commit changes | `.agents/skills/atomic-commits` | `maintainers/skills/merge-trail` |
+| Prepare release | `.agents/skills/feature-delivery` | `maintainers/skills/cut-release` |
+
 ## Playbooks
 
 The 6 maintainer playbooks live under `maintainers/skills/`:

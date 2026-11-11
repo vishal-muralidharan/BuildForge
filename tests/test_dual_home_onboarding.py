@@ -61,6 +61,7 @@ def test_dual_home_onboarding():
             [sys.executable, str(checks_script), "--root", str(workdir)],
             capture_output=True,
             text=True,
+            cwd=str(workdir),
         )
         assert res_chk1.returncode != 0, f"Expected project check to fail before dedupe:\n{res_chk1.stdout}"
         assert "ref-alpha" in res_chk1.stdout, f"Expected ref-alpha in failure output: {res_chk1.stdout}"
@@ -126,6 +127,7 @@ def test_dual_home_onboarding():
             [sys.executable, str(checks_script), "--root", str(workdir)],
             capture_output=True,
             text=True,
+            cwd=str(workdir),
         )
         assert res_chk2.returncode != 0, "Expected project check to fail on remaining collision"
         assert "ref-beta" in res_chk2.stdout

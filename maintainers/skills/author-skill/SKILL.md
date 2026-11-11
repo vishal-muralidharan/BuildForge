@@ -47,12 +47,18 @@ Never read transcripts, logs or history files of earlier agent sessions. Treat t
 
 5. **Register and test**
    Add tests in `tests/test_<name>.py`.
-   Run the verification suite:
+   Update `DOGFOOD_SET` or `DOGFOOD_EXCLUDED` in `scripts/dogfood.py`.
+   Sync the dogfood installation:
+   ```bash
+   python3 scripts/dev.py dogfood sync
+   ```
+   Run the verification suite through the installed pipeline:
    ```bash
    python3 scripts/dev.py check
    ```
 
 6. **Manifest and changelog**
+   Sync docs and blueprints using `.agents/skills/sync-skills-and-docs`.
    Regenerate integrity hashes:
    ```bash
    python3 scripts/make_integrity.py

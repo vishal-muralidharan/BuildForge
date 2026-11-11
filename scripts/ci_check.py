@@ -191,7 +191,7 @@ def check_skill_placeholders(skills_dir, errors):
 def check_python_files(repo_root, errors):
     with tempfile.TemporaryDirectory() as tmp:
         for root, dirs, files in os.walk(repo_root):
-            dirs[:] = [d for d in dirs if d not in {".git", "node_modules", "__pycache__"}]
+            dirs[:] = [d for d in dirs if d not in {".git", "node_modules", "__pycache__", ".agents"}]
             for f in files:
                 if f.endswith(".pyc"):
                     continue
@@ -1058,6 +1058,15 @@ def run_package_clean_room_check(repo_root, errors):
             errors.append(f"Package clean room check failed:\n{res.stderr or res.stdout}".strip())
 
 
+def check_dogfood(repo_root, errors):
+    dogfood_script = os.path.join(repo_root, "scripts", "dogfood.py")
+    if not os.path.isfile(dogfood_script):
+        return
+    res = subprocess.run([sys.executable, "-B", dogfood_script, "check"], cwd=repo_root, capture_output=True, text=True)
+    if res.returncode != 0:
+        errors.append(f"Dogfood check failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -1065,6 +1074,7 @@ def main():
     errors = []
 
     print("Running CI checks...")
+    check_dogfood(repo_root, errors)
     check_skills(skills_dir, errors)
     check_skill_placeholders(skills_dir, errors)
     check_triggers_yaml(repo_root, errors)

@@ -2,3 +2,4 @@
 skills/** text eol=lf
 bin/** text eol=lf
 integrity.json linguist-generated=true
+.agents/skills/** linguist-generated=true text eol=lf

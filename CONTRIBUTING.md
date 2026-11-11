@@ -13,6 +13,7 @@ All changes must go through a pull request merged with a merge commit. Follow th
 - No `WIP`, `fixup!`, `squash!`, or "address review" commits.
 - Do not merge `main` into your feature branch.
 - Never squash or rebase merge.
+- `python3 scripts/dev.py dogfood check` passes.
 
 ## Reporting security vulnerabilities
 
