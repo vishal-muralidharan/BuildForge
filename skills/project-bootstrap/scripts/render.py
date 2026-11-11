@@ -435,7 +435,10 @@ def rules(prof, *areas):
 
 def table(headers, rows):
     lines = ["| " + " | ".join(headers) + " |", "|" + "|".join("---" for _ in headers) + "|"]
-    lines += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
+    for row in rows:
+        if not row or not str(row[0]).strip():
+            continue
+        lines.append("| " + " | ".join(str(c) for c in row) + " |")
     return lines
 
 
@@ -589,13 +592,14 @@ def build_skills(p, pn):
 
 
 def render_agents(p, pn, skill_names, root):
+    prof_path = pn if (pn and pn != "." and pn != "()") else ".agents/project-profile.yaml"
     name = g(p, "project.name")
     sdir = g(p, "docs.skills_dir") or ".agents/skills"
     s = p.get("stack") or {}
     stack = ", ".join(str(v) for k, v in s.items() if v and v != "none" and k in ("framework", "bundler", "styling", "backend", "database"))
-    lines = [BANNER.format(profile=pn), "", f"# Agent Guidelines for {name}", "",
+    lines = [BANNER.format(profile=prof_path), "", f"# Agent Guidelines for {name}", "",
              f"{g(p, 'project.summary')}" + (f" Stack: {stack}." if stack else ""), "",
-             f"Read the skill listed for each area before you touch it. Skills live in `{sdir}`. Facts live in `{pn}`. Rule details live in the skills. Do not copy them here. If your agent does not load skills on its own, open the skill file named in the table.", "",
+             f"Read the skill listed for each area before you touch it. Skills live in `{sdir}`. Facts live in `{prof_path}`. Rule details live in the skills. Do not copy them here. If your agent does not load skills on its own, open the skill file named in the table.", "",
              "## Areas", ""]
     sdir_path = root / sdir
     rows = []
@@ -628,14 +632,19 @@ def render_agents(p, pn, skill_names, root):
         scope_rows = []
         for s in scopes_list:
             if isinstance(s, str):
-                scope_rows.append((f"`{s}`", ""))
-            elif isinstance(s, dict) and s.get("name"):
-                scope_rows.append((f"`{s['name']}`", s.get("purpose", "")))
+                sname = s.strip()
+                if sname:
+                    scope_rows.append((f"`{sname}`", ""))
+            elif isinstance(s, dict):
+                sname = str(s.get("name") or "").strip()
+                if sname:
+                    scope_rows.append((f"`{sname}`", s.get("purpose", "")))
         if scope_rows:
             lines += ["### Scope guide", ""]
             lines += table(["Scope", "Purpose"], scope_rows[:25])
             if len(scope_rows) > 25:
-                lines += ["", f"See the profile (`{pn}`) for the full list of {len(scope_rows)} scopes."]
+                more_count = len(scope_rows) - 25
+                lines += ["", f"{more_count} more scopes: see {prof_path}"]
             lines.append("")
     caps = {k: v for k, v in (p.get("capabilities") or {}).items() if isinstance(v, dict) and v.get("enabled")}
     if caps:
@@ -673,7 +682,8 @@ def render_agents(p, pn, skill_names, root):
 
 
 def render_repo_map(p, pn):
-    lines = [BANNER.format(profile=pn), "", f"# Repo map for {g(p, 'project.name')}", "",
+    prof_path = pn if (pn and pn != "." and pn != "()") else ".agents/project-profile.yaml"
+    lines = [BANNER.format(profile=prof_path), "", f"# Repo map for {g(p, 'project.name')}", "",
              "Maintained by `repo-search` and `sync-skills-and-docs`. Last full scan: TODO", "", "## Layers", ""]
     lines += table(["Path", "Purpose", "Key files"], [(f"`{l['path']}`", l["purpose"], "TODO") for l in g(p, "structure.layers", [])])
     return "\n".join(lines) + "\n"
@@ -711,6 +721,8 @@ def main():
         sys.exit(f"Profile not found: {prof_path}")
     p = yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
     pn = rel_posix(prof_path, root)
+    if not pn or pn == "." or pn == "()":
+        pn = ".agents/project-profile.yaml"
 
     skills_dir = root / (g(p, "docs.skills_dir") or ".agents/skills")
     generated = build_skills(p, pn)
