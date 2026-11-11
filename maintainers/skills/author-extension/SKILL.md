@@ -7,6 +7,9 @@ description: "Guidance for extending Build Forge with new check types, analyzers
 
 Use this playbook when adding an extension to an existing Build Forge skill or runner.
 
+## Privacy Rule
+Never read transcripts, logs or history files of earlier agent sessions. Treat them as private. Ask the user instead.
+
 ## Steps
 
 1. **Pick the recipe**

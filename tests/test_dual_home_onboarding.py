@@ -68,7 +68,7 @@ def test_dual_home_onboarding():
 
         # 3. Run legacy inventory
         res_inv1 = subprocess.run(
-            [sys.executable, str(leg_script), "inventory", "--root", str(workdir)],
+            [sys.executable, str(leg_script), "inventory", "--write", "--root", str(workdir)],
             capture_output=True,
             text=True,
         )
@@ -133,7 +133,7 @@ def test_dual_home_onboarding():
 
         # 8. Re-run legacy inventory
         res_inv2 = subprocess.run(
-            [sys.executable, str(leg_script), "inventory", "--root", str(workdir)],
+            [sys.executable, str(leg_script), "inventory", "--write", "--root", str(workdir)],
             capture_output=True,
             text=True,
         )

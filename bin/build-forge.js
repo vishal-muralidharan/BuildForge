@@ -47,6 +47,13 @@ const AGENTS = [
 
 const POINTER_CONTENT = 'Read AGENTS.md first and follow it. If AGENTS.md does not exist yet, run the project-bootstrap skill at .agents/skills/project-bootstrap/SKILL.md.\n';
 const SUPPORTED_SCHEMA_VERSIONS = [1, 2];
+const BUILD_FORGE_GENERATED_FILES = [
+  'AGENTS.md',
+  'AGENTS.generated.md',
+  '.agents/repo-map.md',
+  '.agents/custom-orphans.md',
+  '.agents/legacy-parity.md',
+];
 
 function hashFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
@@ -1454,6 +1461,83 @@ function doctorCommand(cwd, isJson) {
         }
       }
     } catch (e) {}
+  }
+
+  // 17. Published root check
+  const hasIndexHtml = fs.existsSync(path.join(cwd, 'index.html'));
+  let rootServed = false;
+  if (hasIndexHtml) {
+    const pkgPath = path.join(cwd, 'package.json');
+    let pkgMissingOrNoBuild = false;
+    if (!fs.existsSync(pkgPath)) {
+      pkgMissingOrNoBuild = true;
+    } else {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        if (!pkg.scripts || !pkg.scripts.build) {
+          pkgMissingOrNoBuild = true;
+        }
+      } catch (e) {
+        pkgMissingOrNoBuild = true;
+      }
+    }
+
+    let vercelRoot = false;
+    const vercelPath = path.join(cwd, 'vercel.json');
+    if (fs.existsSync(vercelPath)) {
+      try {
+        const vercel = JSON.parse(fs.readFileSync(vercelPath, 'utf8'));
+        if (['', '.', './'].includes(vercel.outputDirectory)) {
+          vercelRoot = true;
+        }
+      } catch (e) {}
+    }
+
+    let netlifyRoot = false;
+    const netlifyPath = path.join(cwd, 'netlify.toml');
+    if (fs.existsSync(netlifyPath)) {
+      try {
+        const nText = fs.readFileSync(netlifyPath, 'utf8');
+        const m = nText.match(/^\s*publish\s*=\s*["']?([^"'\r\n#]*)["']?/m);
+        if (m && ['', '.', './'].includes(m[1].trim())) {
+          netlifyRoot = true;
+        }
+      } catch (e) {}
+    }
+
+    if (pkgMissingOrNoBuild || vercelRoot || netlifyRoot) {
+      rootServed = true;
+    }
+  }
+
+  if (rootServed) {
+    const candidateFiles = [
+      'AGENTS.md',
+      'AGENTS.generated.md',
+      '.agents/project-profile.yaml',
+      '.agents/build-forge.lock.json',
+      '.agents/legacy-parity.md',
+      '.agents/references.yaml',
+      '.agents/references.lock.json',
+    ];
+    const atRisk = [];
+    for (const f of candidateFiles) {
+      if (fs.existsSync(path.join(cwd, f))) {
+        atRisk.push(f);
+      }
+    }
+    if (atRisk.length === 0 && fs.existsSync(path.join(cwd, '.agents'))) {
+      atRisk.push('.agents');
+    }
+    const riskDetail = atRisk.length > 0 ? ` (${atRisk.join(', ')} at risk)` : '';
+    addCheck(
+      'Published root',
+      'WARN',
+      `The repo root may be published. Files such as .agents/ and AGENTS.md could become public.${riskDetail}`,
+      "The repo root may be published. Files such as .agents/ and AGENTS.md could become public. Check the host's ignore settings."
+    );
+  } else {
+    addCheck('Published root', 'OK', 'Repo root is not served directly or build output is isolated');
   }
 
   const okCount = checks.filter(c => c.status === 'OK').length;

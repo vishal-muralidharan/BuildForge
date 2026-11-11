@@ -11,6 +11,13 @@ All notable changes to Build Forge will be documented in this file.
 - Git merge trail viewer `scripts/dev.py trail` and repository settings auditor `scripts/dev.py repo-settings`.
 - GitHub Actions CI workflow jobs `commit-lint` and `history` enforcing commit messages on pull requests and merge trail on `main`.
 
+### Fixed
+- B1: Legacy import inventory and status are read-only by default and write .agents/legacy-parity.md only when --write is passed.
+- B2: Render scope guide outputs profile path and skips empty scope rows, formatting overflow as N more scopes: see <profile>.
+- B3: Added check_preservation.py to verify non-generated lines across migration, rollout, or update.
+- B4: Added rule forbidding agents from reading transcripts, logs, or history files of earlier sessions to guidelines and playbooks.
+- B5: Added published root check to doctor to warn when repo root containing agent files may be published.
+
 ## [0.2.0] - 2026-11-09
 
 ### Security

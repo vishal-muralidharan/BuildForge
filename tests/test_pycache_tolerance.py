@@ -26,12 +26,12 @@ class TestPycacheTolerance(unittest.TestCase):
             capture_output=True,
         )
 
-        for item in ("package.json", ".gitignore"):
+        for item in ("package.json", ".gitignore", "integrity.json"):
             src = REPO_ROOT / item
             if src.is_file():
                 shutil.copy(src, self.repo_copy / item)
 
-        for folder in ("scripts", "maintainers"):
+        for folder in ("scripts", "maintainers", "skills"):
             src = REPO_ROOT / folder
             if src.is_dir():
                 shutil.copytree(src, self.repo_copy / folder, dirs_exist_ok=True)

@@ -50,6 +50,14 @@ CONVENTION_SKILLS = {
     "review-db-structure",
 }
 
+BUILD_FORGE_GENERATED_FILES = {
+    "AGENTS.md",
+    "AGENTS.generated.md",
+    ".agents/repo-map.md",
+    ".agents/custom-orphans.md",
+    ".agents/legacy-parity.md",
+}
+
 STAMP_RE = re.compile(r"^<!-- build-forge:generated v1 body=([0-9a-f]{64}) -->\n?", re.MULTILINE)
 CUSTOM_BLOCK_RE = re.compile(
     r"<!-- BEGIN CUSTOM: ([a-z0-9-]{1,40}) -->\n?(.*?)<!-- END CUSTOM: \1 -->\n?",

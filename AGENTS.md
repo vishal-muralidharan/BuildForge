@@ -20,3 +20,4 @@ Hard rules for maintainer tasks:
 - Never run `gh pr merge` with `--squash` or `--rebase`. Always merge with `--merge`.
 - Never push to `main` directly.
 - Never merge `main` into a feature branch.
+- Never read transcripts, logs or history files of earlier agent sessions. Treat them as private. Ask the user instead.

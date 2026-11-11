@@ -38,6 +38,13 @@
         "command": "python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --root . --upgrade-unstamped --dry-run",
         "risk": "low",
         "optional": false
+      },
+      {
+        "id": "legacy-parity-write",
+        "title": "Pass --write to legacy import if tooling expects legacy-parity.md",
+        "command": "python3 .agents/skills/project-bootstrap/scripts/legacy_import.py status --write --root .",
+        "risk": "low",
+        "optional": true
       }
     ]
   }

@@ -313,7 +313,7 @@ def run_grader_test_for_scenario_9(tmp_dir: Path) -> None:
 
     leg_script = repo_root / "skills" / "project-bootstrap" / "scripts" / "legacy_import.py"
     # Create inventory
-    subprocess.run([sys.executable, str(leg_script), "inventory", "--root", str(work_pass)], check=True, capture_output=True)
+    subprocess.run([sys.executable, str(leg_script), "inventory", "--write", "--root", str(work_pass)], check=True, capture_output=True)
     # Parse IDs from ledger and accept all
     ledger_text = (work_pass / ".agents" / "legacy-parity.md").read_text(encoding="utf-8")
     import re
@@ -418,7 +418,7 @@ def run_grader_test_for_scenario_11(tmp_dir: Path) -> None:
     render_script = repo_root / "skills" / "project-bootstrap" / "scripts" / "render.py"
 
     subprocess.run(
-        [sys.executable, "-B", str(leg_script), "inventory", "--root", "."],
+        [sys.executable, "-B", str(leg_script), "inventory", "--write", "--root", "."],
         cwd=str(work_pass),
         check=True,
         capture_output=True,

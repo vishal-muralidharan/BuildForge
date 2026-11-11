@@ -25,7 +25,10 @@ class TestLegacyImportRouting(unittest.TestCase):
         self.td.cleanup()
 
     def run_cmd(self, *args):
-        cmd = [sys.executable, "-B", str(LEGACY_SCRIPT), *args]
+        extra = []
+        if args and args[0] == "inventory" and "--write" not in args:
+            extra = ["--write"]
+        cmd = [sys.executable, "-B", str(LEGACY_SCRIPT), *args, *extra]
         return subprocess.run(
             cmd,
             cwd=str(self.root),

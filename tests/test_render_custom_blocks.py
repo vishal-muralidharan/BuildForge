@@ -13,6 +13,7 @@ sys.dont_write_bytecode = True
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RENDER_PY = REPO_ROOT / "skills" / "project-bootstrap" / "scripts" / "render.py"
 CHECK_SYNC_PY = REPO_ROOT / "skills" / "sync-skills-and-docs" / "scripts" / "check_sync.py"
+sys.path.insert(0, str(REPO_ROOT / "skills" / "project-bootstrap" / "scripts"))
 
 BASE_PROFILE = """schema_version: 1
 
@@ -314,6 +315,92 @@ class TestRenderCustomBlocks(unittest.TestCase):
         res = self.run_render("--update")
         self.assertEqual(res.returncode, 1)
         self.assertIn("ERROR: Duplicate custom block name 'notes' in .agents/skills/build-ui/SKILL.md.", res.stderr)
+
+    def test_11_scope_guide_more_than_25_and_empty_scope_handled_cleanly(self):
+        """B2: Profile with >25 scopes and empty scope names generates clean text without holes."""
+        import render
+
+        # 1. Direct render_agents test with empty scope and empty pn
+        empty_scopes = [
+            {"name": f"mod{i}", "purpose": f"module {i} changes"}
+            for i in range(1, 26)
+        ]
+        empty_scopes.append({"name": "", "purpose": "empty name scope"})
+        empty_scopes.append("")
+        empty_scopes.append({"name": "extra26", "purpose": "extra scope 26"})
+
+        raw_prof = {
+            "project": {"name": "demo-app"},
+            "git": {"commit_format": "conventional", "scopes": empty_scopes}
+        }
+        rendered = render.render_agents(raw_prof, "", {"build-ui"}, self.root)
+        self.assertNotIn("()", rendered)
+        self.assertNotIn("``", rendered)
+        for line in rendered.splitlines():
+            self.assertFalse(line.startswith("|  |"), f"Found empty table cell row: {line}")
+        self.assertIn("1 more scopes: see .agents/project-profile.yaml", rendered)
+
+        # 2. Fixture with 26 valid scopes on disk tested with render, validate, and check_sync
+        scopes = [
+            {"name": f"mod{i}", "purpose": f"module {i} changes"}
+            for i in range(1, 27)
+        ]
+        import yaml
+        prof_data = yaml.safe_load(BASE_PROFILE)
+        prof_data["stack"]["package_manager"] = "npm"
+        prof_data["git"]["scopes"] = scopes
+        prof_data["structure"]["layers"] = [{"path": "src", "purpose": "source code"}]
+
+        (self.root / "src").mkdir(parents=True, exist_ok=True)
+        (self.root / "src" / "tokens.css").write_text(":root { --primary: #000; }\n", encoding="utf-8")
+        (self.root / "src" / "index.js").write_text("console.log('hi');\n", encoding="utf-8")
+        (self.root / "package.json").write_text('{"name": "demo-app", "scripts": {"test": "echo test"}}\n', encoding="utf-8")
+
+        self.profile_path.write_text(yaml.safe_dump(prof_data), encoding="utf-8")
+
+        res = self.run_render()
+        self.assertEqual(res.returncode, 0, f"render failed: {res.stderr}")
+
+        # Check all generated files
+        for f in self.root.rglob("*.md"):
+            if not f.is_file():
+                continue
+            text = f.read_text(encoding="utf-8")
+            self.assertNotIn("()", text, f"Found empty hole '()' in {f}")
+            for line in text.splitlines():
+                self.assertFalse(line.startswith("|  |"), f"Found empty table cell row '{line}' in {f}")
+
+        agents_md = self.root / "AGENTS.md"
+        self.assertTrue(agents_md.is_file())
+        agents_text = agents_md.read_text(encoding="utf-8")
+        self.assertIn("1 more scopes: see .agents/project-profile.yaml", agents_text)
+
+        # Run validate_profile
+        val_py = REPO_ROOT / "skills" / "project-bootstrap" / "scripts" / "validate_profile.py"
+        res_val = subprocess.run(
+            [sys.executable, "-B", str(val_py), "--profile", str(self.profile_path), "--root", str(self.root)],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res_val.returncode, 0, f"validate_profile failed: {res_val.stderr}\n{res_val.stdout}")
+
+        # Run check_sync
+        res_sync = subprocess.run(
+            [sys.executable, "-B", str(CHECK_SYNC_PY), "--profile", str(self.profile_path), "--root", str(self.root)],
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res_sync.returncode, 0, f"check_sync failed: {res_sync.stderr}\n{res_sync.stdout}")
+
+    def test_12_standard_rules_in_agents_md(self):
+        """B4: Generated AGENTS.md contains standard rule forbidding reading transcripts/logs."""
+        res = self.run_render()
+        self.assertEqual(res.returncode, 0, f"render failed: {res.stderr}")
+        agents_md = self.root / "AGENTS.md"
+        self.assertTrue(agents_md.is_file())
+        text = agents_md.read_text(encoding="utf-8")
+        expected_rule = "Never read transcripts, logs or history files of earlier agent sessions. Treat them as private. Ask the user instead."
+        self.assertIn(expected_rule, text)
 
 
 def run_all_render_custom_block_tests():
