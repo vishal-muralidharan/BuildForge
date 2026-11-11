@@ -1025,6 +1025,16 @@ def run_published_root_tests(repo_root, errors):
             errors.append(f"Doctor published root tests failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_installer_bytecode_tests(repo_root, errors):
+    test_path = os.path.join(repo_root, "tests", "test_installer_bytecode.py")
+    if os.path.isfile(test_path):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_path], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"Installer bytecode tests failed:\n{res.stderr or res.stdout}".strip())
+
+
 def run_docs_truth_check(repo_root, errors):
     script_path = os.path.join(repo_root, "scripts", "check_docs_truth.py")
     if os.path.isfile(script_path):
@@ -1163,6 +1173,9 @@ def main():
 
     print("Running doctor published root tests...")
     run_published_root_tests(repo_root, errors)
+
+    print("Running installer bytecode tests...")
+    run_installer_bytecode_tests(repo_root, errors)
 
     print("Running package clean-room checks...")
     run_package_clean_room_check(repo_root, errors)
