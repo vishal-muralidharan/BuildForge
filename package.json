@@ -21,7 +21,9 @@
     "tiers.json",
     "upgrade-notes.json",
     "UPGRADING.md",
-    "README.md"
+    "README.md",
+    "!skills/**/__pycache__",
+    "!skills/**/*.pyc"
   ],
   "keywords": [
     "agents",

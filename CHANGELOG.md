@@ -100,6 +100,7 @@ All notable changes to Build Forge will be documented in this file.
 - Integration test suite `tests/test_check_sync.py` verifying glob normalization, code block isolation, and AST linting rules.
 
 ### Fixed
+- The package excludes python bytecode caches. Repo checks ignore untracked caches.
 - Fixed `check_sync.py` stripping leading dots from paths like `.agents/**` by introducing `strip_dot_slash`.
 - Restricted skill discovery in `check_sync.py` to the Areas table's Skill column, preventing false warnings from the Scope guide table.
 - Restricted scope discovery in `check_sync.py` to the Scope guide table.

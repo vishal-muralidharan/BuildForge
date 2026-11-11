@@ -22,6 +22,25 @@ import sys
 import time
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
+_orig_run = subprocess.run
+
+
+def _run_subprocess(*args, **kwargs):
+    env = kwargs.get("env")
+    if env is None:
+        env = os.environ.copy()
+    else:
+        env = env.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    kwargs["env"] = env
+    return _orig_run(*args, **kwargs)
+
+
+subprocess.run = _run_subprocess
+
 try:
     import yaml
 except ImportError:
@@ -467,8 +486,12 @@ def cmd_fixture(args, repo_root: Path) -> None:
                 for root, dirs, files in os.walk(fdir):
                     if ".git" in dirs:
                         errors.append(f"{fdir.name}: Contains forbidden .git folder at {root}/.git.")
+                    if "__pycache__" in dirs:
+                        dirs.remove("__pycache__")
 
                     for fname in files:
+                        if fname.endswith(".pyc"):
+                            continue
                         p = Path(root, fname)
                         try:
                             rel = p.relative_to(repo_root).as_posix()

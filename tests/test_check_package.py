@@ -99,6 +99,30 @@ class TestCheckPackage(unittest.TestCase):
         output = res.stdout + res.stderr
         self.assertIn(removed_skill, output)
 
+    def test_cache_in_tarball_fails(self):
+        """A cache file inside the packed tarball causes check_package to fail."""
+        pkg_json_path = self.copy_root / "package.json"
+        data = json.loads(pkg_json_path.read_text(encoding="utf-8"))
+        data["files"] = [f for f in data.get("files", []) if not f.startswith("!skills/")]
+        pkg_json_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+        cache_dir = self.copy_root / "skills" / "project-bootstrap" / "scripts" / "__pycache__"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        pyc_file = cache_dir / "bad.cpython-314.pyc"
+        pyc_file.write_bytes(b"bad cache")
+
+        res = subprocess.run(
+            [sys.executable, str(CHECK_PACKAGE_SCRIPT), "--root", str(self.copy_root)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(res.returncode, 0)
+        output = res.stdout + res.stderr
+        self.assertTrue(
+            "bad.cpython-314.pyc" in output or "in tarball but not integrity" in output,
+            f"Expected cache failure in check_package output:\n{output}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
