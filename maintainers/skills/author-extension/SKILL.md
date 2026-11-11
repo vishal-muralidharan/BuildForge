@@ -12,6 +12,8 @@ Never read transcripts, logs or history files of earlier agent sessions. Treat t
 
 ## Steps
 
+Route extension development through the installed pipeline skills in `.agents/skills/` (`audit-and-planning`, `feature-delivery`, `targeted-module-testing`, `atomic-commits`).
+
 1. **Pick the recipe**
    List available maintainer extension recipes:
    ```bash
@@ -54,6 +56,7 @@ Never read transcripts, logs or history files of earlier agent sessions. Treat t
 6. **Run maintainer verification**
    ```bash
    python3 scripts/dev.py check
+   python3 scripts/dev.py dogfood check
    ```
    Update `CHANGELOG.md` under `## [Unreleased]`.
 

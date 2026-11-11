@@ -27,9 +27,10 @@ Use this playbook to prepare a new package release of Build Forge.
    - Check that git working tree is clean.
 
 2. **Execute comprehensive verification**
-   Run the full maintainer test suite:
+   Run the full maintainer test suite through the installed pipeline:
    ```bash
    python3 scripts/dev.py check
+   python3 scripts/dev.py dogfood check
    ```
    Ensure all checks pass with 0 failures.
 
