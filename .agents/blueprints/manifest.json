@@ -1,0 +1,33 @@
+{
+  "analyzers": [
+    "auth",
+    "config",
+    "data",
+    "layout",
+    "tokens",
+    "ui"
+  ],
+  "areas": {
+    "config": {
+      "package.json": "4cd6fb9ee7910c708e03ecb14ccd61534db2a6e6d3e851b24798d3aaa82e9cb8",
+      "tests/fixtures/blueprints/secret-env/src/index.js": "53bfa098673d9534daab48f6a9ae11cfd43e8250d3612868cd7d8e6b9867fba0"
+    },
+    "data": {
+      "tests/fixtures/blueprints/js-tokens-storage/src/storage.js": "a0a5dff3bf9522f946b82fc400532132d41b1f5dbf9e292e2f3e2de535168f6e",
+      "tests/fixtures/blueprints/sql-ts-types/schema.sql": "a653a52112fcb3f0dafdd14d9b7a44c4bafd0520a6b99ae0efbb33f5cd86dd23",
+      "tests/fixtures/blueprints/sql-ts-types/src/types.ts": "62b870f5d7d1b4ba42f72b79a8d04d29a18fd40c634fa71bf0b31521f33e9d5a"
+    },
+    "layout": {},
+    "tokens": {
+      "skills/scaffold-app/assets/tokens.base.css": "18b090a5c0c08aeeceb8a2039a58dad962e1d4c9bb01d924fc9e705e1d491d83",
+      "tests/evals/fixtures/existing-app/src/tokens.css": "01cd99581b479b32e7a4d55d43770ee97181983b97189a190d18eaea25bc5b73",
+      "tests/evals/fixtures/field-adoption/src/tokens.css": "91147f822d98c7a83d4f52813ad51ea013dd1f223c1e746bdcfb79dda6877b59",
+      "tests/fixtures/blueprints/js-tokens-storage/src/theme.css": "756a33abb30329ecfb96554409c9ba3c75874fd1d01fed75d39a27e781d44059",
+      "tests/fixtures/blueprints/tailwind-theme/src/theme.css": "2b50e0fa1cd5bc8eda3cc296e1cb02e1e9e7c64264b9ba005dd40985e9e78f6e",
+      "tests/fixtures/field-adoption/src/tokens.css": "91147f822d98c7a83d4f52813ad51ea013dd1f223c1e746bdcfb79dda6877b59",
+      "tests/fixtures/old-install/src/tokens.css": "9f1b0488a1765a055f1eec1a5bf3e4a1e84e7aa90d5c9935995a94e9fd6bc836"
+    },
+    "ui": {}
+  },
+  "generator_version": "0.2.0"
+}
