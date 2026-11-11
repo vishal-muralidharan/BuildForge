@@ -119,6 +119,7 @@ class TestPycacheTolerance(unittest.TestCase):
                 sys.executable,
                 str(self.repo_copy / "scripts" / "dev.py"),
                 "check",
+                "--fast",
             ],
             cwd=str(self.repo_copy),
             capture_output=True,

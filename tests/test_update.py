@@ -309,7 +309,10 @@ class TestSafeUpdate(unittest.TestCase):
         self.assertIn("[WARN] Upgrade actions:", res_doc.stdout)
 
         # Mark all actions as done
-        for act in ("profile-migrate", "blueprints-init", "rule-packs", "migrate-external-refs", "upgrade-unstamped", "legacy-parity-write"):
+        notes = json.loads((REPO_ROOT / "upgrade-notes.json").read_text(encoding="utf-8"))
+        action_ids = [a["id"] for entry in notes for a in entry.get("actions", [])]
+        self.assertIn("agents-gitignore-caches", action_ids)
+        for act in action_ids:
             res_done = run_node(["upgrade", "done", act], self.project_dir)
             self.assertEqual(res_done.returncode, 0, f"upgrade done failed for {act}: {res_done.stderr}")
 

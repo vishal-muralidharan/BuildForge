@@ -54,6 +54,133 @@ const BUILD_FORGE_GENERATED_FILES = [
   '.agents/custom-orphans.md',
   '.agents/legacy-parity.md',
 ];
+const AGENTS_GITIGNORE_LINES = ['__pycache__/', '*.pyc'];
+
+function shouldSkipCacheEntry(name) {
+  return name === '__pycache__' || name === '.DS_Store' || name.endsWith('.pyc') || name.endsWith('.pyo');
+}
+
+function copySkillDir(src, dest, force = true) {
+  fs.cpSync(src, dest, {
+    recursive: true,
+    force,
+    filter: (s) => {
+      const rel = path.relative(src, s);
+      if (!rel) return true;
+      const parts = rel.split(/[\\/]/);
+      return !parts.some(shouldSkipCacheEntry);
+    }
+  });
+}
+
+function buildPythonEnv(extraEnv = null) {
+  return Object.assign({}, process.env, extraEnv || {}, { PYTHONDONTWRITEBYTECODE: '1' });
+}
+
+function spawnPythonSync(python, args, options = {}) {
+  const opts = Object.assign({}, options, {
+    env: buildPythonEnv(options.env)
+  });
+  return spawnSync(python.cmd, [...python.args, ...args], opts);
+}
+
+function getMissingAgentsGitignoreLines(cwd) {
+  const agentsGitignorePath = path.join(cwd, '.agents', '.gitignore');
+  if (!fs.existsSync(agentsGitignorePath)) {
+    return [...AGENTS_GITIGNORE_LINES];
+  }
+  try {
+    const content = fs.readFileSync(agentsGitignorePath, 'utf8');
+    const existingLines = content.split(/\r?\n/).map(l => l.trim());
+    return AGENTS_GITIGNORE_LINES.filter(req => !existingLines.includes(req));
+  } catch (e) {
+    return [];
+  }
+}
+
+function ensureAgentsGitignore(cwd, noGitignore = false) {
+  if (noGitignore) return;
+  const agentsDir = path.join(cwd, '.agents');
+  if (!fs.existsSync(agentsDir)) return;
+  const agentsGitignorePath = path.join(agentsDir, '.gitignore');
+  try {
+    let content = '';
+    if (fs.existsSync(agentsGitignorePath)) {
+      content = fs.readFileSync(agentsGitignorePath, 'utf8');
+    }
+    const existingLines = content.split(/\r?\n/).map(l => l.trim());
+    const toAdd = AGENTS_GITIGNORE_LINES.filter(req => !existingLines.includes(req));
+    if (toAdd.length === 0) return;
+    if (content.length > 0 && !content.endsWith('\n')) {
+      content += '\n';
+    }
+    content += toAdd.join('\n') + '\n';
+    fs.writeFileSync(agentsGitignorePath, content, 'utf8');
+    console.log(`  ignore added ${toAdd.join(', ')} to .agents/.gitignore`);
+  } catch (e) {
+    // Non-fatal if .agents/.gitignore is not writable
+  }
+}
+
+function getTrackedFiles(cwd) {
+  try {
+    const res = spawnSync('git', ['ls-files', '-z'], { cwd, encoding: 'utf8', timeout: 5000 });
+    if (res.status !== 0) return [];
+    return (res.stdout || '').split('\0').map(s => s.trim().replace(/\\/g, '/')).filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
+
+function isPythonCachePath(relPath) {
+  const norm = relPath.replace(/\\/g, '/');
+  const parts = norm.split('/');
+  return parts.includes('__pycache__') || norm.endsWith('.pyc') || norm.endsWith('.pyo');
+}
+
+function cleanUntrackedSkillCaches(cwd, skillDir, trackedSet) {
+  if (!fs.existsSync(skillDir)) return;
+  function isTrackedFile(absPath) {
+    const rel = path.relative(cwd, absPath).split(path.sep).join('/');
+    if (process.platform === 'win32') {
+      const lower = rel.toLowerCase();
+      for (const t of trackedSet) {
+        if (t.toLowerCase() === lower) return true;
+      }
+      return false;
+    }
+    return trackedSet.has(rel);
+  }
+  function cleanDir(dir, insidePycache) {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (e) {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const isPycache = insidePycache || entry.name === '__pycache__';
+        cleanDir(full, isPycache);
+        if (entry.name === '__pycache__' || insidePycache) {
+          try {
+            if (fs.readdirSync(full).length === 0) {
+              fs.rmdirSync(full);
+            }
+          } catch (e) {}
+        }
+      } else if (entry.isFile()) {
+        if (insidePycache || entry.name.endsWith('.pyc') || entry.name.endsWith('.pyo')) {
+          if (!isTrackedFile(full)) {
+            try { fs.unlinkSync(full); } catch (e) {}
+          }
+        }
+      }
+    }
+  }
+  cleanDir(skillDir, false);
+}
 
 function hashFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
@@ -187,15 +314,12 @@ function pruneObsoleteSkillFiles(packageSkillDir, targetSkillDir, skillName, old
     const list = [];
     if (!fs.existsSync(dir)) return list;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (shouldSkipCacheEntry(entry.name)) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name !== '__pycache__') {
-          list.push(...walkFiles(full));
-        }
+        list.push(...walkFiles(full));
       } else {
-        if (!entry.name.endsWith('.pyc') && entry.name !== '.DS_Store') {
-          list.push(full);
-        }
+        list.push(full);
       }
     }
     return list;
@@ -263,11 +387,12 @@ function generateSkillPatch(packageSkillDir, targetSkillDir, skillName, oldLockD
     const list = [];
     if (!fs.existsSync(dir)) return list;
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (shouldSkipCacheEntry(e.name)) continue;
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
-        if (e.name !== '__pycache__') list.push(...walk(full));
+        list.push(...walk(full));
       } else {
-        if (!e.name.endsWith('.pyc') && e.name !== '.DS_Store') list.push(full);
+        list.push(full);
       }
     }
     return list;
@@ -316,7 +441,7 @@ for rel in sorted(modified_rels):
 sys.stdout.writelines(diff_lines)
 `;
     try {
-      const res = spawnSync(python.cmd, [...python.args, '-c', pyScript, packageSkillDir, targetSkillDir, JSON.stringify(modifiedRels)], {
+      const res = spawnPythonSync(python, ['-c', pyScript, packageSkillDir, targetSkillDir, JSON.stringify(modifiedRels)], {
         encoding: 'utf8',
         maxBuffer: 10 * 1024 * 1024
       });
@@ -457,6 +582,7 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
   const added = [];
   const kept = [];
   for (const name of fs.readdirSync(packageSkillsDir)) {
+    if (shouldSkipCacheEntry(name)) continue;
     const from = path.join(packageSkillsDir, name);
     if (!fs.statSync(from).isDirectory()) continue;
     const to = path.join(targetSkillsDir, name);
@@ -467,7 +593,7 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
     if (force && fs.existsSync(to) && oldLockData) {
       pruneObsoleteSkillFiles(from, to, name, oldLockData, workDir);
     }
-    fs.cpSync(from, to, { recursive: true, force: true });
+    copySkillDir(from, to);
     added.push(name);
   }
 
@@ -584,6 +710,7 @@ function installCommand(cwd, options = {}, legacyAgentsArg = null) {
         // Non-fatal if .gitignore is not writable
       }
     }
+    ensureAgentsGitignore(cwd, noGitignore);
   }
 
   if (agentsArg) {
@@ -632,7 +759,7 @@ function createSymlinkOrCopy(target, linkPath, isDir, label) {
     if (isDir) {
       // Last resort: copy so the agent can at least read the skills.
       const absTarget = path.resolve(path.dirname(linkPath), target);
-      fs.cpSync(absTarget, linkPath, { recursive: true });
+      copySkillDir(absTarget, linkPath);
       process.stderr.write(`Warning: Linking failed for ${label}: ${err.message}. Copied folder instead.\n`);
     } else {
       throw err;
@@ -682,6 +809,7 @@ function linkCommand(cwd, agentsArg) {
         // Real folder exists: add 1 relative symlink per missing skill
         const skills = fs.readdirSync(targetSkillsDir);
         for (const skill of skills) {
+          if (shouldSkipCacheEntry(skill)) continue;
           const srcSkill = path.join(targetSkillsDir, skill);
           if (!fs.statSync(srcSkill).isDirectory()) continue;
 
@@ -754,6 +882,7 @@ function areDirsIdentical(dirA, dirB) {
   const filesB = [];
   function collect(dir, base, list) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (shouldSkipCacheEntry(e.name)) continue;
       const rel = path.join(base, e.name);
       if (e.isDirectory()) collect(path.join(dir, e.name), rel, list);
       else if (e.isFile()) list.push(rel);
@@ -1000,7 +1129,11 @@ function findPythonCommand() {
   ];
   for (const c of candidates) {
     try {
-      const res = spawnSync(c.cmd, [...c.args, '--version'], { encoding: 'utf8', timeout: 5000 });
+      const res = spawnSync(c.cmd, [...c.args, '--version'], {
+        encoding: 'utf8',
+        timeout: 5000,
+        env: buildPythonEnv()
+      });
       if (res.status === 0) {
         const out = ((res.stdout || '') + ' ' + (res.stderr || '')).trim();
         if (out.includes('Python 3')) {
@@ -1039,7 +1172,7 @@ function doctorCommand(cwd, isJson) {
   // 3. PyYAML
   if (python) {
     try {
-      const resYaml = spawnSync(python.cmd, [...python.args, '-c', 'import yaml'], { encoding: 'utf8', timeout: 5000 });
+      const resYaml = spawnPythonSync(python, ['-c', 'import yaml'], { encoding: 'utf8', timeout: 5000 });
       if (resYaml.status === 0) {
         addCheck('PyYAML', 'OK', 'PyYAML is installed');
       } else {
@@ -1103,7 +1236,7 @@ function doctorCommand(cwd, isJson) {
       }
       if (python && fs.existsSync(valScript)) {
         try {
-          const resVal = spawnSync(python.cmd, [...python.args, valScript, '--profile', profilePath, '--root', cwd], {
+          const resVal = spawnPythonSync(python, [valScript, '--profile', profilePath, '--root', cwd], {
             encoding: 'utf8',
             timeout: 10000
           });
@@ -1133,7 +1266,7 @@ function doctorCommand(cwd, isJson) {
     }
     if (python && fs.existsSync(refsScript)) {
       try {
-        const resRefs = spawnSync(python.cmd, [...python.args, refsScript, 'verify', '--root', cwd], {
+        const resRefs = spawnPythonSync(python, [refsScript, 'verify', '--root', cwd], {
           encoding: 'utf8',
           timeout: 10000
         });
@@ -1162,7 +1295,7 @@ function doctorCommand(cwd, isJson) {
     }
     if (python && fs.existsSync(bpScript)) {
       try {
-        const resBp = spawnSync(python.cmd, [...python.args, bpScript, 'stale', '--root', cwd], {
+        const resBp = spawnPythonSync(python, [bpScript, 'stale', '--root', cwd], {
           encoding: 'utf8',
           timeout: 10000
         });
@@ -1225,7 +1358,7 @@ function doctorCommand(cwd, isJson) {
     }
     if (python && fs.existsSync(legScript)) {
       try {
-        const resLeg = spawnSync(python.cmd, [...python.args, legScript, 'status', '--root', cwd], {
+        const resLeg = spawnPythonSync(python, [legScript, 'status', '--root', cwd], {
           encoding: 'utf8',
           timeout: 10000
         });
@@ -1540,6 +1673,41 @@ function doctorCommand(cwd, isJson) {
     addCheck('Published root', 'OK', 'Repo root is not served directly or build output is isolated');
   }
 
+  // 18. Tracked python bytecode check
+  let trackedCaches = [];
+  if (fs.existsSync(path.join(cwd, '.git'))) {
+    trackedCaches = getTrackedFiles(cwd).filter(isPythonCachePath);
+  }
+  if (trackedCaches.length > 0) {
+    const listed = trackedCaches.slice(0, 10);
+    const cmdPaths = listed.map(p => (p.includes(' ') ? `"${p}"` : p)).join(' ');
+    const suffix = trackedCaches.length > 10 ? ` (+${trackedCaches.length - 10} more)` : '';
+    addCheck(
+      'Tracked python bytecode',
+      'WARN',
+      `tracked python bytecode (${trackedCaches.length} path(s)): ${listed.join(', ')}${suffix}`,
+      `git rm --cached ${cmdPaths}`
+    );
+  } else {
+    addCheck('Tracked python bytecode', 'OK', 'No tracked python bytecode found');
+  }
+
+  // 19. Agent caches gitignore check
+  const missingIgnore = getMissingAgentsGitignoreLines(cwd);
+  if (missingIgnore.length > 0) {
+    const detail = !fs.existsSync(path.join(cwd, '.agents', '.gitignore'))
+      ? '.agents/.gitignore not found'
+      : `missing ${missingIgnore.join(', ')} in .agents/.gitignore`;
+    addCheck(
+      'Caches ignore',
+      'WARN',
+      `caches not ignored (${detail})`,
+      'run update (npx @v1006/build-forge update)'
+    );
+  } else {
+    addCheck('Caches ignore', 'OK', '.agents/.gitignore ignores python caches');
+  }
+
   const okCount = checks.filter(c => c.status === 'OK').length;
   const warnCount = checks.filter(c => c.status === 'WARN').length;
   const failCount = checks.filter(c => c.status === 'FAIL').length;
@@ -1647,6 +1815,7 @@ function updateCommand(cwd, options = {}) {
   const adopt = !!options.adopt;
   const keepModified = options.keepModified || new Set();
   const restore = options.restore || new Set();
+  const noGitignore = !!options.noGitignore;
 
   const packageSkillsDir = path.join(__dirname, '..', 'skills');
   const targetSkillsDir = path.join(cwd, '.agents', 'skills');
@@ -1754,6 +1923,7 @@ function updateCommand(cwd, options = {}) {
       process.exit(unresolved.length > 0 ? 1 : 0);
     }
 
+    const trackedSet = fs.existsSync(path.join(cwd, '.git')) ? new Set(getTrackedFiles(cwd)) : new Set();
     // Apply restore
     const skillsToRestore = new Set(restore);
     if (skillsToRestore.has('all')) {
@@ -1764,7 +1934,7 @@ function updateCommand(cwd, options = {}) {
         }
       }
     }
-    if (skillsToRestore.length > 0) {
+    if (skillsToRestore.size > 0) {
       const workDir = path.join(cwd, '.agents', 'work');
       fs.mkdirSync(workDir, { recursive: true });
       for (const name of skillsToRestore) {
@@ -1777,8 +1947,9 @@ function updateCommand(cwd, options = {}) {
             fs.writeFileSync(patchFile, pDiff, 'utf8');
             console.log(`  saved patch: .agents/work/overwritten-${name}.patch`);
           }
+          cleanUntrackedSkillCaches(cwd, targetSkillDir, trackedSet);
         }
-        fs.cpSync(pkgSkillDir, targetSkillDir, { recursive: true, force: true });
+        copySkillDir(pkgSkillDir, targetSkillDir);
         console.log(`  restored skill: ${name}`);
       }
     }
@@ -1786,14 +1957,14 @@ function updateCommand(cwd, options = {}) {
     // Install missing core tier skills
     for (const coreSkill of coreSkills) {
       if (!fs.existsSync(path.join(targetSkillsDir, coreSkill))) {
-        fs.cpSync(path.join(packageSkillsDir, coreSkill), path.join(targetSkillsDir, coreSkill), { recursive: true, force: true });
+        copySkillDir(path.join(packageSkillsDir, coreSkill), path.join(targetSkillsDir, coreSkill));
         console.log(`  installed missing core skill: ${coreSkill}`);
       }
     }
 
     // Write lock file from package expected integrity hashes
     const allInstalledPkgSkills = new Set(
-      fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
+      fs.readdirSync(targetSkillsDir).filter(n => !shouldSkipCacheEntry(n) && fs.existsSync(path.join(packageSkillsDir, n)))
     );
     const newManifest = {};
     for (const skillName of allInstalledPkgSkills) {
@@ -1807,6 +1978,7 @@ function updateCommand(cwd, options = {}) {
     newManifest['_installed'] = Array.from(allInstalledPkgSkills).sort();
     fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
     console.log(`Adopt complete: .agents/build-forge.lock.json written with version ${pkgVersion}.`);
+    ensureAgentsGitignore(cwd, noGitignore);
     return;
   }
 
@@ -1934,6 +2106,8 @@ function updateCommand(cwd, options = {}) {
     }
   }
 
+  const missingAgentsGi = noGitignore ? [] : getMissingAgentsGitignoreLines(cwd);
+
   if (dryRun) {
     console.log(`DRY RUN: update plan for Build Forge ${pkgVersion}:`);
     const hasPendingChanges = (
@@ -1943,6 +2117,7 @@ function updateCommand(cwd, options = {}) {
       differingSkills.length > 0 ||
       availableNonCore.length > 0 ||
       pendingUpgradeActions.length > 0 ||
+      missingAgentsGi.length > 0 ||
       unapproved.length > 0
     );
     if (!hasPendingChanges) {
@@ -1959,6 +2134,9 @@ function updateCommand(cwd, options = {}) {
     }
     if (differingSkills.length > 0) {
       console.log(`  Would update differing skill(s): ${differingSkills.join(', ')}`);
+    }
+    if (missingAgentsGi.length > 0) {
+      console.log(`  Would add to .agents/.gitignore: ${missingAgentsGi.join(', ')}`);
     }
     if (availableNonCore.length > 0) {
       console.log(`  Available optional skill(s) to add: ${availableNonCore.join(', ')}`);
@@ -1977,10 +2155,13 @@ function updateCommand(cwd, options = {}) {
   }
 
   fs.mkdirSync(targetSkillsDir, { recursive: true });
+  const trackedSet = fs.existsSync(path.join(cwd, '.git')) ? new Set(getTrackedFiles(cwd)) : new Set();
 
   // 1. Install missing core tier skills
   for (const coreSkill of missingCore) {
-    fs.cpSync(path.join(packageSkillsDir, coreSkill), path.join(targetSkillsDir, coreSkill), { recursive: true, force: true });
+    const destCore = path.join(targetSkillsDir, coreSkill);
+    cleanUntrackedSkillCaches(cwd, destCore, trackedSet);
+    copySkillDir(path.join(packageSkillsDir, coreSkill), destCore);
     console.log(`  installed missing core skill: ${coreSkill}`);
   }
 
@@ -1999,15 +2180,16 @@ function updateCommand(cwd, options = {}) {
           fs.writeFileSync(patchFile, pDiff, 'utf8');
           console.log(`  saved patch: .agents/work/overwritten-${name}.patch`);
         }
+        cleanUntrackedSkillCaches(cwd, targetSkillDir, trackedSet);
       }
-      fs.cpSync(pkgSkillDir, targetSkillDir, { recursive: true, force: true });
+      copySkillDir(pkgSkillDir, targetSkillDir);
       console.log(`  updated skill: ${name}`);
     }
   }
 
   // 3. Update lockfile: keep package integrity hashes for installed skills
   const allInstalledPkgSkills = new Set(
-    fs.readdirSync(targetSkillsDir).filter(n => fs.existsSync(path.join(packageSkillsDir, n)))
+    fs.readdirSync(targetSkillsDir).filter(n => !shouldSkipCacheEntry(n) && fs.existsSync(path.join(packageSkillsDir, n)))
   );
   const newManifest = {};
   for (const skillName of allInstalledPkgSkills) {
@@ -2021,6 +2203,7 @@ function updateCommand(cwd, options = {}) {
   newManifest['_installed'] = Array.from(allInstalledPkgSkills).sort();
   fs.writeFileSync(lockFilePath, JSON.stringify(newManifest, null, 2) + '\n', 'utf8');
   console.log(`Build Forge: Updated pipeline skills and lockfile to version ${pkgVersion}.`);
+  ensureAgentsGitignore(cwd, noGitignore);
 
   // 4. List available non-core skills
   if (availableNonCore.length > 0) {
@@ -2066,7 +2249,7 @@ function updateCommand(cwd, options = {}) {
   const python = findPythonCommand();
   if (fs.existsSync(profilePath) && fs.existsSync(migrateScript) && python) {
     try {
-      const resPlan = spawnSync(python.cmd, [...python.args, migrateScript, 'plan', '--profile', profilePath, '--root', cwd], {
+      const resPlan = spawnPythonSync(python, [migrateScript, 'plan', '--profile', profilePath, '--root', cwd], {
         encoding: 'utf8',
         timeout: 10000
       });
@@ -2129,7 +2312,7 @@ function addCommand(cwd, skillName) {
     return;
   }
   fs.mkdirSync(dest, { recursive: true });
-  fs.cpSync(src, dest, { recursive: true });
+  copySkillDir(src, dest);
   console.log(`Added skill '${skillName}' to .agents/skills/${skillName}.`);
 
   if (fs.existsSync(lockFilePath)) {
@@ -2246,7 +2429,7 @@ function main() {
   } else if (command === 'outdated') {
     outdatedCommand(cwd, json);
   } else if (command === 'update') {
-    updateCommand(cwd, { dryRun, adopt, keepModified, restore });
+    updateCommand(cwd, { dryRun, adopt, keepModified, restore, noGitignore });
   } else if (command === 'upgrade') {
     const subcmd = positional[1];
     const actionId = positional[2];
@@ -2271,7 +2454,7 @@ function main() {
     console.log('  diff [--patch]');
     console.log('  doctor [--json]');
     console.log('  outdated [--json]');
-    console.log('  update [--dry-run] [--adopt] [--keep-modified <skill>] [--restore <skill>]');
+    console.log('  update [--dry-run] [--adopt] [--keep-modified <skill>] [--restore <skill>] [--no-gitignore]');
     console.log('  upgrade done <action-id>');
     console.log('  add <skill-name>');
     console.log('  remove <skill-name> [--force]');
@@ -2301,5 +2484,9 @@ module.exports = {
   upgradeCommand,
   addCommand,
   removeCommand,
-  listCommand
+  listCommand,
+  shouldSkipCacheEntry,
+  copySkillDir,
+  buildPythonEnv,
+  ensureAgentsGitignore
 };

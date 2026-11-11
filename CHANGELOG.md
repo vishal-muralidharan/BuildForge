@@ -107,6 +107,7 @@ All notable changes to Build Forge will be documented in this file.
 - Integration test suite `tests/test_check_sync.py` verifying glob normalization, code block isolation, and AST linting rules.
 
 ### Fixed
+- Installer, update, and link commands skip `__pycache__`, `.pyc`, `.pyo`, and `.DS_Store` files, create `.agents/.gitignore` for Python caches, clean untracked caches in replaced skills, set `PYTHONDONTWRITEBYTECODE=1` for Python subprocesses, and warn on tracked or unignored caches in `doctor`.
 - The package excludes python bytecode caches. Repo checks ignore untracked caches.
 - Fixed `check_sync.py` stripping leading dots from paths like `.agents/**` by introducing `strip_dot_slash`.
 - Restricted skill discovery in `check_sync.py` to the Areas table's Skill column, preventing false warnings from the Scope guide table.
