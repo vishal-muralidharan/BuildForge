@@ -1080,6 +1080,7 @@ def check_dogfood(repo_root, errors):
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
+    fast_mode = "--fast" in sys.argv
 
     errors = []
 
@@ -1095,69 +1096,71 @@ def main():
     check_dashes(skills_dir, errors)
     check_feature_delivery_workflows(skills_dir, errors)
 
-    print("Running smoke tests...")
-    run_smoke_test(repo_root, errors)
+    if not fast_mode:
+        print("Running smoke tests...")
+        run_smoke_test(repo_root, errors)
 
-    print("Running multi-agent link tests...")
-    run_link_tests(repo_root, errors)
+        print("Running multi-agent link tests...")
+        run_link_tests(repo_root, errors)
 
-    print("Running references system tests...")
-    run_references_tests(repo_root, errors)
+        print("Running references system tests...")
+        run_references_tests(repo_root, errors)
 
-    print("Running vetting scanner tests...")
-    run_vet_tests(repo_root, errors)
+        print("Running vetting scanner tests...")
+        run_vet_tests(repo_root, errors)
 
-    print("Running CLI flags tests...")
-    run_cli_flags_tests(repo_root, errors)
+        print("Running CLI flags tests...")
+        run_cli_flags_tests(repo_root, errors)
 
-    print("Running legacy parity importer fixture tests...")
-    run_legacy_parity_fixture_tests(repo_root, errors)
+        print("Running legacy parity importer fixture tests...")
+        run_legacy_parity_fixture_tests(repo_root, errors)
 
-    print("Running lifecycle integration tests...")
-    run_lifecycle_fixture_tests(repo_root, errors)
+        print("Running lifecycle integration tests...")
+        run_lifecycle_fixture_tests(repo_root, errors)
 
-    print("Running evaluation grader fixture tests...")
-    run_eval_grader_tests(repo_root, errors)
+        print("Running evaluation grader fixture tests...")
+        run_eval_grader_tests(repo_root, errors)
 
-    print("Running render custom blocks integration tests...")
-    run_render_custom_block_tests(repo_root, errors)
+        print("Running render custom blocks integration tests...")
+        run_render_custom_block_tests(repo_root, errors)
 
-    print("Running profile validation tests...")
-    run_validate_profile_tests(repo_root, errors)
+        print("Running profile validation tests...")
+        run_validate_profile_tests(repo_root, errors)
 
-    print("Running suggest scope tests...")
-    run_suggest_scope_tests(repo_root, errors)
+        print("Running suggest scope tests...")
+        run_suggest_scope_tests(repo_root, errors)
 
-    print("Running dual-home onboarding integration tests...")
-    run_dual_home_onboarding_tests(repo_root, errors)
+        print("Running dual-home onboarding integration tests...")
+        run_dual_home_onboarding_tests(repo_root, errors)
 
-    print("Running check_sync tests...")
-    run_check_sync_tests(repo_root, errors)
+        print("Running check_sync tests...")
+        run_check_sync_tests(repo_root, errors)
 
-    print("Running skill contracts tests...")
-    run_skill_contracts_tests(repo_root, errors)
+        print("Running skill contracts tests...")
+        run_skill_contracts_tests(repo_root, errors)
 
-    print("Running project blueprints integration tests...")
-    run_project_blueprints_tests(repo_root, errors)
+        print("Running project blueprints integration tests...")
+        run_project_blueprints_tests(repo_root, errors)
 
-    print("Running field adoption integration tests...")
-    run_field_adoption_tests(repo_root, errors)
+        print("Running field adoption integration tests...")
+        run_field_adoption_tests(repo_root, errors)
 
-    print("Running maintainer tooling tests...")
-    run_maintainer_tooling_tests(repo_root, errors)
+        print("Running maintainer tooling tests...")
+        run_maintainer_tooling_tests(repo_root, errors)
 
-    print("Running hazard sweep tests...")
-    run_hazard_sweep_tests(repo_root, errors)
+        print("Running hazard sweep tests...")
+        run_hazard_sweep_tests(repo_root, errors)
 
-    print("Running rule packs tests...")
-    run_rule_packs_tests(repo_root, errors)
+        print("Running rule packs tests...")
+        run_rule_packs_tests(repo_root, errors)
 
-    print("Running safe update integration tests...")
-    run_update_tests(repo_root, errors)
+        print("Running safe update integration tests...")
+        run_update_tests(repo_root, errors)
 
     print("Running allowlist guard and fixture tests...")
     check_allowlist(repo_root, errors)
-    run_allowlist_fixture_tests(repo_root, errors)
+    if not fast_mode:
+        run_allowlist_fixture_tests(repo_root, errors)
 
     print("Running integrity manifest checks...")
     check_integrity_manifest(repo_root, errors)
@@ -1165,20 +1168,21 @@ def main():
     print("Running docs truth checks...")
     run_docs_truth_check(repo_root, errors)
 
-    print("Running pycache tolerance tests...")
-    run_pycache_tolerance_tests(repo_root, errors)
+    if not fast_mode:
+        print("Running pycache tolerance tests...")
+        run_pycache_tolerance_tests(repo_root, errors)
 
-    print("Running check preservation tests...")
-    run_preservation_tests(repo_root, errors)
+        print("Running check preservation tests...")
+        run_preservation_tests(repo_root, errors)
 
-    print("Running doctor published root tests...")
-    run_published_root_tests(repo_root, errors)
+        print("Running doctor published root tests...")
+        run_published_root_tests(repo_root, errors)
 
-    print("Running installer bytecode tests...")
-    run_installer_bytecode_tests(repo_root, errors)
+        print("Running installer bytecode tests...")
+        run_installer_bytecode_tests(repo_root, errors)
 
-    print("Running package clean-room checks...")
-    run_package_clean_room_check(repo_root, errors)
+        print("Running package clean-room checks...")
+        run_package_clean_room_check(repo_root, errors)
 
     if errors:
         print(f"\nCI checks failed with {len(errors)} error(s):")
