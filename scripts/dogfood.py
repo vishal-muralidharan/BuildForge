@@ -141,7 +141,19 @@ def check_dogfood(repo_root: Path) -> list:
     installed_on_disk = set()
     for entry in agents_skills_dir.iterdir():
         if entry.is_dir() and entry.name not in IGNORED_NAMES:
-            installed_on_disk.add(entry.name)
+            if entry.name in source_skill_dirs:
+                installed_on_disk.add(entry.name)
+            else:
+                # Check if this is a generated convention skill from project profile
+                skill_md = entry / "SKILL.md"
+                if skill_md.is_file():
+                    try:
+                        head = skill_md.read_text(encoding="utf-8", errors="ignore")[:400]
+                        if "<!-- build-forge:generated" in head or "by project-bootstrap" in head:
+                            continue
+                    except Exception:
+                        pass
+                installed_on_disk.add(entry.name)
 
     if sorted(installed_on_disk) != sorted(DOGFOOD_SET):
         missing = sorted(set(DOGFOOD_SET) - set(installed_on_disk))
