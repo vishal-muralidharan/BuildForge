@@ -4,28 +4,6 @@ All notable changes to Build Forge will be documented in this file.
 
 ## [Unreleased]
 
-### Added
-- Merge trail policy and maintainer playbook `maintainers/skills/merge-trail/SKILL.md` enforcing merge commits on `main`.
-- First-parent git history checker `scripts/check_history.py` and baseline file `maintainers/history-baseline.txt`.
-- Conventional commit message validator `scripts/check_commits.py`.
-- Git merge trail viewer `scripts/dev.py trail` and repository settings auditor `scripts/dev.py repo-settings`.
-- GitHub Actions CI workflow jobs `commit-lint` and `history` enforcing commit messages on pull requests and merge trail on `main`.
-
-### Fixed
-- B1: Legacy import inventory and status are read-only by default and write .agents/legacy-parity.md only when --write is passed.
-- B2: Render scope guide outputs profile path and skips empty scope rows, formatting overflow as N more scopes: see <profile>.
-- B3: Added check_preservation.py to verify non-generated lines across migration, rollout, or update.
-- B4: Added rule forbidding agents from reading transcripts, logs, or history files of earlier sessions to guidelines and playbooks.
-- B5: Added published root check to doctor to warn when repo root containing agent files may be published.
-- Core tier in `tiers.json` lists the 10 dogfooded pipeline skills again (`project-bootstrap`, `rules-to-tests` and `targeted-module-testing` had been moved out of core), so `update` installs them and `remove` refuses them without `--force`. New test `tests/test_tiers.py` keeps the core tier equal to the dogfood set.
-- `detect_stack.py` skips agent folders (`.agents`, `.claude`, `.cursor` and similar) when it counts source files, naming, token files and storage hints. Before, it proposed the installed `scaffold-app` token template as the project token file and reported false storage hints. It also answers `--help`. New test `tests/test_detect_stack.py`.
-- `legacy_import.py` skips `.claude/skills` when it is a link or a copy made by `build-forge link`, and treats pointer files written by `link` as generated. Before, the linked Build Forge skills were read as user rules (1,153 statements and 278 false rule candidates on a 4 file app). Similarity checks use cached normalization and cheap upper bounds, so inventory on that app dropped from over 100 seconds to under 1 second with the same decisions. New test `tests/test_legacy_import_links.py`.
-- `validate_profile.py --strict-paths` accepts paths that Build Forge writes itself (`AGENTS.md`, `AGENTS.generated.md`, pointer files, `docs.repo_map` and anything under `.agents/`) before `render.py` creates them. A profile with `stack.package_manager: none` and no commands now passes with a warning, so static sites validate. New test `tests/test_validate_generated_paths.py`.
-- `validate_profile.py`, `render.py`, `check_sync.py`, `check_commit_message.py` and `suggest_scope.py` default `--profile` to `.agents/project-profile.yaml` under `--root` (or the current folder), like `packs.py` and `run_rule_checks.py` already did, and print a clear error when no profile exists. Before, a missing `--profile` exited with code 2. New test `tests/test_profile_default.py`.
-- The profile template starts at `schema_version: 2` with a `blueprints` block, so new projects need no migration. Branch workflows default to `merge_method: merge` in the template, in `branchflow.py` and in the docs, which keeps every commit in the history. New test `tests/test_template_defaults.py`.
-- `build-forge link` explains when `--agents auto` finds no agents, fails on unknown agent ids instead of doing nothing, and reports when every selected agent is already linked. New test `tests/test_link_message.py`.
-- `scripts/dev.py check` no longer lists a `trigger_check` step for a script that does not exist (it always showed SKIP). README names the GitHub issues page for bug reports.
-
 ## [0.2.0] - 2026-11-09
 
 ### Security
@@ -113,6 +91,11 @@ All notable changes to Build Forge will be documented in this file.
 - Markdown scanner `skills/sync-skills-and-docs/scripts/mdscan.py` for section and table extraction that ignores fenced code blocks.
 - Python AST linter `scripts/lint_py.py` that fails on multi-character strip operations without `# strip-chars-ok:` comments and `./` prefixes in glob patterns.
 - Integration test suite `tests/test_check_sync.py` verifying glob normalization, code block isolation, and AST linting rules.
+- Merge trail policy and maintainer playbook `maintainers/skills/merge-trail/SKILL.md` enforcing merge commits on `main`.
+- First-parent git history checker `scripts/check_history.py` and baseline file `maintainers/history-baseline.txt`.
+- Conventional commit message validator `scripts/check_commits.py`.
+- Git merge trail viewer `scripts/dev.py trail` and repository settings auditor `scripts/dev.py repo-settings`.
+- GitHub Actions CI workflow jobs `commit-lint` and `history` enforcing commit messages on pull requests and merge trail on `main`.
 
 ### Fixed
 - Installer, update, and link commands skip `__pycache__`, `.pyc`, `.pyo`, and `.DS_Store` files, create `.agents/.gitignore` for Python caches, clean untracked caches in replaced skills, set `PYTHONDONTWRITEBYTECODE=1` for Python subprocesses, and warn on tracked or unignored caches in `doctor`.
@@ -192,6 +175,19 @@ All notable changes to Build Forge will be documented in this file.
 - Automatic `.gitignore` updating during `build-forge install` to ignore `.agents/work/` and `.agents/vendor/`.
 - CI smoke test coverage for `status`, `diff`, and `.gitignore` auto-ignore in `scripts/ci_check.py`.
 - `check_integrity_manifest` in `scripts/ci_check.py` verifying the skills tree against `integrity.json`.
+- B1: Legacy import inventory and status are read-only by default and write .agents/legacy-parity.md only when --write is passed.
+- B2: Render scope guide outputs profile path and skips empty scope rows, formatting overflow as N more scopes: see <profile>.
+- B3: Added check_preservation.py to verify non-generated lines across migration, rollout, or update.
+- B4: Added rule forbidding agents from reading transcripts, logs, or history files of earlier sessions to guidelines and playbooks.
+- B5: Added published root check to doctor to warn when repo root containing agent files may be published.
+- Core tier in `tiers.json` lists the 10 dogfooded pipeline skills again (`project-bootstrap`, `rules-to-tests` and `targeted-module-testing` had been moved out of core), so `update` installs them and `remove` refuses them without `--force`. New test `tests/test_tiers.py` keeps the core tier equal to the dogfood set.
+- `detect_stack.py` skips agent folders (`.agents`, `.claude`, `.cursor` and similar) when it counts source files, naming, token files and storage hints. Before, it proposed the installed `scaffold-app` token template as the project token file and reported false storage hints. It also answers `--help`. New test `tests/test_detect_stack.py`.
+- `legacy_import.py` skips `.claude/skills` when it is a link or a copy made by `build-forge link`, and treats pointer files written by `link` as generated. Before, the linked Build Forge skills were read as user rules (1,153 statements and 278 false rule candidates on a 4 file app). Similarity checks use cached normalization and cheap upper bounds, so inventory on that app dropped from over 100 seconds to under 1 second with the same decisions. New test `tests/test_legacy_import_links.py`.
+- `validate_profile.py --strict-paths` accepts paths that Build Forge writes itself (`AGENTS.md`, `AGENTS.generated.md`, pointer files, `docs.repo_map` and anything under `.agents/`) before `render.py` creates them. A profile with `stack.package_manager: none` and no commands now passes with a warning, so static sites validate. New test `tests/test_validate_generated_paths.py`.
+- `validate_profile.py`, `render.py`, `check_sync.py`, `check_commit_message.py` and `suggest_scope.py` default `--profile` to `.agents/project-profile.yaml` under `--root` (or the current folder), like `packs.py` and `run_rule_checks.py` already did, and print a clear error when no profile exists. Before, a missing `--profile` exited with code 2. New test `tests/test_profile_default.py`.
+- The profile template starts at `schema_version: 2` with a `blueprints` block, so new projects need no migration. Branch workflows default to `merge_method: merge` in the template, in `branchflow.py` and in the docs, which keeps every commit in the history. New test `tests/test_template_defaults.py`.
+- `build-forge link` explains when `--agents auto` finds no agents, fails on unknown agent ids instead of doing nothing, and reports when every selected agent is already linked. New test `tests/test_link_message.py`.
+- `scripts/dev.py check` no longer lists a `trigger_check` step for a script that does not exist (it always showed SKIP). README names the GitHub issues page for bug reports.
 
 ### Changed
 - Updated `sync-skills-and-docs` guidance and documentation to use `render.py --update` instead of `--force`.
