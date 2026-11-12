@@ -768,13 +768,33 @@ function createSymlinkOrCopy(target, linkPath, isDir, label) {
 }
 
 function linkCommand(cwd, agentsArg) {
-  const selected = resolveSelectedAgents(agentsArg || 'all', cwd);
+  const requested = agentsArg || 'all';
+  const selected = resolveSelectedAgents(requested, cwd);
   const targetSkillsDir = path.join(cwd, '.agents', 'skills');
+  const agentList = AGENTS.map(a => `${a.label} (${a.id})`).join(', ');
 
   if (!fs.existsSync(targetSkillsDir)) {
     console.error('.agents/skills not found. Run install first: npx @v1006/build-forge install');
     process.exit(1);
   }
+
+  if (requested !== 'all' && requested !== 'auto') {
+    const known = new Set(AGENTS.map(a => a.id));
+    const unknown = requested.split(',').map(s => s.trim().toLowerCase()).filter(id => id && !known.has(id));
+    if (unknown.length > 0) {
+      console.error(`Unknown agent id(s): ${unknown.join(', ')}. Available agents: ${agentList}`);
+      process.exit(1);
+    }
+  }
+
+  if (selected.length === 0) {
+    console.log('No coding agent folders or pointer files were found, so nothing was linked.');
+    console.log('Link a specific agent with: npx @v1006/build-forge link --agents <id|all>');
+    console.log(`Available agents: ${agentList}`);
+    return;
+  }
+
+  let changes = 0;
 
   for (const agent of selected) {
     // 1. Pointer file
@@ -784,6 +804,7 @@ function linkCommand(cwd, agentsArg) {
         fs.mkdirSync(path.dirname(ptrPath), { recursive: true });
         fs.writeFileSync(ptrPath, POINTER_CONTENT, 'utf8');
         console.log(`  pointer  ${agent.pointerFile} created for ${agent.label}`);
+        changes += 1;
       }
     }
 
@@ -803,6 +824,7 @@ function linkCommand(cwd, agentsArg) {
         const rel = path.relative(path.dirname(skillsPath), targetSkillsDir);
         createSymlinkOrCopy(rel, skillsPath, true, agent.label);
         console.log(`  link     ${agent.skillsFolder} -> ${rel} for ${agent.label}`);
+        changes += 1;
       } else if (lstat.isSymbolicLink()) {
         // Symlink already exists, no change needed
       } else if (lstat.isDirectory()) {
@@ -819,9 +841,13 @@ function linkCommand(cwd, agentsArg) {
           const rel = path.relative(skillsPath, srcSkill);
           createSymlinkOrCopy(rel, destSkill, true, `${agent.label} (${skill})`);
           console.log(`  link     ${path.join(agent.skillsFolder, skill)} -> ${rel}`);
+          changes += 1;
         }
       }
     }
+  }
+  if (changes === 0) {
+    console.log(`All selected agents are already linked: ${selected.map(a => a.label).join(', ')}.`);
   }
 }
 

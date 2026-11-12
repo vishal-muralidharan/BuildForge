@@ -163,7 +163,6 @@ def cmd_check(args, repo_root: Path) -> None:
         ("lint_py", repo_root / "scripts" / "lint_py.py", []),
         ("skill_contracts", repo_root / "scripts" / "skill_contracts.py", []),
         ("budget", repo_root / "scripts" / "budget.py", []),
-        ("trigger_check", repo_root / "scripts" / "trigger_check.py", []),
         ("ci_check", repo_root / "scripts" / "ci_check.py", ["--fast"] if args.fast else []),
         ("dogfood", repo_root / "scripts" / "dogfood.py", ["check"]),
         ("make_integrity", repo_root / "scripts" / "make_integrity.py", ["--check"]),

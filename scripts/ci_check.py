@@ -1077,6 +1077,17 @@ def check_dogfood(repo_root, errors):
         errors.append(f"Dogfood check failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_unit_test_file(repo_root, errors, filename, label):
+    """Run 1 unittest file under tests/ and record a failure."""
+    test_path = os.path.join(repo_root, "tests", filename)
+    if os.path.isfile(test_path):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_path], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"{label} failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -1180,6 +1191,27 @@ def main():
 
         print("Running installer bytecode tests...")
         run_installer_bytecode_tests(repo_root, errors)
+
+        print("Running tier tests...")
+        run_unit_test_file(repo_root, errors, "test_tiers.py", "Tier tests")
+
+        print("Running stack detection tests...")
+        run_unit_test_file(repo_root, errors, "test_detect_stack.py", "Stack detection tests")
+
+        print("Running legacy import link tests...")
+        run_unit_test_file(repo_root, errors, "test_legacy_import_links.py", "Legacy import link tests")
+
+        print("Running generated path validation tests...")
+        run_unit_test_file(repo_root, errors, "test_validate_generated_paths.py", "Generated path validation tests")
+
+        print("Running profile default tests...")
+        run_unit_test_file(repo_root, errors, "test_profile_default.py", "Profile default tests")
+
+        print("Running profile template tests...")
+        run_unit_test_file(repo_root, errors, "test_template_defaults.py", "Profile template tests")
+
+        print("Running link message tests...")
+        run_unit_test_file(repo_root, errors, "test_link_message.py", "Link message tests")
 
         print("Running package clean-room checks...")
         run_package_clean_room_check(repo_root, errors)

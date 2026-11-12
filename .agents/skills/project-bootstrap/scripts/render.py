@@ -701,9 +701,22 @@ def rel_posix(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
+
+DEFAULT_PROFILE = ".agents/project-profile.yaml"
+
+
+def resolve_profile_arg(profile, root=None) -> str:
+    """Return the profile path. Defaults to .agents/project-profile.yaml under --root or the current folder."""
+    if profile:
+        return profile
+    candidate = Path(root or ".") / DEFAULT_PROFILE
+    if not candidate.is_file():
+        sys.exit(f"ERROR: no profile at {candidate}. Pass --profile <path>.")
+    return str(candidate)
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--profile", required=True)
+    ap.add_argument("--profile", default=None, help="Defaults to .agents/project-profile.yaml under --root")
     ap.add_argument("--root", default=".")
     ap.add_argument("--update", action="store_true", help="Regenerate stamped files while preserving custom blocks; refuse files with hand edits outside blocks")
     ap.add_argument("--salvage", action="store_true", help="Regenerate stamped files and salvage hand edits outside custom blocks into 'salvaged' block")
@@ -716,6 +729,7 @@ def main():
     ap.add_argument("--allow-dirty", action="store_true", help="Allow overwrite/salvage/migration despite uncommitted git changes")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+    a.profile = resolve_profile_arg(a.profile, a.root)
 
     if a.discard_edits and not a.yes_discard:
         sys.exit("ERROR: --discard-edits requires --yes-discard.")

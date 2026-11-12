@@ -14,6 +14,7 @@ Commands:
 import argparse
 import difflib
 import fnmatch
+import functools
 import hashlib
 import json
 import os
@@ -49,6 +50,8 @@ SCRIPT_EXTENSIONS = {
 TEST_DIR_NAMES = {"test", "tests", "__tests__", "fixtures"}
 GENERATOR_BANNER_SNIPPET = "by project-bootstrap"
 GENERATOR_STAMP_MARKER = "<!-- build-forge:generated"
+# Text that `build-forge link` writes into CLAUDE.md, GEMINI.md and other pointer files.
+LINK_POINTER_TEXT = "Read AGENTS.md first and follow it. If AGENTS.md does not exist yet, run the project-bootstrap skill at .agents/skills/project-bootstrap/SKILL.md."
 
 # Documented threshold for matching an existing profile rule:
 # Token overlap (Jaccard similarity of lowercase word tokens) >= 0.50 AND
@@ -78,23 +81,52 @@ def word_tokens(text: str) -> set:
     return set(normalize_text(text).split())
 
 
-def similarity_score(t1: str, t2: str) -> tuple:
-    s1 = normalize_text(t1)
-    s2 = normalize_text(t2)
+@functools.lru_cache(maxsize=None)
+def _normalized(text: str) -> tuple:
+    """Return the normalized text and its token set. Cached because each statement is compared many times."""
+    s = normalize_text(text)
+    return s, frozenset(s.split())
+
+
+def similarity_score(t1: str, t2: str, min_ratio: float = 0.0) -> tuple:
+    """Return (token overlap, difflib ratio).
+
+    When min_ratio is set and a cheap upper bound of the ratio is already below it,
+    the bound is returned instead of the exact ratio. Callers that only compare the
+    ratio against thresholds at or above min_ratio get the same decision, faster.
+    """
+    s1, tokens1 = _normalized(t1)
+    s2, tokens2 = _normalized(t2)
     if not s1 or not s2:
         return 0.0, 0.0
-    tokens1 = set(s1.split())
-    tokens2 = set(s2.split())
     overlap = len(tokens1 & tokens2) / max(1, len(tokens1 | tokens2))
-    ratio = difflib.SequenceMatcher(None, s1, s2).ratio()
-    return overlap, ratio
+    matcher = difflib.SequenceMatcher(None, s1, s2)
+    if min_ratio > 0:
+        bound = matcher.real_quick_ratio()
+        if bound < min_ratio:
+            return overlap, bound
+        bound = matcher.quick_ratio()
+        if bound < min_ratio:
+            return overlap, bound
+    return overlap, matcher.ratio()
+
+
+def is_similar(t1: str, t2: str, overlap_min: float, ratio_with_overlap: float, ratio_alone: float) -> bool:
+    """True when (overlap >= overlap_min and ratio >= ratio_with_overlap) or ratio >= ratio_alone."""
+    s1, tokens1 = _normalized(t1)
+    s2, tokens2 = _normalized(t2)
+    if not s1 or not s2:
+        return False
+    overlap = len(tokens1 & tokens2) / max(1, len(tokens1 | tokens2))
+    needed = min(ratio_with_overlap, ratio_alone) if overlap >= overlap_min else ratio_alone
+    _, ratio = similarity_score(t1, t2, min_ratio=needed)
+    return (overlap >= overlap_min and ratio >= ratio_with_overlap) or ratio >= ratio_alone
 
 
 def is_covered_by_rule(text: str, profile_rules: list) -> tuple:
     for r in profile_rules:
         r_text = r.get("text", "")
-        overlap, ratio = similarity_score(text, r_text)
-        if (overlap >= SIMILARITY_TOKEN_OVERLAP_MIN and ratio >= SIMILARITY_DIFFLIB_MIN) or ratio >= SIMILARITY_DIFFLIB_DIRECT:
+        if is_similar(text, r_text, SIMILARITY_TOKEN_OVERLAP_MIN, SIMILARITY_DIFFLIB_MIN, SIMILARITY_DIFFLIB_DIRECT):
             return True, r.get("id", "rule")
     return False, ""
 
@@ -145,8 +177,11 @@ def is_generated_file(p: Path) -> bool:
     if p.name == "AGENTS.generated.md":
         return True
     try:
-        head = p.read_text(encoding="utf-8", errors="ignore")[:400]
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        head = text[:400]
         if GENERATOR_BANNER_SNIPPET in head or GENERATOR_STAMP_MARKER in head:
+            return True
+        if text.strip() == LINK_POINTER_TEXT:
             return True
     except Exception:
         pass
@@ -332,7 +367,7 @@ def find_and_classify_sources(root: Path, include_skipped: bool = False):
         return len(split_statements(p, root))
 
     # 1. Root agent files
-    for name in ("AGENTS.md", "CLAUDE.md", ".cursorrules", "INSTRUCTIONS.md", ".windsurfrules", ".clinerules"):
+    for name in ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursorrules", "INSTRUCTIONS.md", ".windsurfrules", ".clinerules"):
         p = root / name
         if p.is_file():
             if is_generated_file(p):
@@ -350,8 +385,16 @@ def find_and_classify_sources(root: Path, include_skipped: bool = False):
 
     gh_copilot = root / ".github" / "copilot-instructions.md"
     if gh_copilot.is_file():
-        active_files.append((gh_copilot, "local", "GitHub Copilot instructions"))
-        source_counts["local"] += count_stmts(gh_copilot)
+        if is_generated_file(gh_copilot):
+            cnt = count_stmts(gh_copilot)
+            source_counts["generated"] += cnt
+            skipped_sources.append({
+                "path": ".github/copilot-instructions.md", "class": "generated",
+                "reason": "Pointer file made by link", "count": cnt
+            })
+        else:
+            active_files.append((gh_copilot, "local", "GitHub Copilot instructions"))
+            source_counts["local"] += count_stmts(gh_copilot)
 
     # 2. .cursor/rules
     cursor_rules = root / ".cursor" / "rules"
@@ -363,17 +406,44 @@ def find_and_classify_sources(root: Path, include_skipped: bool = False):
                     source_counts["local"] += count_stmts(p)
 
     # 3. .claude/skills
+    # The link command points .claude/skills (or each skill inside it) at .agents/skills,
+    # or copies the skills when symlinks are not available. Those are Build Forge files, not user rules.
     claude_skills = root / ".claude" / "skills"
+    agents_skills = root / ".agents" / "skills"
+    agents_skills_resolved = agents_skills.resolve()
+
+    def points_into_agents_skills(p: Path) -> bool:
+        try:
+            p.resolve().relative_to(agents_skills_resolved)
+            return True
+        except ValueError:
+            return False
+
+    def record_link(path_label: str, files_root: Path, reason: str) -> None:
+        cnt = 0
+        for fp in sorted(files_root.rglob("*")):
+            if fp.is_file() and fp.suffix.lower() in (".md", ".txt") and not should_ignore_file(fp, files_root):
+                cnt += count_stmts(fp)
+        source_counts["build-forge"] += cnt
+        skipped_sources.append({"path": path_label, "class": "build-forge", "reason": reason, "count": cnt})
+
     if claude_skills.is_dir():
-        for item in sorted(claude_skills.iterdir()):
-            if item.is_symlink():
-                continue
-            if item.is_dir():
-                for p in sorted(item.rglob("*")):
-                    if p.is_file() and p.suffix.lower() in (".md", ".txt"):
-                        if not should_ignore_file(p, item):
-                            active_files.append((p, "local", "Claude skill"))
-                            source_counts["local"] += count_stmts(p)
+        if claude_skills.is_symlink() or points_into_agents_skills(claude_skills):
+            record_link(".claude/skills", claude_skills, "Agent link to .agents/skills")
+        else:
+            for item in sorted(claude_skills.iterdir()):
+                if item.is_symlink():
+                    continue
+                if item.is_dir():
+                    twin = agents_skills / item.name
+                    if twin.is_dir() and compute_dir_hashes(item) == compute_dir_hashes(twin):
+                        record_link(f".claude/skills/{item.name}", item, "Copy of .agents/skills made by link")
+                        continue
+                    for p in sorted(item.rglob("*")):
+                        if p.is_file() and p.suffix.lower() in (".md", ".txt"):
+                            if not should_ignore_file(p, item):
+                                active_files.append((p, "local", "Claude skill"))
+                                source_counts["local"] += count_stmts(p)
 
     # 4. .agents/vendor (always reference, never legacy source)
     vendor_dir = root / ".agents" / "vendor"
@@ -730,8 +800,7 @@ def classify_statement(stmt: dict, seen_statements: list, profile_rules: list, b
 
     # 1. Check duplicate against seen statements
     for prev in seen_statements:
-        ov, rat = similarity_score(text, prev["text"])
-        if (ov >= 0.85 and rat >= 0.85) or rat >= 0.90:
+        if is_similar(text, prev["text"], 0.85, 0.85, 0.90):
             return {
                 "class": "duplicate",
                 "proposed_destination": f"duplicate of {prev['id']}",

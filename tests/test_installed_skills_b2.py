@@ -121,29 +121,29 @@ class TestInstalledSkillsB2(unittest.TestCase):
 
     def test_02_add_extends_installed_list(self):
         """CLI add installs skill and adds it to _installed in the lock."""
-        res_add = subprocess.run(["node", str(CLI_PATH), "add", "targeted-module-testing"], cwd=str(self.tmp), capture_output=True, text=True)
+        res_add = subprocess.run(["node", str(CLI_PATH), "add", "legal-and-settings-pages"], cwd=str(self.tmp), capture_output=True, text=True)
         self.assertEqual(res_add.returncode, 0, f"Add failed: {res_add.stderr}")
 
         lock = json.loads((self.tmp / ".agents" / "build-forge.lock.json").read_text(encoding="utf-8"))
         self.assertIn("_installed", lock)
-        self.assertIn("targeted-module-testing", lock["_installed"])
-        self.assertTrue((self.tmp / ".agents" / "skills" / "targeted-module-testing" / "SKILL.md").is_file())
+        self.assertIn("legal-and-settings-pages", lock["_installed"])
+        self.assertTrue((self.tmp / ".agents" / "skills" / "legal-and-settings-pages" / "SKILL.md").is_file())
 
     def test_03_remove_shrinks_installed_list(self):
         """CLI remove deletes skill from disk, from lock, and shrinks _installed."""
         # First ensure a skill is installed
-        subprocess.run(["node", str(CLI_PATH), "add", "targeted-module-testing"], cwd=str(self.tmp), capture_output=True, text=True)
-        res_rm = subprocess.run(["node", str(CLI_PATH), "remove", "targeted-module-testing"], cwd=str(self.tmp), capture_output=True, text=True)
+        subprocess.run(["node", str(CLI_PATH), "add", "legal-and-settings-pages"], cwd=str(self.tmp), capture_output=True, text=True)
+        res_rm = subprocess.run(["node", str(CLI_PATH), "remove", "legal-and-settings-pages"], cwd=str(self.tmp), capture_output=True, text=True)
         self.assertEqual(res_rm.returncode, 0, f"Remove failed: {res_rm.stderr}")
 
         lock = json.loads((self.tmp / ".agents" / "build-forge.lock.json").read_text(encoding="utf-8"))
         if "_installed" in lock:
-            self.assertNotIn("targeted-module-testing", lock["_installed"])
-        self.assertNotIn("skills/targeted-module-testing/SKILL.md", lock)
-        self.assertFalse((self.tmp / ".agents" / "skills" / "targeted-module-testing").exists())
+            self.assertNotIn("legal-and-settings-pages", lock["_installed"])
+        self.assertNotIn("skills/legal-and-settings-pages/SKILL.md", lock)
+        self.assertFalse((self.tmp / ".agents" / "skills" / "legal-and-settings-pages").exists())
 
         # Removing uninstalled skill exits 1
-        res_un = subprocess.run(["node", str(CLI_PATH), "remove", "targeted-module-testing"], cwd=str(self.tmp), capture_output=True, text=True)
+        res_un = subprocess.run(["node", str(CLI_PATH), "remove", "legal-and-settings-pages"], cwd=str(self.tmp), capture_output=True, text=True)
         self.assertEqual(res_un.returncode, 1)
 
         # Removing core skill without --force exits 1
