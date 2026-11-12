@@ -1198,6 +1198,9 @@ def main():
         print("Running stack detection tests...")
         run_unit_test_file(repo_root, errors, "test_detect_stack.py", "Stack detection tests")
 
+        print("Running legacy import link tests...")
+        run_unit_test_file(repo_root, errors, "test_legacy_import_links.py", "Legacy import link tests")
+
         print("Running package clean-room checks...")
         run_package_clean_room_check(repo_root, errors)
 

@@ -57,7 +57,7 @@
   "skills/project-bootstrap/scripts/check_preservation.py": "24b64eae2c1de8895fadeae7a5d85fb629bec3d246d69d31a9970f9072ccb6de",
   "skills/project-bootstrap/scripts/detect_stack.py": "b954d9c00474283844faf856f3085261e2f4bdf5e5c964c5609146650372145c",
   "skills/project-bootstrap/scripts/hazard_sweep.py": "1a52a3ec8bbf74c4964b12b0f14dcb0f8130392acb14aabc67da10699acf9c51",
-  "skills/project-bootstrap/scripts/legacy_import.py": "bbcefa74a6e29e5ba46dde6efc56eaab272d52b958a0582bd296e31fdbcb48f5",
+  "skills/project-bootstrap/scripts/legacy_import.py": "44064e23862257fc7c522020463cb10f88f321d3e2b57870a732e202d6ccb9ba",
   "skills/project-bootstrap/scripts/migrate_profile.py": "c00668912743bfd4836086643f48e10bc96d50877715fc8d62a39248a41caf7b",
   "skills/project-bootstrap/scripts/packs.py": "430549e6fe53feef780253b6f055db94f838560e168c049c28b0bb3bde4abd02",
   "skills/project-bootstrap/scripts/render.py": "b3e9a40a25b5b2a8c38501096bcd9c5cb589599629f00f3baaa4b39831fef6ea",
