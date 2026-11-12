@@ -18,6 +18,7 @@ All notable changes to Build Forge will be documented in this file.
 - B4: Added rule forbidding agents from reading transcripts, logs, or history files of earlier sessions to guidelines and playbooks.
 - B5: Added published root check to doctor to warn when repo root containing agent files may be published.
 - Core tier in `tiers.json` lists the 10 dogfooded pipeline skills again (`project-bootstrap`, `rules-to-tests` and `targeted-module-testing` had been moved out of core), so `update` installs them and `remove` refuses them without `--force`. New test `tests/test_tiers.py` keeps the core tier equal to the dogfood set.
+- `detect_stack.py` skips agent folders (`.agents`, `.claude`, `.cursor` and similar) when it counts source files, naming, token files and storage hints. Before, it proposed the installed `scaffold-app` token template as the project token file and reported false storage hints. It also answers `--help`. New test `tests/test_detect_stack.py`.
 
 ## [0.2.0] - 2026-11-09
 
