@@ -131,17 +131,17 @@ class TestSafeUpdate(unittest.TestCase):
 
         # Optional skills listed in output
         self.assertIn("Available optional skills:", res.stdout)
-        self.assertIn("add targeted-module-testing", res.stdout)
+        self.assertIn("add legal-and-settings-pages", res.stdout)
 
         # Test add command
-        res_add = run_node(["add", "targeted-module-testing"], self.project_dir)
+        res_add = run_node(["add", "legal-and-settings-pages"], self.project_dir)
         self.assertEqual(res_add.returncode, 0)
-        tmt_file = self.project_dir / ".agents" / "skills" / "targeted-module-testing" / "SKILL.md"
+        tmt_file = self.project_dir / ".agents" / "skills" / "legal-and-settings-pages" / "SKILL.md"
         self.assertTrue(tmt_file.is_file())
 
         # Lockfile updated
         lock = json.loads((self.project_dir / ".agents" / "build-forge.lock.json").read_text(encoding="utf-8"))
-        self.assertIn("skills/targeted-module-testing/SKILL.md", lock)
+        self.assertIn("skills/legal-and-settings-pages/SKILL.md", lock)
 
     def test_04_vendor_references_profile_untouched(self):
         """update never touches .agents/vendor, references, or project-profile.yaml."""

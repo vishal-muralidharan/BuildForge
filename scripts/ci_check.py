@@ -1077,6 +1077,17 @@ def check_dogfood(repo_root, errors):
         errors.append(f"Dogfood check failed:\n{res.stderr or res.stdout}".strip())
 
 
+def run_unit_test_file(repo_root, errors, filename, label):
+    """Run 1 unittest file under tests/ and record a failure."""
+    test_path = os.path.join(repo_root, "tests", filename)
+    if os.path.isfile(test_path):
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        res = subprocess.run([sys.executable, "-B", test_path], cwd=repo_root, capture_output=True, text=True, env=env)
+        if res.returncode != 0:
+            errors.append(f"{label} failed:\n{res.stderr or res.stdout}".strip())
+
+
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     skills_dir = os.path.join(repo_root, "skills")
@@ -1180,6 +1191,9 @@ def main():
 
         print("Running installer bytecode tests...")
         run_installer_bytecode_tests(repo_root, errors)
+
+        print("Running tier tests...")
+        run_unit_test_file(repo_root, errors, "test_tiers.py", "Tier tests")
 
         print("Running package clean-room checks...")
         run_package_clean_room_check(repo_root, errors)
