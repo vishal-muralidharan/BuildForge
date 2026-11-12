@@ -1201,6 +1201,9 @@ def main():
         print("Running legacy import link tests...")
         run_unit_test_file(repo_root, errors, "test_legacy_import_links.py", "Legacy import link tests")
 
+        print("Running generated path validation tests...")
+        run_unit_test_file(repo_root, errors, "test_validate_generated_paths.py", "Generated path validation tests")
+
         print("Running package clean-room checks...")
         run_package_clean_room_check(repo_root, errors)
 

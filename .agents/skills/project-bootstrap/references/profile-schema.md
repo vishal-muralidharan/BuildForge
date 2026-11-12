@@ -19,9 +19,9 @@ File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml
 | `project.mode` | `existing` or `new` | Required. |
 | `project.platforms` | list | web, pwa, desktop, ios, android, cli, api. |
 | `stack.*` | string | `language`, `framework`, `package_manager` are required. Use `none` for slots that do not apply. |
-| `commands.*` | string | Exact shell commands. Empty means not available. `check` must run lint, test and build. Or set all 3 separately. `test_single` uses `{path}`. |
+| `commands.*` | string | Exact shell commands. Empty means not available. `check` must run lint, test and build. Or set all 3 separately. A project with no build tooling sets `stack.package_manager` to `none` and may leave them empty. `test_single` uses `{path}`. |
 | `structure.layers` | list | At least 1. Each has `path` and `purpose`. |
-| `structure.root_allowed` | list | Files and folders allowed in the repo root. |
+| `structure.root_allowed` | list | Files and folders allowed in the repo root. Files that Build Forge writes (`AGENTS.md`, pointer files, `.agents/`) may be listed before they exist. |
 | `structure.tests` | `colocated` or `tests-dir` | Required. |
 | `naming` | list | Each has `item`, `style`, `example`. |
 | `design.*` | mixed | If `enabled` is true, `tokens_file` is required. `enforced_by` names the test or lint rule. |

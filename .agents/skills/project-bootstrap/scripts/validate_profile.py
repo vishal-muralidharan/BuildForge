@@ -70,6 +70,24 @@ def strip_dot_slash(path: str) -> str:
     return p
 
 
+# Files that render.py and `build-forge link` create. A profile may name them before they exist.
+GENERATED_OUTPUTS = {"AGENTS.md", "AGENTS.generated.md", "CLAUDE.md", "GEMINI.md",
+                     ".github/copilot-instructions.md", ".cursorrules", ".windsurfrules", ".agents"}
+
+
+def is_generated_output(pat: str, prof: dict) -> bool:
+    """True when a path or glob names a file or folder that Build Forge itself writes."""
+    norm = strip_dot_slash(pat).rstrip("/")
+    if not norm:
+        return False
+    names = set(GENERATED_OUTPUTS)
+    for field in ("docs.agents_file", "docs.repo_map"):
+        value = get(prof, field)
+        if isinstance(value, str) and value.strip():
+            names.add(strip_dot_slash(value).rstrip("/"))
+    return norm in names or norm.startswith(".agents/")
+
+
 def path_matches(root: Path, pat: str) -> bool:
     norm = strip_dot_slash(pat).rstrip("/")
     if not norm:
@@ -112,7 +130,11 @@ def main():
 
     cmds = get(prof, "commands", {}) or {}
     if not cmds.get("check") and not all(cmds.get(k) for k in ("lint", "test", "build")):
-        errors.append("commands.check is required, or set lint, test and build")
+        if str(get(prof, "stack.package_manager") or "").strip().lower() == "none":
+            warnings.append("no check command: stack.package_manager is none, so the pipeline skips automated checks")
+        else:
+            errors.append("commands.check is required, or set lint, test and build. "
+                          "For a project with no build tooling, set stack.package_manager to none")
     if "{path}" not in (cmds.get("test_single") or "{path}"):
         warnings.append("commands.test_single should contain {path}")
 
@@ -587,13 +609,13 @@ def main():
             if isinstance(sc, dict):
                 sname = sc.get("name", str(sidx))
                 for pidx, pat in enumerate(sc.get("paths", []) or []):
-                    if isinstance(pat, str) and pat:
+                    if isinstance(pat, str) and pat and not is_generated_output(pat, prof):
                         if not path_matches(root_dir, pat):
                             record_issue(f"unmatched path in git.scopes[{sname}].paths[{pidx}]: '{pat}'")
 
         # 4. structure.root_allowed
         for idx, r in enumerate(get(prof, "structure.root_allowed", []) or []):
-            if isinstance(r, str) and r:
+            if isinstance(r, str) and r and not is_generated_output(r, prof):
                 if not path_matches(root_dir, r):
                     record_issue(f"unmatched pattern in structure.root_allowed[{idx}]: '{r}'")
 
