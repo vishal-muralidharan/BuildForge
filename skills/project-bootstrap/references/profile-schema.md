@@ -1,4 +1,4 @@
-# Project profile schema (version 1)
+# Project profile schema (versions 1 and 2)
 
 File: `.agents/project-profile.yaml`. Copy `assets/project-profile.template.yaml` to start. Validate with `scripts/validate_profile.py`.
 
@@ -56,7 +56,7 @@ Opt-in configuration for feature and bug fix branch mode:
 - `mode`: `off`, `ask`, or `always` (default `ask`).
 - `branch_format`: branch name template, default `"<type>/<slug>"`. Type must be in `git.types`, slug must be kebab-case, 40 characters or fewer.
 - `sync`: `merge` or `rebase` (default `merge`).
-- `merge_method`: `squash`, `merge`, or `rebase` (default `squash`).
+- `merge_method`: `merge`, `squash`, or `rebase` (default `merge`, which keeps every commit in the history).
 - `remote`: remote name, default `origin`.
 - `cleanup`: `ask` or `keep` (default `ask`).
 - `worktree`: boolean, default `false`.

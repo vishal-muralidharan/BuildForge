@@ -1207,6 +1207,9 @@ def main():
         print("Running profile default tests...")
         run_unit_test_file(repo_root, errors, "test_profile_default.py", "Profile default tests")
 
+        print("Running profile template tests...")
+        run_unit_test_file(repo_root, errors, "test_template_defaults.py", "Profile template tests")
+
         print("Running package clean-room checks...")
         run_package_clean_room_check(repo_root, errors)
 
