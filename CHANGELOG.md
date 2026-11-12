@@ -24,6 +24,7 @@ All notable changes to Build Forge will be documented in this file.
 - `validate_profile.py`, `render.py`, `check_sync.py`, `check_commit_message.py` and `suggest_scope.py` default `--profile` to `.agents/project-profile.yaml` under `--root` (or the current folder), like `packs.py` and `run_rule_checks.py` already did, and print a clear error when no profile exists. Before, a missing `--profile` exited with code 2. New test `tests/test_profile_default.py`.
 - The profile template starts at `schema_version: 2` with a `blueprints` block, so new projects need no migration. Branch workflows default to `merge_method: merge` in the template, in `branchflow.py` and in the docs, which keeps every commit in the history. New test `tests/test_template_defaults.py`.
 - `build-forge link` explains when `--agents auto` finds no agents, fails on unknown agent ids instead of doing nothing, and reports when every selected agent is already linked. New test `tests/test_link_message.py`.
+- `scripts/dev.py check` no longer lists a `trigger_check` step for a script that does not exist (it always showed SKIP). README names the GitHub issues page for bug reports.
 
 ## [0.2.0] - 2026-11-09
 
