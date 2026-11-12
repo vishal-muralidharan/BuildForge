@@ -102,14 +102,28 @@ def path_matches(root: Path, pat: str) -> bool:
     return False
 
 
+
+DEFAULT_PROFILE = ".agents/project-profile.yaml"
+
+
+def resolve_profile_arg(profile, root=None) -> str:
+    """Return the profile path. Defaults to .agents/project-profile.yaml under --root or the current folder."""
+    if profile:
+        return profile
+    candidate = Path(root or ".") / DEFAULT_PROFILE
+    if not candidate.is_file():
+        sys.exit(f"ERROR: no profile at {candidate}. Pass --profile <path>.")
+    return str(candidate)
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--profile", required=True)
+    ap.add_argument("--profile", default=None, help="Defaults to .agents/project-profile.yaml under --root")
     ap.add_argument("--root", default=None)
     ap.add_argument("--strict", action="store_true")
     ap.add_argument("--strict-paths", action="store_true", help="Treat unmatched paths and globs as errors.")
     ap.add_argument("--strict-claims", action="store_true", help="Treat claim-unverified warnings as errors.")
     a = ap.parse_args()
+    a.profile = resolve_profile_arg(a.profile, a.root)
 
     errors, warnings = [], []
     try:
