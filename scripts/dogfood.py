@@ -29,6 +29,7 @@ DOGFOOD_SET = [
 DOGFOOD_EXCLUDED = [
     "legal-and-settings-pages",
     "product-spec",
+    "project-readme",
     "scaffold-app",
 ]
 
