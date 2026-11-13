@@ -54,6 +54,28 @@ def get_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def register_in_py_collection(path: Path, var: str, name: str) -> bool:
+    """Add a quoted name to a multi-line list or set literal assigned to `var`. Returns True when changed.
+
+    Keeps the existing order. Inserts alphabetically when the collection is already sorted.
+    Exits with a clear message when the literal is not found, so a registry is never skipped silently.
+    """
+    text = path.read_text(encoding="utf-8")
+    m = re.search(r"(^" + re.escape(var) + r"\s*=\s*[\[{]\n)((?:[ \t]+\"[^\"\n]+\",\n)*)(^[\]}])", text, re.M)
+    if not m:
+        sys.exit(f"Error: could not find the multi-line list {var} in {path}. Add '{name}' by hand.")
+    items = re.findall(r'"([^"\n]+)"', m.group(2))
+    if name in items:
+        return False
+    if items == sorted(items):
+        items = sorted(items + [name])
+    else:
+        items.append(name)
+    body = "".join(f'    "{i}",\n' for i in items)
+    path.write_text(text[:m.start(2)] + body + text[m.end(2):], encoding="utf-8")
+    return True
+
+
 def cmd_new_skill(args, repo_root: Path) -> None:
     name = args.name.strip()
     if not re.match(r"^[a-z0-9-]{1,40}$", name):
@@ -111,6 +133,28 @@ def cmd_new_skill(args, repo_root: Path) -> None:
         tiers_data[args.tier].sort()
     tiers_path.write_text(json.dumps(tiers_data, indent=2) + "\n", encoding="utf-8")
 
+    # Documented skill counts ("14 pipeline skills") must follow the number of skills.
+    skill_total = sum(1 for e in (repo_root / "skills").iterdir() if e.is_dir() and (e / "SKILL.md").is_file())
+    for doc in ("README.md", "UPGRADING.md", "MAINTAINING.md", "maintainers/README.md"):
+        doc_path = repo_root / doc
+        if doc_path.is_file():
+            doc_text = doc_path.read_text(encoding="utf-8")
+            new_text = re.sub(r"\b\d+ (pipeline skills?)\b", lambda m: f"{skill_total} {m.group(1)}", doc_text)
+            if new_text != doc_text:
+                doc_path.write_text(new_text, encoding="utf-8")
+
+    # Registries that fail CI when a new skill is missing from them.
+    registered = []
+    dogfood_py = repo_root / "scripts" / "dogfood.py"
+    if dogfood_py.is_file():
+        var = "DOGFOOD_SET" if args.tier == "core" else "DOGFOOD_EXCLUDED"
+        if register_in_py_collection(dogfood_py, var, name):
+            registered.append(f"scripts/dogfood.py {var}")
+    ci_check_py = repo_root / "scripts" / "ci_check.py"
+    if ci_check_py.is_file():
+        if register_in_py_collection(ci_check_py, "ALLOWED_SKILLS", name):
+            registered.append("scripts/ci_check.py ALLOWED_SKILLS")
+
     triggers_path = repo_root / "tests" / "triggers.yaml"
     trigger_lines = (
         f"\n{name}:\n"
@@ -155,7 +199,11 @@ def cmd_new_skill(args, repo_root: Path) -> None:
 
     print(f"Scaffolded skill '{name}' under skills/{name}.")
     print("Added to tiers.json, tests/triggers.yaml, README.md, and CHANGELOG.md.")
+    for entry in registered:
+        print(f"Registered in {entry}.")
     print("Regenerated integrity.json.")
+    if args.tier == "core":
+        print("Core tier skills are dogfooded. Run: python3 scripts/dev.py dogfood sync")
 
 
 def cmd_check(args, repo_root: Path) -> None:

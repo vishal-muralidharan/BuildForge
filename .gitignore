@@ -20,3 +20,17 @@ __pycache__/
 # OS artifacts
 .DS_Store
 Thumbs.db
+
+# Local development pipeline (not published)
+.agents/
+.claude/
+.cursor/
+.windsurf/
+.gemini/
+.cursorrules
+.windsurfrules
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+AGENTS.generated.md
+.github/copilot-instructions.md

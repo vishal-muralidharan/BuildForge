@@ -60,7 +60,7 @@ cp -r skills .agents/skills
 
 ### What install writes
 
-The installer copies the 13 pipeline skills into `.agents/skills/`. It writes `.agents/build-forge.lock.json` with a hash of every pipeline skill file.
+The installer copies the 14 pipeline skills into `.agents/skills/`. It writes `.agents/build-forge.lock.json` with a hash of every pipeline skill file.
 
 ### Overwrite existing skills
 
@@ -289,7 +289,7 @@ The pipeline is goal-oriented rather than task-oriented: it does not stop merely
 AGENTS.md                       # Generated: Router read by agents
 ```
 
-- **Build Forge files**: The 13 pipeline skills in `.agents/skills/` and `.agents/build-forge.lock.json`. These are read only files from the npm package.
+- **Build Forge files**: The 14 pipeline skills in `.agents/skills/` and `.agents/build-forge.lock.json`. These are read only files from the npm package.
 - **Generated files**: `.agents/project-profile.yaml`, `AGENTS.md`, `.agents/repo-map.md`, `.agents/checks/`, and convention skills like `build-ui`. These files adapt to your project, belong to you, and may be edited freely.
 
 ## Skills
@@ -803,7 +803,7 @@ This deletes and recopies pipeline skills. Any extra files added inside pipeline
 
 ### Uninstall
 
-1. Delete the 13 pipeline skill folders from `.agents/skills/`.
+1. Delete the 14 pipeline skill folders from `.agents/skills/`.
 2. Delete `.agents/build-forge.lock.json`.
 
 All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention skills, and the repo map) remain in your repository and stay yours.

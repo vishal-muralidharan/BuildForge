@@ -110,6 +110,28 @@ def check_docs_truth(repo_root: Path) -> tuple:
     return bf_results, py_results, missing_count
 
 
+def check_skill_counts(repo_root: Path) -> list:
+    """Return error strings for docs that state a pipeline skill count different from skills/."""
+    skills_dir = repo_root / "skills"
+    if not skills_dir.is_dir():
+        return []
+    actual = sum(1 for e in skills_dir.iterdir() if e.is_dir() and (e / "SKILL.md").is_file())
+    errors = []
+    count_re = re.compile(r"\b(\d+) pipeline skills?\b")
+    for df in find_doc_files(repo_root):
+        if skills_dir in df.parents:
+            continue
+        try:
+            content = df.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        for n, line in enumerate(content.splitlines(), 1):
+            for m in count_re.finditer(line):
+                if int(m.group(1)) != actual:
+                    errors.append(f"{df.relative_to(repo_root).as_posix()}:{n}: says {m.group(1)} pipeline skills, skills/ has {actual}")
+    return errors
+
+
 def main():
     parser = argparse.ArgumentParser(description="Verify documentation truth for Build Forge commands.")
     parser.add_argument("--root", default=None, help="Repository root path")
@@ -133,6 +155,10 @@ def main():
         print(f"{script:<55} [{status:<4}]     {loc_str}")
 
     print("-" * 90)
+    count_errors = check_skill_counts(repo_root)
+    for err in count_errors:
+        print(f"SKILL COUNT: {err}")
+    missing_count += len(count_errors)
     if missing_count > 0:
         print(f"\nDocumentation truth check: FAILED ({missing_count} missing item(s)).")
         sys.exit(1)

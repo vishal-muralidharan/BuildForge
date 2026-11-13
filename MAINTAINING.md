@@ -2,14 +2,25 @@
 
 This guide covers publishing, skill changes, testing, and repository settings for maintainers of `@v1006/build-forge`.
 
-The rules in [AGENTS.md](AGENTS.md) apply to all work in this repository.
+The rules in the local `AGENTS.md` (see Local development pipeline below) and in this guide apply to all work in this repository.
 
 This repository uses its own installed pipeline skills in `.agents/skills/`. For all development tasks, follow the pipeline skills (`audit-and-planning`, `feature-delivery`, `targeted-module-testing`, `atomic-commits`, `sync-skills-and-docs`). Never edit skills directly in `.agents/skills/`; always edit in `skills/` with maintainer approval and run `python3 scripts/dev.py dogfood sync`.
+
+### Local development pipeline (not in git)
+
+The installed pipeline (`.agents/`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and the other agent pointer files) is a local development aid. Git ignores it, so it does not show on GitHub and CI does not use it. After a fresh clone, create it with:
+
+```bash
+python3 scripts/dev.py dogfood sync
+```
+
+Then render the agent files with your coding agent, or copy them from your previous clone. Without them, every script and test in this repository still works. `python3 scripts/dev.py dogfood check` prints `not adopted` and still checks that the skill lists in `scripts/dogfood.py` match `skills/`.
 
 ## Maintainer toolkit (`scripts/dev.py`)
 
 Maintainer tasks use `scripts/dev.py`:
 - Scaffold a new skill: `python3 scripts/dev.py new-skill <name> --tier core|new-app|module [--scripts] [--refs]`
+  `new-skill` also registers the skill in `scripts/dogfood.py` (`DOGFOOD_SET` for core, `DOGFOOD_EXCLUDED` otherwise) and in `ALLOWED_SKILLS` in `scripts/ci_check.py`, so CI does not fail on a missing entry. For a core skill, run `python3 scripts/dev.py dogfood sync` afterward.
 - Run checks: `python3 scripts/dev.py check [--fast]`
 - Search impact: `python3 scripts/dev.py impact <token>`
 - Manage recipes: `python3 scripts/dev.py recipe list | show <name> | verify <name> --arg key=value`
@@ -186,6 +197,10 @@ To keep the test matrix (Ubuntu, macOS, Windows; Node 18, 22) green across all C
    Always provide `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` in test fixture environments so `git commit` succeeds in headless environments.
 5. **Windows shell wildcard expansion**:
    `cmd.exe` on Windows does not expand wildcards like `tests/*.test.js` in `package.json` scripts. Use `node --test` with default recursive discovery rather than file path globs.
+6. **New skills must be registered**:
+   Every folder in `skills/` must appear in `DOGFOOD_SET` or `DOGFOOD_EXCLUDED` (`scripts/dogfood.py`) and in `ALLOWED_SKILLS` (`scripts/ci_check.py`). Use `python3 scripts/dev.py new-skill`, which does both. `tests/test_skill_registry.py` fails when scaffolding leaves a registry out of date.
+7. **"No checks reported" is not proof that a repository has no CI**:
+   GitHub needs several seconds to attach checks to a new pull request. After `gh pr create`, wait until checks appear (for example, poll `gh pr checks` for up to 60 seconds) before treating the pull request as having none.
 
 [CHANGELOG.md](CHANGELOG.md) uses the Keep a Changelog headings.
 
