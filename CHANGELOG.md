@@ -4,6 +4,9 @@ All notable changes to Build Forge will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `project-readme` skill (module tier): writes a README in 1 of 4 styles (`technical`, `showcase`, `minimal`, `api`) from facts in the profile, blueprints, and package files, and keeps the GitHub description, homepage, and topics in `.agents/repo-meta.yaml`. `readme_facts.py` collects the facts and suggests a style and topics. `check_readme.py` checks required sections, scripts, links, images, secrets, placeholders, and GitHub limits, and prints the `gh repo edit` commands with `--print-gh`. New test `tests/test_project_readme.py`.
+
 ## [0.2.0] - 2026-11-09
 
 ### Security

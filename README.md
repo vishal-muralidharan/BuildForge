@@ -266,6 +266,7 @@ The pipeline is goal-oriented rather than task-oriented: it does not stop merely
 ```text
 .agents/
   project-profile.yaml          # Generated: Single source of truth for the project
+  repo-meta.yaml                # project-readme: GitHub description, homepage, and topics
   repo-map.md                   # Generated: Cache of where symbols and files live
   build-forge.lock.json         # Build Forge: Hash manifest of installed pipeline skills
   checks/                       # Generated / user: Project rule checks (run_rule_checks.py)
@@ -276,6 +277,7 @@ The pipeline is goal-oriented rather than task-oriented: it does not stop merely
     feature-delivery/           # Build Forge: Pipeline skill (read only)
     legal-and-settings-pages/   # Build Forge: Pipeline skill (read only)
     product-spec/               # Build Forge: Pipeline skill (read only)
+    project-readme/             # Build Forge: Pipeline skill (read only)
     project-bootstrap/          # Build Forge: Pipeline skill (read only)
     repo-search/                # Build Forge: Pipeline skill (read only)
     rules-to-tests/             # Build Forge: Pipeline skill (read only)
@@ -294,6 +296,7 @@ AGENTS.md                       # Generated: Router read by agents
 
 | Skill | What it does | When to use it |
 |---|---|---|
+| `project-readme` | Writes a README in a style that fits the project (technical, showcase, minimal, or api) from real facts, plus the GitHub description, homepage, and topics. Checks commands, links, secrets, and GitHub limits. | When a repo needs a README, a better first impression, or GitHub description and topics. |
 | `atomic-commits` | Enforces small, single purpose commits with checked messages. | When committing code in a project with a profile, before starting the next unit of work. |
 | `audit-and-planning` | Searches codebase, diagnoses root cause, checks rules, and writes an atomic plan. | Before starting any feature, bug fix or refactor, even for small tasks. |
 | `extend-pipeline` | Extends the pipeline with vetted, pinned third party skills. | When adding external skills, review tools, hosting recipes, or updating references. |
@@ -728,6 +731,19 @@ Removing a reference deletes its installed folder and its configuration entry. I
 `legal-and-settings-pages` creates a Settings page, public legal documents (terms of service, privacy policy), a manage-my-data export page, terms consent on signup, and server-side account deletion.
 
 The generated pages are templates, not legal advice. Laws and regulations change across jurisdictions. Have a qualified person review all generated legal pages before launch.
+
+## README and GitHub page
+
+`project-readme` writes a README that fits the kind of project and stays true to the code. It picks 1 of 4 styles: `technical` for tools and libraries, `showcase` for apps people use, `minimal` for small static sites, and `api` for backend services. It also keeps the GitHub description, homepage, and topics in `.agents/repo-meta.yaml`.
+
+```bash
+npx @v1006/build-forge add project-readme
+python3 .agents/skills/project-readme/scripts/readme_facts.py --root .
+python3 .agents/skills/project-readme/scripts/check_readme.py --root .
+python3 .agents/skills/project-readme/scripts/check_readme.py --root . --print-gh
+```
+
+The check fails on a missing section, a script that does not exist, a broken link or image, a secret-like value, or a description or topic over the GitHub limits. `--print-gh` prints the `gh repo edit` commands. You run them. The skill never changes GitHub settings.
 
 ## Verify your install
 
