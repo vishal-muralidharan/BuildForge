@@ -1217,6 +1217,9 @@ def main():
         print("Running project readme tests...")
         run_unit_test_file(repo_root, errors, "test_project_readme.py", "Project readme tests")
 
+        print("Running skill registry tests...")
+        run_unit_test_file(repo_root, errors, "test_skill_registry.py", "Skill registry tests")
+
         print("Running package clean-room checks...")
         run_package_clean_room_check(repo_root, errors)
 

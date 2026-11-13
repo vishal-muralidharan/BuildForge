@@ -80,14 +80,13 @@ def collect_skill_files(skill_dir: Path) -> dict:
     return files
 
 
-def check_dogfood(repo_root: Path) -> list:
-    """Perform read-only check of installed skills against DOGFOOD_SET and source skills."""
+def check_skill_lists(repo_root: Path) -> list:
+    """Check that every skill in skills/ is listed in DOGFOOD_SET or DOGFOOD_EXCLUDED, and the reverse.
+
+    This needs no installed .agents folder, so it also runs in CI and in fresh clones.
+    """
     errors = []
     skills_dir = repo_root / "skills"
-    agents_skills_dir = repo_root / ".agents" / "skills"
-    lock_file = repo_root / ".agents" / "build-forge.lock.json"
-    integrity_file = repo_root / "integrity.json"
-
     # 1. Check skills/ directory contents against DOGFOOD_SET and DOGFOOD_EXCLUDED
     if not skills_dir.is_dir():
         errors.append(f"Source skills directory missing: {skills_dir}")
@@ -113,6 +112,27 @@ def check_dogfood(repo_root: Path) -> list:
             errors.append(
                 f"skill '{name}' in DOGFOOD_SET or DOGFOOD_EXCLUDED does not exist in skills/"
             )
+
+    return errors
+
+
+def check_dogfood(repo_root: Path) -> list:
+    """Perform read-only check of installed skills against DOGFOOD_SET and source skills."""
+    errors = []
+    skills_dir = repo_root / "skills"
+    agents_skills_dir = repo_root / ".agents" / "skills"
+    lock_file = repo_root / ".agents" / "build-forge.lock.json"
+    integrity_file = repo_root / "integrity.json"
+
+    # 1. Check skills/ against DOGFOOD_SET and DOGFOOD_EXCLUDED
+    errors.extend(check_skill_lists(repo_root))
+    if not skills_dir.is_dir():
+        return errors
+
+    source_skill_dirs = set()
+    for entry in skills_dir.iterdir():
+        if entry.is_dir() and entry.name not in IGNORED_NAMES:
+            source_skill_dirs.add(entry.name)
 
     # 2. Check lock file
     if not lock_file.is_file():
@@ -278,7 +298,14 @@ def cmd_status(args, repo_root: Path) -> int:
 def cmd_check(args, repo_root: Path) -> int:
     state = check_adoption_state(repo_root)
     if state == "not_adopted":
-        print("not adopted")
+        # No local dev pipeline (for example in CI or a fresh clone). The skill lists still must match skills/.
+        errors = check_skill_lists(repo_root) if (repo_root / "skills").is_dir() else []
+        if errors:
+            for err in errors:
+                print(f"DOGFOOD DRIFT: {err}")
+            print("run: python3 scripts/dev.py new-skill <name> --tier <tier> for new skills, or edit the lists in scripts/dogfood.py")
+            return 1
+        print("not adopted (no local dev pipeline). Skill lists match skills/.")
         return 0
     if state == "profile_no_lock":
         print("Error: .agents/project-profile.yaml exists but .agents/build-forge.lock.json is missing.", file=sys.stderr)
