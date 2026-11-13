@@ -42,6 +42,8 @@ gh pr checks <number> --watch
 ```
 All status checks must pass, including `commit-lint`.
 
+Right after `gh pr create`, GitHub may print `no checks reported` for several seconds. That does not mean the repository has no CI. Poll `gh pr checks <number>` for up to 60 seconds until checks appear before you merge.
+
 ### 3. Merge with a Merge Commit
 Run:
 ```bash

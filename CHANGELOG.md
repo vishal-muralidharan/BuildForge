@@ -4,6 +4,15 @@ All notable changes to Build Forge will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- `scripts/dogfood.py check` verifies that every folder in `skills/` is listed in `DOGFOOD_SET` or `DOGFOOD_EXCLUDED` even when no `.agents` folder is installed, as in CI and fresh clones. Before, the check was skipped there and a new skill failed CI only on a machine that had the local pipeline.
+- `python3 scripts/dev.py new-skill` registers the new skill in `scripts/dogfood.py` (`DOGFOOD_SET` for the core tier, `DOGFOOD_EXCLUDED` otherwise) and in `ALLOWED_SKILLS` in `scripts/ci_check.py`. It exits with an error when a registry literal is missing instead of skipping it. It also updates the documented skill count (for example "14 pipeline skills") in `README.md`, `UPGRADING.md`, `MAINTAINING.md`, and `maintainers/README.md`. New test `tests/test_skill_registry.py`.
+- `scripts/check_docs_truth.py` fails when a doc states a pipeline skill count that differs from the number of folders in `skills/`. `README.md` said 13 after `project-readme` made it 14.
+
+### Changed
+- Maintainer docs: the local development pipeline (`.agents/`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and the other agent pointer files) is not tracked in git. `MAINTAINING.md` explains how to recreate it with `python3 scripts/dev.py dogfood sync`.
+- Maintainer docs and the `merge-trail` playbook note that `no checks reported` right after `gh pr create` does not mean a repository has no CI.
+
 ### Added
 - `project-readme` skill (module tier): writes a README in 1 of 4 styles (`technical`, `showcase`, `minimal`, `api`) from facts in the profile, blueprints, and package files, and keeps the GitHub description, homepage, and topics in `.agents/repo-meta.yaml`. `readme_facts.py` collects the facts and suggests a style and topics. `check_readme.py` checks required sections, scripts, links, images, secrets, placeholders, and GitHub limits, and prints the `gh repo edit` commands with `--print-gh`. New test `tests/test_project_readme.py`.
 
