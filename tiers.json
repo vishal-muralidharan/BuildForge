@@ -16,6 +16,7 @@
     "scaffold-app"
   ],
   "module": [
-    "legal-and-settings-pages"
+    "legal-and-settings-pages",
+    "project-readme"
   ]
 }

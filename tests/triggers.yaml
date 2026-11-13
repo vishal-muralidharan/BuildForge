@@ -154,3 +154,15 @@ targeted-module-testing:
     - "write marketing copy"
     - "design ui mockup"
 
+
+project-readme:
+  positive:
+    - "write a readme for this project"
+    - "make the readme catchy for visitors"
+    - "add a github repo description and topics"
+    - "refresh the readme with features and screenshots"
+    - "set up a project page on github"
+  negative:
+    - "fix the failing unit test"
+    - "add a privacy policy page"
+    - "commit the staged changes"
