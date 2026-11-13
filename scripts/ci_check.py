@@ -64,6 +64,7 @@ ALLOWED_SKILLS = {
     "product-spec",
     "project-blueprints",
     "project-bootstrap",
+    "project-readme",
     "repo-search",
     "rules-to-tests",
     "scaffold-app",
@@ -1212,6 +1213,9 @@ def main():
 
         print("Running link message tests...")
         run_unit_test_file(repo_root, errors, "test_link_message.py", "Link message tests")
+
+        print("Running project readme tests...")
+        run_unit_test_file(repo_root, errors, "test_project_readme.py", "Project readme tests")
 
         print("Running package clean-room checks...")
         run_package_clean_room_check(repo_root, errors)
