@@ -204,9 +204,9 @@ To keep the test matrix (Ubuntu, macOS, Windows; Node 18, 22) green across all C
 
 [CHANGELOG.md](CHANGELOG.md) uses the Keep a Changelog headings.
 
-Deprecation policy: [CONFIRM: deprecation policy]
+Deprecation policy: While the version is below 1.0.0, a feature is deprecated in one release and may be removed in the next minor release. The release that deprecates it prints a warning where the feature is used, and records the deprecation in [CHANGELOG.md](CHANGELOG.md) and [UPGRADING.md](UPGRADING.md). From 1.0.0, a deprecated feature stays for at least one minor release and is removed only in a major release.
 
-Publishing roadmap: [CONFIRM: switch the publish workflow to npm trusted publishing, check the current npm docs]
+Publishing roadmap: Move the publish workflow to npm trusted publishing, which needs no stored token. Check the current npm documentation first. Until then, releases are published by hand with a granular npm access token that is created for the release and deleted afterwards.
 
 Note on package provenance: npm provenance generation only works from a public repository. If the repository is ever made private, `--provenance` must be removed from `publish.yml`.
 

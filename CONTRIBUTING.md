@@ -2,11 +2,11 @@
 
 Bug reports and suggestions are welcome.
 
-Code contributions: [CONFIRM: policy. The license does not allow derivative works, so contributions may need a written agreement]
+Code contributions: Pull requests from outside contributors are not accepted at this time, because the license does not allow derivative works. If you want to change something, open an issue first and describe it. A code change can be considered after a written agreement with the copyright holder.
 
 ## Pull requests
 
-All changes must go through a pull request merged with a merge commit. Follow these requirements:
+These rules apply to maintainers, and to anyone who has a written agreement to contribute. All changes must go through a pull request merged with a merge commit. Follow these requirements:
 
 - One branch per task, named `<type>/<slug>`.
 - Commits are clean units with conventional commit subjects (`<type>(<scope>): <subject>`).

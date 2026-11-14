@@ -33,6 +33,18 @@ For skills that differ from the package, pass `--keep-modified <skill>` or `--re
 
 ---
 
+## Upgrading from 0.2.0 to 0.3.0
+
+Build Forge 0.3.0 adds the optional `project-readme` skill. No action is required for existing projects.
+
+To use it:
+```bash
+npx @v1006/build-forge update
+npx @v1006/build-forge add project-readme
+```
+
+`update` refreshes the installed pipeline skills and lists `project-readme` among the optional skills you can add. `add` installs it. The skill writes a README in 1 of 4 styles (`technical`, `showcase`, `minimal`, `api`) and keeps the GitHub description, homepage, and topics in `.agents/repo-meta.yaml`. It never changes GitHub settings. It prints the `gh repo edit` commands for you to run.
+
 ## Upgrading from 0.1.0 to 0.2.0
 
 Build Forge 0.2.0 introduces project blueprints, curated rule packs, and integrity-verified updates.
