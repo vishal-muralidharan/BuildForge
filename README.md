@@ -852,7 +852,7 @@ Build Forge is distributed under the [Build Forge License](LICENSE). Below is a 
 
 - Security issues: See [SECURITY.md](SECURITY.md) for reporting guidelines.
 - Version history: See [CHANGELOG.md](CHANGELOG.md).
-- Contributing: See [CONTRIBUTING.md](CONTRIBUTING.md). [CONFIRM: contribution policy]. The license does not allow derivative works.
+- Contributing: See [CONTRIBUTING.md](CONTRIBUTING.md). Outside pull requests are not accepted for now. The license does not allow derivative works.
 - Bug reports: open an issue at https://github.com/vishal-muralidharan/BuildForge/issues
 
 ## Maintainers
