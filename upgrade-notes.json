@@ -54,6 +54,11 @@
         "optional": true
       }
     ]
+  },
+  {
+    "version": "0.3.0",
+    "since": "0.2.0",
+    "notes": "Build Forge 0.3.0 adds the optional project-readme skill. It writes a README in 1 of 4 styles and keeps the GitHub description, homepage, and topics in .agents/repo-meta.yaml. No action is required for existing projects.",
+    "actions": []
   }
 ]
-
