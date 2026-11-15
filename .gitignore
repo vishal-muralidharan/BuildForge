@@ -34,3 +34,8 @@ GEMINI.md
 AGENTS.md
 AGENTS.generated.md
 .github/copilot-instructions.md
+
+# Environment files: keep secrets out of git
+.env
+.env.*
+!.env.example
