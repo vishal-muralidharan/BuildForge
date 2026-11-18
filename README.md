@@ -439,7 +439,7 @@ python3 .agents/skills/project-bootstrap/scripts/packs.py lint
 
 ### How checks fail the build
 
-Mechanical rules carry a `check` block executed by `run_rule_checks.py`. This runner is hooked into your single `check` command (such as `npm test` or `npm run check`). When an agent or developer violates a check pattern, the build fails immediately. The output shows the rule ID, offending file:line, and a hint explaining how to fix the violation. User-edited rule text is never overwritten on pack updates, and dropped rules remain permanently ignored.
+Mechanical rules carry a `check` block executed by `run_rule_checks.py`. This runner is hooked into your project test command (such as `npm test`). When an agent or developer violates a check pattern, the build fails immediately. The output shows the rule ID, offending file:line, and a hint explaining how to fix the violation. User-edited rule text is never overwritten on pack updates, and dropped rules remain permanently ignored.
 
 ## Project blueprints
 
@@ -846,7 +846,7 @@ Build Forge is distributed under the [Build Forge License](LICENSE). Below is a 
 6. **Ending**: The license ends automatically upon breach of any terms, requiring deletion of all copies.
 7. **No warranty**: The software is provided "as is", without warranty of any kind.
 8. **Limit of liability**: The copyright holder is not liable for any claims or damages arising from use.
-9. **Governing law**: [TODO: governing law and courts]
+9. **Governing law**: Governed by the laws of India, with jurisdiction in the courts of Bengaluru.
 
 ## Support
 
