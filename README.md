@@ -7,6 +7,52 @@ A build pipeline of 12 agent skills for new and existing projects: spec, bootstr
 
 Distributed under the [Build Forge License](LICENSE).
 
+## Install
+
+Run 1 command in your project root:
+
+```bash
+npx @v1006/build-forge install
+```
+
+## Quick Start
+
+Initialize Build Forge and link coding agents in 1 step:
+
+```bash
+npx @v1006/build-forge install --agents auto --yes
+```
+
+## Commands
+
+| Command | Arguments / Flags | Description |
+|---|---|---|
+| `npx @v1006/build-forge install` | `[--force] [--agents <auto\|claude>] [--yes]` | Installs core pipeline skills into `.agents/skills/`. |
+| `npx @v1006/build-forge doctor` | `[--json]` | Diagnoses environment, profile, and skill lock health. |
+| `npx @v1006/build-forge status` | `[--json]` | Displays installation state, agent links, and skill inventory. |
+| `npx @v1006/build-forge diff` | `[<skill>]` | Diffs installed skills against packaged versions. |
+| `npx @v1006/build-forge outdated` | | Checks npm registry for available package updates. |
+| `npx @v1006/build-forge update` | `[--dry-run] [--keep-modified <skill>] [--restore <skill>]` | Safely updates pipeline skills while protecting local edits. |
+| `npx @v1006/build-forge list` | | Lists bundled skills by tier and installation status. |
+| `npx @v1006/build-forge add <skill>` | | Installs an optional skill into `.agents/skills/`. |
+| `npx @v1006/build-forge link` | `[--agents <auto\|claude\|cursor\|windsurf>]` | Symlinks skills for specific AI agent environments. |
+| `npx @v1006/build-forge unlink` | | Removes agent symlinks without deleting skill files. |
+| `npx @v1006/build-forge upgrade done <id>` | | Records completed version upgrade migration actions. |
+
+## Configuration
+
+Build Forge reads `.agents/project-profile.yaml` as the single source of truth. When updating settings, edit the profile and re-render guidance files:
+
+```bash
+python3 .agents/skills/project-bootstrap/scripts/render.py --profile .agents/project-profile.yaml --update
+```
+
+## Compatibility
+
+- **Runtime:** Node.js >= 18, Python 3, PyYAML (`pip install pyyaml`), and git.
+- **Agent platforms:** Works with Claude Code, OpenAI Codex, Gemini CLI, GitHub Copilot, Cursor, and Windsurf. See [COMPATIBILITY.md](COMPATIBILITY.md).
+- **Agent capabilities:** File read, file edit, and shell command execution.
+
 ## What it is
 
 AI agents lose project context across sessions and drift from project rules. Every skill reads 1 project profile file as the single source of truth. New apps and existing projects then follow the same 7 gated pipeline stages from start to finish.
@@ -27,19 +73,7 @@ Project context -> project-bootstrap -> .agents/project-profile.yaml
                       AGENTS.md           Convention skills        repo-map.md
 ```
 
-## Works with
-
-Build Forge works with coding agents that support the open Agent Skills format or read `AGENTS.md`. Confirmed agents include Claude Code, OpenAI Codex, Gemini CLI, GitHub Copilot, Cursor, and Windsurf. See [COMPATIBILITY.md](COMPATIBILITY.md) for setup details, pointer files, and verification status.
-
-## Requirements
-
-- Node.js >= 18 (from package.json engines)
-- Python 3
-- PyYAML (`pip install pyyaml`)
-- git
-- Agent capabilities: The agent must read files, edit files, and run shell commands.
-
-## Install
+## Advanced Installation Options
 
 ### With npx
 
@@ -221,7 +255,7 @@ When a package update introduces a new `schema_version` for `.agents/project-pro
 
 A migration never deletes any rule or field added by the user. Unknown and custom fields are preserved intact. No backup files are created because git tracks the change.
 
-## Quick start
+## Examples
 
 ### Path 1: New app
 
@@ -816,6 +850,10 @@ All generated files (`.agents/project-profile.yaml`, `AGENTS.md`, convention ski
 - Automated deploy capability is disabled by default.
 - `scaffold-app` runs official framework generators and requires network access during scaffolding.
 
+## Upgrading
+
+For version migration notes and release highlights, see [CHANGELOG.md](CHANGELOG.md) and [UPGRADING.md](UPGRADING.md).
+
 ## Troubleshooting
 
 | Problem | Cause | Fix |
@@ -848,12 +886,12 @@ Build Forge is distributed under the [Build Forge License](LICENSE). Below is a 
 8. **Limit of liability**: The copyright holder is not liable for any claims or damages arising from use.
 9. **Governing law**: Governed by the laws of India, with jurisdiction in the courts of Bengaluru.
 
-## Support
+## Contributing and Security
 
-- Security issues: See [SECURITY.md](SECURITY.md) for reporting guidelines.
-- Version history: See [CHANGELOG.md](CHANGELOG.md).
-- Contributing: See [CONTRIBUTING.md](CONTRIBUTING.md). Outside pull requests are not accepted for now. The license does not allow derivative works.
-- Bug reports: open an issue at https://github.com/vishal-muralidharan/BuildForge/issues
+- Security policy: See [SECURITY.md](SECURITY.md) for vulnerability reporting guidelines.
+- Contributing: See [CONTRIBUTING.md](CONTRIBUTING.md). External pull requests are closed for now as the license does not permit derivative works.
+- Changelog: See [CHANGELOG.md](CHANGELOG.md) and [UPGRADING.md](UPGRADING.md).
+- Issues: Report bugs at https://github.com/vishal-muralidharan/BuildForge/issues
 
 ## Maintainers
 
