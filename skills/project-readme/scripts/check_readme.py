@@ -37,8 +37,10 @@ REQUIRED = {
                  ("getting started", "run locally", "quick start", "setup", "installation"),
                  ("tech stack", "built with", "stack")],
     "minimal": [],
-    "api": [("endpoints", "api", "routes"), ("setup", "getting started", "run locally", "installation"),
-            ("environment", "configuration", "config")],
+    "api": [("install", "installation", "setup", "getting started"),
+            ("quick start", "usage", "quickstart", "endpoints", "api", "routes"),
+            ("commands", "options", "cli", "configuration", "config", "environment"),
+            ("license",)],
 }
 IGNORE_DIRS = {"node_modules", "dist", "build", ".git", ".next", "coverage", "venv", ".venv", "__pycache__"}
 SECRET_PATTERNS = [

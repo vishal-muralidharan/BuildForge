@@ -1,41 +1,34 @@
 # README styles
 
-Pick 1 style per project. `readme_facts.py` suggests one with a reason. The user can override it.
+Pick 1 style per project. Every style has a clear target audience, goal, structure, and tone.
 
-| Style | Use for | Tone | Emojis |
-|---|---|---|---|
-| `technical` | CLIs, libraries, frameworks, developer tools | Precise, complete, scannable | None in headings. Status badges are fine. |
-| `showcase` | Apps people use: web apps, mobile apps, extensions | Friendly, visual, benefit first | 1 per feature line, same pattern throughout |
-| `minimal` | Small static sites, portfolios, experiments | Short and clear | Optional, a few at most |
-| `api` | Backends and services without their own UI | Exact and contract focused | None in headings |
+| Style | Used by | Audience |
+|---|---|---|
+| `showcase` | BitHab, Humane, Liefde, NeMo, TeNo, PP | Visitors, recruiters, users |
+| `minimal` | Portfolio | You and quick visitors |
+| `technical` | Razorpay Buildathon | Developers and reviewers |
+| `api` | BuildForge | People who use the tool |
 
-## How the suggestion works
+---
 
-- A `bin` entry, or a package with `main` or `exports` and no UI framework: `technical`.
-- A UI framework (React, Vue, Svelte, Next, Angular, Solid) or a browser extension manifest: `showcase`.
-- A backend framework (FastAPI, Flask, Django, Express, Nest, Hono) and no UI: `api`.
-- An `index.html` at the root and no package manager: `minimal`.
-- A repo with both a UI and a backend: `showcase`, with an API section.
+## 1. Showcase (apps people use)
 
-## Sections per style
+The goal is to make a visitor understand and want the app in 30 seconds.
 
-`check_readme.py` requires the sections marked required. Heading text can vary. The check ignores emojis and case.
+- Title and a 1 line pitch.
+- Live link and a screenshot or GIF.
+- Features: 5 to 8 bullets, each about what the user gets.
+- Tech stack.
+- Getting started: prerequisites, install, env variable names, run.
+- Scripts: dev, test, lint, build.
+- Tests: how to run them and what they cover.
+- Project structure: short.
+- Deployment: where it runs and how.
+- Author and license.
 
-- `technical`: Install (required), Usage or Quick start (required), Requirements or Compatibility (required), Configuration, Commands or CLI reference, Contributing, License (required).
-- `showcase`: Features (required), Getting started or Run locally (required), Tech stack or Built with (required), Screenshots or Demo, Roadmap, License.
-- `minimal`: a title and a 1 or 2 sentence summary (required), then what to look at and how to run it.
-- `api`: Endpoints or API (required), Setup or Getting started (required), Environment or Configuration (required), Error format, License.
+**Tone:** confident, benefits first. The first screen sells the app, and the setup comes after.
 
-## Writing rules for every style
-
-- Lead with the value for the reader, then the how.
-- Short paragraphs, 1 idea each. Lists for features and steps.
-- Every command in a fenced code block, copied from the real scripts.
-- Screenshots with descriptive alt text and relative paths into the repo.
-- Name environment variables from `.env.example`. Never show values.
-- Link the license file instead of restating it.
-
-## Showcase emoji pattern
+### Showcase emoji pattern
 
 Put 1 emoji at the start of each feature line, chosen for meaning, not decoration:
 
@@ -48,3 +41,79 @@ Put 1 emoji at the start of each feature line, chosen for meaning, not decoratio
 ```
 
 Keep emojis out of commands, code blocks, and table headers.
+
+---
+
+## 2. Minimal (small sites)
+
+The goal is to say what it is and how to run it, in about 30 lines.
+
+- Title and 1 line.
+- Live link.
+- How to run or edit it locally.
+- How it deploys.
+- License.
+
+Leave out feature lists, architecture, and structure trees.
+
+---
+
+## 3. Technical (fullstack or backend)
+
+The goal is for a developer to understand how it works and run every part.
+
+- Overview: the problem and the solution.
+- Architecture: components, data flow, a diagram or short description.
+- Tech stack, with the reason for each choice.
+- Setup for each part, such as backend and frontend, and env variable names.
+- How to run and how to test.
+- API endpoints: a short table.
+- Data model.
+- Key decisions and tradeoffs.
+- Known limits.
+- Deployment.
+
+**Tone:** precise and complete. Write for someone who will change the code.
+
+---
+
+## 4. API (CLI or library)
+
+The goal is for a user to install it and succeed in 2 minutes.
+
+- What it is, in 1 line.
+- Install: 1 command.
+- Quick start: 1 example that works when pasted.
+- Commands and options: a table.
+- Configuration.
+- Examples for common tasks.
+- Output and exit codes.
+- Version support and compatibility.
+- Upgrading, with a link to the changelog.
+- Troubleshooting.
+- Contributing, security policy, license.
+
+**Tone:** exact and scannable. Use code blocks that can be copied.
+
+---
+
+## Other common types
+
+- **Library or package:** like API, plus a short reference of the public functions and the install for each package manager.
+- **Monorepo or docs hub:** a map of the folders, what each one does, and how to run all of them.
+- **Profile README (GitHub profile):** who you are, what you work on, links. Keep it short.
+- **Data or research:** the question, the data source, the method, how to reproduce the results, the limits.
+- **Template or starter:** what you get, how to use the template, and what to change first.
+- **Course or final year project:** the problem, the approach, the results, how to run, and the team.
+
+---
+
+## Rules for every README
+
+- The first screen answers what it is, why it matters, and how to start.
+- Every command works exactly as written.
+- Every command and script matches package.json or the project card.
+- Links are relative and point to files that exist. No file:/// links and no local paths such as /Users/....
+- Show env variable names only. Never show values or secrets.
+- Take every fact from the code. Do not invent features.
+- Update the README when a feature changes.
