@@ -884,7 +884,7 @@ Build Forge is distributed under the [Build Forge License](LICENSE). Below is a 
 6. **Ending**: The license ends automatically upon breach of any terms, requiring deletion of all copies.
 7. **No warranty**: The software is provided "as is", without warranty of any kind.
 8. **Limit of liability**: The copyright holder is not liable for any claims or damages arising from use.
-9. **Governing law**: Governed by the laws of India, with jurisdiction in the courts of Bengaluru.
+9. **Governing law**: This license is governed by the laws of India. The courts of Chennai, Tamil Nadu, India have exclusive jurisdiction over any dispute.
 
 ## Contributing and Security
 
